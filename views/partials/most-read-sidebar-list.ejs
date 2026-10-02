@@ -1,0 +1,18 @@
+<% (items || []).forEach(function (item) { %>
+<li class="most-read-sidebar__item">
+  <a href="<%= item.href %>" class="most-read-sidebar__link group">
+    <span class="most-read-sidebar__thumb">
+      <img
+        src="<%= item.image %>"
+        alt=""
+        loading="lazy"
+        fetchpriority="low"
+        decoding="async"
+        class="most-read-sidebar__img"
+        data-object-position="<%= item.heroPosition || '50% 50%' %>"
+      />
+    </span>
+    <span class="most-read-sidebar__title font-article-title min-w-0 flex-1 text-white group-hover:text-11accent"><%= item.title %></span>
+  </a>
+</li>
+<% }); %>

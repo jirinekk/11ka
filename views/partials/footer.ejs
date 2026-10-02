@@ -1,0 +1,119 @@
+  <footer class="mt-auto border-t border-white/10 bg-[#080c14]">
+    <div class="mx-auto max-w-7xl px-4 py-10 lg:px-6">
+      <div class="site-footer__top">
+        <a href="/" class="site-footer__logo inline-flex" aria-label="11ka domů">
+          <img src="/logo.png" alt="11ka" class="h-8 w-auto" />
+        </a>
+        <nav class="site-footer__nav" aria-label="Patička">
+          <a href="/kontakt">Kontakt</a>
+          <a href="/spoluprace">Spolupráce</a>
+          <a href="/redakce">Redakce</a>
+          <a href="/11ka-pomaha">11ka Pomáhá</a>
+          <a href="/podminky-uziti">Podmínky užití</a>
+          <a href="/ochrana-osobnich-udaju">Ochrana osobních údajů</a>
+          <a href="/cookies">Cookies</a>
+          <button type="button" data-cookie-settings-open aria-controls="cookie-banner" aria-expanded="false">Upravit nastavení cookies</button>
+        </nav>
+      </div>
+      <div class="site-footer__legal">
+        <div class="site-footer__meta">
+          <div class="site-footer__developer">
+            <span class="site-footer__meta-kicker">Vývojář</span>
+            <p class="site-footer__operator-name"><a href="https://danielsmrz.dev/" target="_blank" rel="noopener" class="site-footer__meta-link">Daniel Smrž</a></p>
+            <p class="site-footer__operator-detail">
+              <a href="mailto:danielsmrz25@gmail.com" class="site-footer__meta-link">danielsmrz25@gmail.com</a>
+            </p>
+          </div>
+          <div class="site-footer__operator">
+            <span class="site-footer__meta-kicker">Provozovatel</span>
+            <p class="site-footer__operator-name">Aneta Kozelková</p>
+            <p class="site-footer__operator-detail">Havlíčkova 1113, 547 01 Náchod · IČO 76075087</p>
+            <p class="site-footer__operator-detail">Fyzická osoba podnikající dle živnostenského zákona · MEU Náchod</p>
+          </div>
+          <p class="site-footer__copyright">© <%= new Date().getFullYear() %> 11ka</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div
+    id="cookie-banner"
+    role="dialog"
+    aria-modal="true"
+    aria-live="polite"
+    aria-hidden="true"
+    aria-labelledby="cookie-banner-title"
+  >
+    <button
+      type="button"
+      id="cookie-banner-close"
+      class="cookie-banner__close"
+      data-cookie-close
+      hidden
+      aria-label="Zavřít nastavení cookies"
+    >
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M6 18 18 6" stroke-linecap="round"/></svg>
+    </button>
+    <div class="cookie-banner-inner mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between lg:px-6">
+      <div class="min-w-0 text-sm text-slate-300" role="document">
+        <p id="cookie-banner-title" class="sr-only">Nastavení cookies</p>
+        Používáme cookies pro správné fungování webu a zlepšení obsahu.
+        <a href="/cookies" class="text-11accent hover:underline">Více informací</a>.
+      </div>
+      <div class="cookie-banner__actions flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:items-end">
+        <p id="cookie-banner-status" class="cookie-banner__status" role="status" aria-live="polite" hidden></p>
+        <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-stretch sm:justify-end">
+        <button
+          id="cookie-reject"
+          type="button"
+          class="btn-11 btn-11--ghost cookie-banner__choice btn-11--block btn-11--block-sm-auto min-h-[44px]"
+          data-cookie-choice="rejected"
+          aria-pressed="false"
+        >Nesouhlasím</button>
+        <button
+          id="cookie-accept"
+          type="button"
+          class="btn-11 btn-11--ghost cookie-banner__choice btn-11--block btn-11--block-sm-auto min-h-[44px]"
+          data-cookie-choice="accepted"
+          aria-pressed="false"
+        >Souhlasím</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/cookie-banner-ui.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>"></script>
+  <script src="/js/ssp-zone-init.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
+  <script src="/js/site-consent.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
+  <script src="/js/most-read-refresh.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
+  <script src="/js/match-live-clock.js?v=<%= encodeURIComponent((typeof assetVersion !== 'undefined' ? assetVersion : '1') + '-clock4') %>" defer></script>
+  <script src="/js/ui-overlay-guard.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
+  <% if (typeof showRecruitmentModal !== 'undefined' && showRecruitmentModal) { %>
+  <script src="/js/recruitment-modal.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
+  <% } %>
+  <div
+    id="adblock-gate"
+    class="hidden fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="adblock-gate-title"
+  >
+    <div class="w-full max-w-xl rounded-2xl border border-white/15 bg-[#0f1729] p-6 text-center shadow-2xl shadow-black/70">
+      <h2 id="adblock-gate-title" class="text-xl font-bold text-white sm:text-2xl">Vypněte prosím blokování reklam</h2>
+      <p class="mt-3 text-sm leading-relaxed text-slate-300 sm:text-base">
+        Tento web je financován reklamami. Abychom mohli zobrazit obsah, vypněte prosím adblock
+        nebo jiný systém pro blokování reklam a obnovte stránku.
+      </p>
+      <p class="mt-3 text-xs text-11muted">
+        Po vypnutí blokace reklam stiskněte obnovení stránky.
+      </p>
+      <button
+        type="button"
+        class="mt-5 inline-flex min-h-[40px] items-center justify-center rounded-xl border border-white/25 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+        data-adblock-reload
+      >Obnovit stránku</button>
+    </div>
+  </div>
+  <script src="/js/adblock-gate.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
+</body>
+</html>

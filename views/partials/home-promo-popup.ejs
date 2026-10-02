@@ -1,0 +1,105 @@
+<% if (typeof homePromoPopup !== 'undefined' && homePromoPopup && homePromoPopup.enabled) { %>
+<div
+  id="home-promo-popup"
+  class="home-promo-popup"
+  role="dialog"
+  aria-modal="true"
+  aria-hidden="true"
+  aria-labelledby="home-promo-popup-title"
+  data-home-promo-popup
+  data-home-promo-delay="<%= homePromoPopup.delayMs %>"
+>
+  <button type="button" class="home-promo-popup__backdrop" aria-hidden="true" tabindex="-1" data-home-promo-close></button>
+  <div class="home-promo-popup__shell">
+    <div class="home-promo-popup__media">
+      <img
+        src="<%= homePromoPopup.imageUrl %>"
+        alt="<%= homePromoPopup.imageAlt %>"
+        class="home-promo-popup__image"
+        width="768"
+        height="960"
+        loading="lazy"
+        decoding="async"
+      >
+    </div>
+    <div class="home-promo-popup__panel">
+      <div class="home-promo-popup__panel-head">
+        <a href="<%= homePromoPopup.brandUrl %>" class="home-promo-popup__brand" target="_blank" rel="noopener noreferrer">
+          <img
+            src="<%= homePromoPopup.brandLogoUrl %>"
+            alt="<%= homePromoPopup.brandName %>"
+            class="home-promo-popup__brand-logo"
+            width="32"
+            height="32"
+            loading="lazy"
+            decoding="async"
+          >
+          <span class="home-promo-popup__brand-name"><%= homePromoPopup.brandHandle %></span>
+        </a>
+        <button
+          type="button"
+          class="home-promo-popup__close home-promo-popup__close--panel"
+          aria-label="Zavřít promo okno"
+          data-home-promo-close
+          data-home-promo-focus
+        >
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.22 4.22a.75.75 0 011.06 0L10 8.94l4.72-4.72a.75.75 0 111.06 1.06L11.06 10l4.72 4.72a.75.75 0 11-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 11-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 010-1.06z" clip-rule="evenodd"/></svg>
+        </button>
+      </div>
+      <div class="home-promo-popup__panel-body">
+        <h2 id="home-promo-popup-title" class="home-promo-popup__title"><%= homePromoPopup.title %></h2>
+        <p class="home-promo-popup__conditions-label"><%= homePromoPopup.conditionsLabel %></p>
+        <ol class="home-promo-popup__conditions">
+          <% homePromoPopup.conditions.forEach(function (item) { %>
+          <li>
+            <% if (item.link) { %><%= item.text %><a href="<%= item.link.href %>" class="home-promo-popup__link" target="_blank" rel="noopener noreferrer"><%= item.link.label %></a><% } else { %><%= item.text %><% } %>
+          </li>
+          <% }); %>
+        </ol>
+        <p class="home-promo-popup__outro"><%= homePromoPopup.outro %></p>
+      </div>
+      <div class="home-promo-popup__panel-foot">
+        <% if (homePromoPopup.countdownEndsAt) { %>
+        <div
+          class="home-promo-popup__countdown"
+          data-home-promo-countdown
+          data-countdown-end="<%= homePromoPopup.countdownEndsAt %>"
+          data-countdown-live-until="<%= homePromoPopup.countdownLiveUntil %>"
+        >
+          <p class="home-promo-popup__countdown-label" data-home-promo-countdown-label><%= homePromoPopup.countdownLabel %></p>
+          <div class="home-promo-popup__countdown-grid" data-home-promo-countdown-values aria-live="polite">
+            <div class="home-promo-popup__countdown-unit">
+              <span class="home-promo-popup__countdown-value" data-countdown-days>--</span>
+              <span class="home-promo-popup__countdown-name">dní</span>
+            </div>
+            <div class="home-promo-popup__countdown-unit">
+              <span class="home-promo-popup__countdown-value" data-countdown-hours>--</span>
+              <span class="home-promo-popup__countdown-name">hod</span>
+            </div>
+            <div class="home-promo-popup__countdown-unit">
+              <span class="home-promo-popup__countdown-value" data-countdown-minutes>--</span>
+              <span class="home-promo-popup__countdown-name">min</span>
+            </div>
+            <div class="home-promo-popup__countdown-unit">
+              <span class="home-promo-popup__countdown-value" data-countdown-seconds>--</span>
+              <span class="home-promo-popup__countdown-name">sek</span>
+            </div>
+          </div>
+          <p class="home-promo-popup__countdown-ended hidden" data-home-promo-countdown-live>
+            <%= homePromoPopup.countdownLiveMessage %>
+            <a href="<%= homePromoPopup.brandUrl %>" class="home-promo-popup__link" target="_blank" rel="noopener noreferrer"><%= homePromoPopup.brandHandle %></a>.
+          </p>
+          <p class="home-promo-popup__countdown-ended hidden" data-home-promo-countdown-past>
+            <%= homePromoPopup.countdownPastMessage %>
+            <a href="<%= homePromoPopup.brandUrl %>" class="home-promo-popup__link" target="_blank" rel="noopener noreferrer"><%= homePromoPopup.brandHandle %></a>.
+          </p>
+        </div>
+        <% } %>
+        <a href="<%= homePromoPopup.ctaUrl %>" class="btn-11 btn-11--primary btn-11--block" target="_blank" rel="noopener noreferrer">
+          <%= homePromoPopup.ctaLabel %>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>

@@ -1,0 +1,369 @@
+<%
+  var teamSource = editingTeam || (typeof formDraft !== 'undefined' ? formDraft : null) || {};
+  var teamName = teamSource.name || '';
+  var teamCompetition = teamSource.competition || '';
+  var teamLogoPath = teamSource.logo_path || '';
+  var teamRoster = teamSource.roster || [];
+  if (!teamRoster.length) {
+    teamRoster = [
+      { section: 'Brankáři', players: [] },
+      { section: 'Obránci', players: [] },
+      { section: 'Záložníci', players: [] },
+      { section: 'Útočníci', players: [] },
+      { section: 'Trenér', players: [] }
+    ];
+  }
+%>
+<section class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white"><%= editingTeam ? 'Upravit tým' : 'Vytvořit tým' %></h2>
+  <form
+    id="zapasy-team-form"
+    class="mt-4 grid gap-3 sm:grid-cols-2"
+    method="post"
+    action="<%= formAction %>"
+    enctype="multipart/form-data"
+  >
+    <input type="hidden" name="action" value="<%= editingTeam ? 'update_team' : 'create_team' %>" />
+    <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+    <input type="hidden" name="roster_json" id="zapasy-team-roster-json" value="" />
+    <% if (editingTeam) { %><input type="hidden" name="id" value="<%= editingTeam.id %>" /><% } %>
+
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Název týmu *</label>
+      <input name="name" required value="<%= teamName %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Soutěž</label>
+      <input name="competition" value="<%= teamCompetition %>" placeholder="např. Chance Liga" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Logo týmu</label>
+      <div class="mt-2 flex flex-wrap items-center gap-4">
+        <% if (teamLogoPath) { %>
+        <img
+          src="<%= teamLogoPath %>"
+          alt=""
+          class="zapasy-team-form__logo-preview h-16 w-16 rounded-xl border border-white/10 bg-white/5 object-contain p-1"
+          id="zapasy-team-logo-preview"
+        />
+        <% } else { %>
+        <div
+          class="zapasy-team-form__logo-preview flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/5 text-xs text-11muted"
+          id="zapasy-team-logo-preview"
+          hidden
+        ></div>
+        <% } %>
+        <input
+          type="file"
+          name="logo_file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          class="min-w-0 text-sm text-11muted file:mr-3 file:rounded-lg file:border-0 file:bg-11accent file:px-3 file:py-2 file:text-sm file:font-medium file:text-11bg"
+          id="zapasy-team-logo-input"
+        />
+      </div>
+      <p class="mt-1 text-xs text-11muted">JPG, PNG, WebP nebo GIF, max. 4 MB.</p>
+    </div>
+
+    <div class="sm:col-span-2 flex flex-wrap gap-2">
+      <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg"><%= editingTeam ? 'Uložit změny' : 'Vytvořit tým' %></button>
+      <% if (editingTeam) { %>
+      <a href="<%= cancelHref %>" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5">Zrušit úpravu</a>
+      <% } %>
+    </div>
+  </form>
+</section>
+
+<script>
+  (function () {
+    var form = document.getElementById('zapasy-team-form');
+    if (!form) return;
+
+    var rosterRoot = document.getElementById('zapasy-team-roster');
+    var rosterInput = document.getElementById('zapasy-team-roster-json');
+    var logoInput = document.getElementById('zapasy-team-logo-input');
+    var logoPreview = document.getElementById('zapasy-team-logo-preview');
+    var initialRoster = <%- JSON.stringify(teamRoster) %>;
+    var logoBlobUrl = null;
+
+    function flagFromCode(code) {
+      var c = String(code || '').trim().toUpperCase();
+      if (!/^[A-Z]{2}$/.test(c)) return '';
+      return c.replace(/./g, function (ch) {
+        return String.fromCodePoint(127397 + ch.charCodeAt(0));
+      });
+    }
+
+    function escHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function emptyPlayer(isCoach) {
+      return {
+        number: '',
+        name: '',
+        nationality: '',
+        age: '',
+        injured: false,
+        isCoach: !!isCoach
+      };
+    }
+
+    function normalizeRosterState(roster) {
+      var sections = ['Brankáři', 'Obránci', 'Záložníci', 'Útočníci', 'Trenér'];
+      var map = {};
+      (roster || []).forEach(function (block) {
+        if (block && block.section) map[block.section] = block.players || [];
+      });
+      return sections.map(function (section) {
+        return {
+          section: section,
+          players: (map[section] || []).map(function (player) {
+            return {
+              number: player.number != null ? String(player.number) : '',
+              name: player.name || '',
+              nationality: player.nationality || '',
+              age: player.age != null && player.age !== '' ? String(player.age) : '',
+              injured: !!player.injured,
+              isCoach: section === 'Trenér'
+            };
+          })
+        };
+      });
+    }
+
+    function ensureDefaultRows(state) {
+      state.forEach(function (block) {
+        if (!block.players.length) {
+          block.players.push(emptyPlayer(block.section === 'Trenér'));
+        }
+      });
+      return state;
+    }
+
+    var rosterState = ensureDefaultRows(normalizeRosterState(initialRoster));
+
+    function allowNumber(block) {
+      return block.section !== 'Trenér';
+    }
+
+    function collectRosterFromDom() {
+      if (!rosterRoot) return;
+      rosterState.forEach(function (block, sectionIdx) {
+        var sectionEl = rosterRoot.querySelector('[data-roster-section-idx="' + sectionIdx + '"]');
+        if (!sectionEl) return;
+        var showNumber = allowNumber(block);
+        var rows = sectionEl.querySelectorAll('[data-roster-row]');
+        block.players = Array.prototype.map.call(rows, function (row) {
+          return {
+            number: showNumber ? ((row.querySelector('[data-field="number"]') || {}).value || '') : '',
+            name: (row.querySelector('[data-field="name"]') || {}).value || '',
+            nationality: (row.querySelector('[data-field="nationality"]') || {}).value || '',
+            age: (row.querySelector('[data-field="age"]') || {}).value || '',
+            injured: !!((row.querySelector('[data-field="injured"]') || {}).checked),
+            isCoach: block.section === 'Trenér'
+          };
+        });
+      });
+    }
+
+    function getSectionBlock(sectionEl) {
+      if (!sectionEl) return null;
+      var sectionIdx = parseInt(sectionEl.getAttribute('data-roster-section-idx'), 10);
+      if (!Number.isFinite(sectionIdx)) return null;
+      return rosterState[sectionIdx] || null;
+    }
+
+    function serializeRoster() {
+      return rosterState.map(function (block) {
+        return {
+          section: block.section,
+          players: block.players
+            .filter(function (player) { return String(player.name || '').trim(); })
+            .map(function (player) {
+              return {
+                number: allowNumber(block) ? (String(player.number || '').trim() || null) : null,
+                name: String(player.name || '').trim(),
+                nationality: String(player.nationality || '').trim().toUpperCase() || null,
+                age: player.age === '' ? null : parseInt(player.age, 10),
+                injured: !!player.injured
+              };
+            })
+        };
+      });
+    }
+
+    function syncRosterInput() {
+      collectRosterFromDom();
+      if (rosterInput) rosterInput.value = JSON.stringify(serializeRoster());
+    }
+
+    function renderRow(block, player, rowIndex) {
+      var isCoach = block.section === 'Trenér';
+      var showNumber = allowNumber(block);
+      var row = document.createElement('tr');
+      row.setAttribute('data-roster-row', String(rowIndex));
+      row.innerHTML =
+        (showNumber
+          ? '<td class="zapasy-team-roster__cell zapasy-team-roster__cell--num">' +
+              '<input type="text" inputmode="numeric" data-field="number" value="' + escHtml(player.number) + '" class="zapasy-team-roster__input" aria-label="Číslo dresu" />' +
+            '</td>'
+          : '') +
+        '<td class="zapasy-team-roster__cell zapasy-team-roster__cell--name">' +
+          '<div class="zapasy-team-roster__name-wrap">' +
+            '<span class="zapasy-team-roster__flag" data-flag-for="' + rowIndex + '">' + flagFromCode(player.nationality) + '</span>' +
+            '<input type="text" data-field="name" value="' + escHtml(player.name) + '" placeholder="' + (isCoach ? 'Jméno trenéra' : 'Jméno hráče') + '" class="zapasy-team-roster__input zapasy-team-roster__input--name" aria-label="Jméno" />' +
+            (player.injured ? '<span class="zapasy-team-roster__injured" title="Zraněný">✚</span>' : '<span class="zapasy-team-roster__injured" title="Zraněný" hidden>✚</span>') +
+          '</div>' +
+        '</td>' +
+        '<td class="zapasy-team-roster__cell">' +
+          '<input type="text" data-field="nationality" value="' + escHtml(player.nationality) + '" placeholder="CZ" maxlength="3" class="zapasy-team-roster__input zapasy-team-roster__input--nat" aria-label="Národnost" />' +
+        '</td>' +
+        '<td class="zapasy-team-roster__cell">' +
+          '<input type="text" inputmode="numeric" data-field="age" value="' + escHtml(player.age) + '" class="zapasy-team-roster__input zapasy-team-roster__input--age" aria-label="Věk" />' +
+        '</td>' +
+        '<td class="zapasy-team-roster__cell zapasy-team-roster__cell--actions">' +
+          '<label class="zapasy-team-roster__injured-toggle" title="Zraněný">' +
+            '<input type="checkbox" data-field="injured"' + (player.injured ? ' checked' : '') + ' />' +
+            '<span>✚</span>' +
+          '</label>' +
+          '<button type="button" class="zapasy-team-roster__remove" data-remove-row aria-label="Odebrat řádek">×</button>' +
+        '</td>';
+
+      var natInput = row.querySelector('[data-field="nationality"]');
+      var injuredInput = row.querySelector('[data-field="injured"]');
+      var injuredBadge = row.querySelector('.zapasy-team-roster__injured');
+      if (natInput) {
+        natInput.addEventListener('input', function () {
+          var flag = row.querySelector('[data-flag-for="' + rowIndex + '"]');
+          if (flag) flag.textContent = flagFromCode(natInput.value);
+          syncRosterInput();
+        });
+      }
+      if (injuredInput && injuredBadge) {
+        injuredInput.addEventListener('change', function () {
+          injuredBadge.hidden = !injuredInput.checked;
+          syncRosterInput();
+        });
+      }
+      row.querySelectorAll('input:not([type="checkbox"])').forEach(function (input) {
+        input.addEventListener('input', syncRosterInput);
+        input.addEventListener('change', syncRosterInput);
+      });
+      if (injuredInput) {
+        injuredInput.addEventListener('change', syncRosterInput);
+      }
+      return row;
+    }
+
+    function renderSection(block, sectionIdx) {
+      var section = document.createElement('section');
+      section.className = 'zapasy-team-roster__section';
+      section.setAttribute('data-roster-section-idx', String(sectionIdx));
+      section.setAttribute('data-roster-section', block.section);
+
+      var isCoach = block.section === 'Trenér';
+      var showNumber = allowNumber(block);
+      section.innerHTML =
+        '<div class="zapasy-team-roster__head">' +
+          '<h4 class="zapasy-team-roster__title">' + block.section + '</h4>' +
+          '<button type="button" class="zapasy-team-roster__add" data-add-player>Přidat' + (isCoach ? ' trenéra' : ' hráče') + '</button>' +
+        '</div>' +
+        '<div class="zapasy-team-roster__table-wrap">' +
+          '<table class="zapasy-team-roster__table">' +
+            '<thead><tr>' +
+              (showNumber ? '<th>Číslo</th>' : '') +
+              '<th>Jméno</th>' +
+              '<th>Nár.</th>' +
+              '<th>Věk</th>' +
+              '<th></th>' +
+            '</tr></thead>' +
+            '<tbody data-roster-body></tbody>' +
+          '</table>' +
+        '</div>';
+
+      var body = section.querySelector('[data-roster-body]');
+      block.players.forEach(function (player, index) {
+        body.appendChild(renderRow(block, player, index));
+      });
+
+      return section;
+    }
+
+    function renderRoster() {
+      if (!rosterRoot) return;
+      rosterRoot.innerHTML = '';
+      rosterState.forEach(function (block, sectionIdx) {
+        rosterRoot.appendChild(renderSection(block, sectionIdx));
+      });
+    }
+
+    if (rosterRoot) {
+      rosterRoot.addEventListener('click', function (event) {
+        var addBtn = event.target.closest('[data-add-player]');
+        if (addBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          var block = getSectionBlock(addBtn.closest('[data-roster-section-idx]'));
+          if (!block) return;
+          collectRosterFromDom();
+          block.players.push(emptyPlayer(block.section === 'Trenér'));
+          renderRoster();
+          syncRosterInput();
+          return;
+        }
+
+        var removeBtn = event.target.closest('[data-remove-row]');
+        if (removeBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          var row = removeBtn.closest('[data-roster-row]');
+          var block = getSectionBlock(removeBtn.closest('[data-roster-section-idx]'));
+          if (!block || !row) return;
+          collectRosterFromDom();
+          var rowIndex = parseInt(row.getAttribute('data-roster-row'), 10);
+          var isCoach = block.section === 'Trenér';
+          if (block.players.length <= 1) {
+            block.players[0] = emptyPlayer(isCoach);
+          } else if (Number.isFinite(rowIndex)) {
+            block.players.splice(rowIndex, 1);
+          }
+          renderRoster();
+          syncRosterInput();
+        }
+      });
+    }
+
+    if (logoInput && logoPreview) {
+      logoInput.addEventListener('change', function () {
+        var file = logoInput.files && logoInput.files[0];
+        if (logoBlobUrl) {
+          URL.revokeObjectURL(logoBlobUrl);
+          logoBlobUrl = null;
+        }
+        if (!file) return;
+        logoBlobUrl = URL.createObjectURL(file);
+        if (logoPreview.tagName === 'IMG') {
+          logoPreview.src = logoBlobUrl;
+        } else {
+          var img = document.createElement('img');
+          img.id = 'zapasy-team-logo-preview';
+          img.className = 'zapasy-team-form__logo-preview h-16 w-16 rounded-xl border border-white/10 bg-white/5 object-contain p-1';
+          img.alt = '';
+          img.src = logoBlobUrl;
+          logoPreview.replaceWith(img);
+          logoPreview = img;
+        }
+      });
+    }
+
+    form.addEventListener('submit', function () {
+      syncRosterInput();
+    });
+
+    renderRoster();
+    syncRosterInput();
+  })();
+</script>

@@ -1,0 +1,8 @@
+<% var list = typeof items !== 'undefined' && items ? items : []; %>
+<% if (!list.length) { return; } %>
+<div class="card-11 home-weekly-most-read p-4">
+  <h2 class="mb-1 text-lg font-bold text-11accent">Nejčtenější články týdne</h2>
+  <ul class="most-read-sidebar">
+    <%- include('most-read-sidebar-list', { items: list }) %>
+  </ul>
+</div>

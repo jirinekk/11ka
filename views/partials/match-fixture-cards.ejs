@@ -1,0 +1,87 @@
+<%
+  var groupOrder = [];
+  var groups = {};
+  (fixtures || []).forEach(function (fixture) {
+    var key = fixture.competition || 'Další zápasy';
+    if (!groups[key]) {
+      groups[key] = [];
+      groupOrder.push(key);
+    }
+    groups[key].push(fixture);
+  });
+%>
+<% function fixtureSideClass(fixture) {
+  if (fixture.status === 'Probíhá') return 'live';
+  if (fixture.status === 'Odehráno') return 'done';
+  if (fixture.status === 'Odloženo') return 'postponed';
+  if (fixture.status === 'Zrušeno') return 'cancelled';
+  return 'upcoming';
+} %>
+
+<div class="match-score-list">
+  <% groupOrder.forEach(function (competition) { %>
+  <section class="match-score-group">
+    <header class="match-score-group__head">
+      <h2 class="match-score-group__title"><%= competition %></h2>
+    </header>
+
+    <div class="match-score-group__rows">
+      <% groups[competition].forEach(function (fixture) { %>
+      <article class="match-score-row">
+        <div class="match-score-row__time match-score-row__time--<%= fixtureSideClass(fixture) %>" aria-label="Datum a čas">
+          <% if (fixture.kickoffDate && !(fixture.isLive && fixture.liveStartedAt)) { %>
+          <span class="match-score-row__date"><%= fixture.kickoffDate %></span>
+          <% } %>
+          <% if (fixture.isLive && fixture.liveStartedAt) { %>
+          <span
+            class="match-score-row__status match-live-clock"
+            data-match-live-clock="<%= fixture.liveStartedAt %>"
+            data-match-live-clock-compact="1"
+            data-match-live-clock-first-half-extra="<%= fixture.firstHalfExtraMinutes != null ? fixture.firstHalfExtraMinutes : '' %>"
+            data-match-live-clock-first-half-set="<%= fixture.firstHalfExtraSet ? '1' : '0' %>"
+            data-match-live-clock-second-half-extra="<%= fixture.secondHalfExtraMinutes != null ? fixture.secondHalfExtraMinutes : '' %>"
+            data-match-live-clock-second-half-set="<%= fixture.secondHalfExtraSet ? '1' : '0' %>"
+          >0'</span>
+          <% } else { %>
+          <span class="match-score-row__status"><%= fixture.sideLabel %></span>
+          <% } %>
+        </div>
+
+        <div class="match-score-row__body">
+          <div class="match-score-row__team">
+            <span class="match-score-row__crest" aria-hidden="true">
+              <% if (fixture.homeLogo) { %>
+              <img src="<%= fixture.homeLogo %>" alt="" class="match-score-row__logo" />
+              <% } else { %>
+              <span class="match-score-row__logo-fallback"></span>
+              <% } %>
+            </span>
+            <span class="match-score-row__name"><%= fixture.homeTeam %></span>
+            <% if (fixture.showScore) { %>
+            <span class="match-score-row__score"><%= fixture.homeScore %></span>
+            <% } %>
+          </div>
+          <div class="match-score-row__team">
+            <span class="match-score-row__crest" aria-hidden="true">
+              <% if (fixture.awayLogo) { %>
+              <img src="<%= fixture.awayLogo %>" alt="" class="match-score-row__logo" />
+              <% } else { %>
+              <span class="match-score-row__logo-fallback"></span>
+              <% } %>
+            </span>
+            <span class="match-score-row__name"><%= fixture.awayTeam %></span>
+            <% if (fixture.showScore) { %>
+            <span class="match-score-row__score"><%= fixture.awayScore %></span>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="match-score-row__actions">
+          <a href="<%= fixture.detailUrl %>" class="match-score-row__view">Zobrazit</a>
+        </div>
+      </article>
+      <% }); %>
+    </div>
+  </section>
+  <% }); %>
+</div>

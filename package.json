@@ -1,0 +1,36 @@
+{
+  "name": "11ka",
+  "version": "1.0.0",
+  "private": true,
+  "description": "11ka - online sports magazine",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:prod": "node server.js",
+    "dev": "node --watch server.js",
+    "build:css": "tailwindcss -c tailwind.config.js -i ./tailwind.input.css -o ./public/css/tailwind.generated.css --minify",
+    "install:production": "npm ci --omit=dev"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.11.1",
+    "compression": "^1.8.1",
+    "connect-sqlite3": "^0.9.16",
+    "dotenv": "^17.3.1",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.3.1",
+    "express-session": "^1.19.0",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.3",
+    "sanitize-html": "^2.17.2",
+    "sharp": "^0.35.3",
+    "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

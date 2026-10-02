@@ -1,0 +1,115 @@
+<%- include('partials/header') %>
+
+<main id="main-content" class="flex-1" tabindex="-1">
+  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+    <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <div class="min-w-0 space-y-6">
+        <header>
+          <h1 class="font-display text-2xl font-bold leading-tight text-white sm:text-3xl">
+            <%= pageTitle %>
+          </h1>
+        </header>
+
+        <section aria-label="Seznam zápasů">
+          <% if (fixtures && fixtures.length) { %>
+          <%- include('partials/match-fixture-cards', { fixtures: fixtures }) %>
+
+          <% if (typeof pagination !== 'undefined' && pagination && pagination.totalPages > 1) { %>
+          <nav class="mt-8 flex flex-wrap items-center justify-center gap-2" aria-label="Stránkování">
+            <% if (pagination.hasPrev) { %>
+            <a
+              href="<%= pagination.prevUrl %>"
+              class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+              rel="prev"
+            >Předchozí</a>
+            <% } else { %>
+            <span
+              class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50"
+              aria-disabled="true"
+            >Předchozí</span>
+            <% } %>
+
+            <div class="flex flex-wrap items-center justify-center gap-1">
+              <% pagination.pages.forEach(function (p) { %>
+                <% if (p.current) { %>
+                <span
+                  class="min-w-[40px] rounded-lg bg-11accent px-3 py-2 text-center text-sm text-11bg transition"
+                  aria-current="page"
+                ><%= p.n %></span>
+                <% } else { %>
+                <a
+                  href="<%= p.url %>"
+                  class="min-w-[40px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+                ><%= p.n %></a>
+                <% } %>
+              <% }); %>
+            </div>
+
+            <% if (pagination.hasNext) { %>
+            <a
+              href="<%= pagination.nextUrl %>"
+              class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+              rel="next"
+            >Další</a>
+            <% } else { %>
+            <span
+              class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50"
+              aria-disabled="true"
+            >Další</span>
+            <% } %>
+          </nav>
+          <% } %>
+          <% } else { %>
+          <div class="card-11 p-6 text-center">
+            <p class="text-sm font-medium text-slate-200">Momentálně není nastavený žádný zápas.</p>
+            <p class="mt-4">
+              <a href="/" class="btn-11 btn-11--sm btn-11--accent-outline">Zpět domů</a>
+            </p>
+          </div>
+          <% } %>
+        </section>
+      </div>
+
+      <aside class="space-y-6 lg:sticky lg:top-24">
+        <%- include('partials/sidebar-ssp-ad') %>
+
+        <div class="card-11 p-4">
+          <h2 class="mb-2 text-lg font-bold text-11accent">Newsletter</h2>
+          <p class="text-sm text-11muted"><%= newsletter.description %></p>
+          <% if (typeof newsletterStatus !== 'undefined' && newsletterStatus === 'ok') { %>
+          <p class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+            Jste přihlášeni k odběru novinek.
+          </p>
+          <% } else if (typeof newsletterStatus !== 'undefined' && newsletterStatus === 'dupe') { %>
+          <p class="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            Tento e-mail už v odběru je.
+          </p>
+          <% } else if (typeof newsletterStatus !== 'undefined' && newsletterStatus === 'bad') { %>
+          <p class="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            Zadejte platný e-mail.
+          </p>
+          <% } %>
+          <form class="mt-4 space-y-2" action="/newsletter" method="post">
+            <label class="sr-only" for="newsletter-email-live">E-mail</label>
+            <input
+              id="newsletter-email-live"
+              name="email"
+              type="email"
+              required
+              autocomplete="email"
+              placeholder="váš@email.cz"
+              class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
+            />
+            <button type="submit" class="btn-11 btn-11--primary btn-11--block">
+              Přihlásit se
+            </button>
+          </form>
+        </div>
+
+        <%- include('partials/sidebar-social') %>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

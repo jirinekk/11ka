@@ -1,0 +1,26 @@
+/* Druk Wide - pouze pro titulky článků (třída .font-article-title).
+   Oddělený název rodiny, aby se Druk omylem nepoužil v UI / navigaci. */
+
+@font-face {
+  font-family: '11ka Article';
+  src: url('/fonts/druk/DrukWide-Medium.ttf') format('truetype');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF,
+    U+0100-024F,
+    U+1E00-1EFF;
+}
+
+@font-face {
+  font-family: '11ka Article';
+  src: url('/fonts/druk/DrukWide-Medium.ttf') format('truetype');
+  font-weight: 400 800;
+  font-style: italic;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF,
+    U+0100-024F,
+    U+1E00-1EFF;
+}

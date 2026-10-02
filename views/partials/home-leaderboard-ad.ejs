@@ -1,0 +1,10 @@
+<%
+  var adSlug = typeof sectionSlug !== 'undefined' ? sectionSlug : '';
+  var adWrapId = typeof wrapId !== 'undefined' ? wrapId : ('home-ssp-wrap-' + adSlug);
+  var adDomId = typeof domId !== 'undefined' ? domId : '';
+  if (!adDomId) return;
+%>
+<div id="<%= adWrapId %>" class="home-leaderboard-ad card-11 p-4 perf-cv is-pending-ad">
+  <p class="mb-2 text-center text-xs font-medium uppercase tracking-wide text-11muted">Reklama</p>
+  <div id="<%= adDomId %>" class="home-side-ad-wrap home-side-ad-wrap--970x210 mx-auto w-full max-w-full overflow-hidden"></div>
+</div>

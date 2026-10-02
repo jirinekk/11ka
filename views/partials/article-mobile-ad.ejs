@@ -1,0 +1,16 @@
+<%
+  var adZoneId = typeof zoneId !== 'undefined' ? zoneId : 411438;
+  var adDomId = typeof domId !== 'undefined' ? domId : 'ssp-zone-411438-article';
+  var adMarginClass = typeof marginClass !== 'undefined' ? marginClass : 'mt-8';
+%>
+<div class="card-11 article-mobile-ad-card <%= adMarginClass %> p-4 perf-cv md:hidden">
+  <p class="mb-2 text-center text-xs font-medium uppercase tracking-wide text-11muted">Reklama</p>
+  <div
+    id="<%= adDomId %>"
+    class="home-side-ad-wrap home-side-ad-wrap--300x600 mx-auto overflow-hidden"
+    data-ssp-zone="<%= adZoneId %>"
+    data-ssp-width="300"
+    data-ssp-height="600"
+    data-ssp-mq="max:767"
+  ></div>
+</div>

@@ -1,0 +1,89 @@
+<%- include('../partials/admin-layout-start') %>
+
+<div class="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-white md:text-3xl">Všechny reelska</h1>
+    <p class="mt-1 text-sm text-11muted">Přehled všech reels videí v systému</p>
+  </div>
+</div>
+
+<%
+  var f = filters || { q: '', status: '' };
+  var statusVals = statusOptions || ['active', 'inactive'];
+  function pageLink(pageNum) {
+    var ps = [];
+    ps.push('page=' + encodeURIComponent(String(pageNum)));
+    if (f.q) ps.push('q=' + encodeURIComponent(f.q));
+    if (f.status) ps.push('status=' + encodeURIComponent(f.status));
+    return '/administrace/reels?' + ps.join('&');
+  }
+%>
+<form method="get" action="/administrace/reels" class="mt-6 grid gap-3 rounded-xl border border-white/10 bg-[#111827]/60 p-4 sm:grid-cols-[minmax(0,1fr)_200px_auto]">
+  <div>
+    <label for="q" class="text-xs text-11muted">Vyhledávání</label>
+    <input id="q" name="q" type="search" value="<%= f.q %>" placeholder="Nadpis, popis nebo cesta k souboru" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+  </div>
+  <div>
+    <label for="status" class="text-xs text-11muted">Stav</label>
+    <select id="status" name="status" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white">
+      <option value="">Všechny</option>
+      <% statusVals.forEach(function (s) { %>
+      <option value="<%= s %>" <%= f.status === s ? 'selected' : '' %>><%= s %></option>
+      <% }); %>
+    </select>
+  </div>
+  <div class="flex items-end gap-2">
+    <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg transition hover:brightness-110">Filtrovat</button>
+    <% if (f.q || f.status) { %>
+    <a href="/administrace/reels" class="rounded-xl border border-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/5">Reset</a>
+    <% } %>
+  </div>
+</form>
+
+<ul class="mt-8 space-y-2">
+  <% if (!reels.length) { %>
+  <li class="card-11 px-4 py-6 text-sm text-11muted">Žádná reels videa neodpovídají zadanému filtru.</li>
+  <% } %>
+  <% reels.forEach(function (item) { %>
+  <li class="card-11 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+    <div class="min-w-0">
+      <span class="font-semibold text-white"><%= item.headline || item.title %></span>
+      <span class="ml-2 text-xs <%= item.is_active ? 'text-emerald-300' : 'text-slate-400' %>"><%= item.is_active ? 'active' : 'inactive' %></span>
+      <p class="truncate text-xs text-slate-300"><%= item.title %></p>
+      <p class="truncate text-xs text-11muted"><%= item.file_path || 'Bez souboru' %></p>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <a href="/administrace/reels/<%= item.id %>/edit" class="text-sm text-11accent hover:underline">Upravit</a>
+      <form method="post" action="/administrace/reels/<%= item.id %>/smazat" class="inline" onsubmit="return confirm('Smazat video?');">
+        <button type="submit" class="text-sm text-red-400 hover:underline">Smazat</button>
+      </form>
+    </div>
+  </li>
+  <% }); %>
+</ul>
+
+<%
+  var p = pagination || { page: 1, totalPages: 1, totalItems: reels.length, hasPrev: false, hasNext: false };
+  var from = p.totalItems === 0 ? 0 : ((p.page - 1) * p.perPage + 1);
+  var to = p.totalItems === 0 ? 0 : Math.min(p.page * p.perPage, p.totalItems);
+%>
+<div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+  <p class="text-sm text-11muted">Zobrazeno <%= from %>–<%= to %> z <%= p.totalItems %> videí</p>
+  <% if (p.totalPages > 1) { %>
+  <nav class="flex items-center gap-2" aria-label="Stránkování reels">
+    <% if (p.hasPrev) { %>
+    <a href="<%= pageLink(p.page - 1) %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Předchozí</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Předchozí</span>
+    <% } %>
+    <span class="rounded-lg border border-11accent/40 bg-11accent/10 px-3 py-1.5 text-sm font-semibold text-11accent"><%= p.page %> / <%= p.totalPages %></span>
+    <% if (p.hasNext) { %>
+    <a href="<%= pageLink(p.page + 1) %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Další</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Další</span>
+    <% } %>
+  </nav>
+  <% } %>
+</div>
+
+<%- include('../partials/admin-layout-end') %>

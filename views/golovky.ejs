@@ -1,0 +1,56 @@
+<%- include('partials/header') %>
+
+<main id="main-content" class="flex-1" tabindex="-1">
+  <div class="mx-auto w-full max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+    <header class="mb-5">
+      <h1 class="text-2xl font-bold leading-tight text-white sm:text-3xl">Gólovky</h1>
+    </header>
+
+    <% if (reels && reels.length) { %>
+    <section class="reels-feed" aria-label="Reels feed">
+        <% reels.forEach(function (item) { %>
+      <article class="reels-card" data-reel-card>
+        <div class="reels-video-wrap">
+            <video autoplay loop playsinline preload="metadata" class="h-full w-full object-contain">
+            <source src="<%= item.mediaUrl %>" />
+          </video>
+          <%
+            var fullDescription = String(item.title || '');
+            var shortDescription = fullDescription.length > 75 ? (fullDescription.slice(0, 75).trimEnd() + '...') : fullDescription;
+            var hasMoreDescription = fullDescription.length > 75;
+          %>
+          <div class="reels-video-caption">
+            <p class="reels-video-headline"><%= item.headline || 'Bez nadpisu' %></p>
+            <p class="reels-video-description" data-reel-description>
+              <span class="reels-desc-short"><%= shortDescription %></span>
+              <% if (hasMoreDescription) { %>
+              <span class="reels-desc-full"><%= fullDescription %></span>
+              <% } %>
+            </p>
+            <% if (hasMoreDescription) { %>
+            <button type="button" class="reels-more-btn" data-reel-toggle>Zobrazit více</button>
+            <% } %>
+          </div>
+          <div class="reels-pause-indicator" aria-hidden="true">
+            <span class="reels-pause-bar"></span>
+            <span class="reels-pause-bar"></span>
+          </div>
+        </div>
+      </article>
+      <% }); %>
+    </section>
+    <div class="reels-desktop-nav" aria-hidden="true">
+      <button type="button" class="reels-nav-btn" data-reels-nav="up" aria-label="Předchozí video">↑</button>
+      <button type="button" class="reels-nav-btn" data-reels-nav="down" aria-label="Další video">↓</button>
+    </div>
+    <% } else { %>
+    <section class="card-11 p-6 text-center">
+      <p class="text-sm font-medium text-slate-200">Zatím tu nejsou žádné gólovky.</p>
+    </section>
+    <% } %>
+  </div>
+</main>
+
+<script src="/js/golovky-reels.js?v=10" defer></script>
+
+<%- include('partials/footer') %>

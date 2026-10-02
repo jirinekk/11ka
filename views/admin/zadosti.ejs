@@ -1,0 +1,55 @@
+<%- include('../partials/admin-layout-start') %>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">Žádosti o vydání</h1>
+  <p class="mt-1 text-sm text-11muted">Články čekající na schválení</p>
+</div>
+
+<% if (!pending.length) { %>
+<p class="mt-8 text-11muted">Žádné články ke schválení.</p>
+<% } else { %>
+<ul class="mt-8 space-y-4">
+  <% pending.forEach(function (a) { %>
+  <li class="card-11 flex flex-wrap items-center justify-between gap-4 p-4">
+    <div>
+      <p class="font-medium text-white"><%= a.title %></p>
+      <p class="mt-1 text-xs text-11muted"><%= a.author_display || a.author_email %> · <%= a.slug %></p>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <a href="/administrace/clanek/<%= a.id %>/edit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">Upravit / vydat</a>
+      <% if (currentUser && (typeof hasAnyRole === 'function' ? hasAnyRole(currentUser, 'vedeni', 'sefredaktor') : (currentUser.role === 'vedeni' || currentUser.role === 'sefredaktor'))) { %>
+      <form method="post" action="/administrace/clanek/<%= a.id %>/smazat" class="inline" onsubmit="return confirm('Smazat článek ve frontě?');">
+        <button type="submit" class="rounded-xl border border-red-500/40 px-3 py-2 text-sm text-red-300 hover:bg-red-500/10">Smazat</button>
+      </form>
+      <% } %>
+    </div>
+  </li>
+  <% }); %>
+</ul>
+
+<%
+  var p = pagination || { page: 1, perPage: pending.length, totalPages: 1, totalItems: pending.length, hasPrev: false, hasNext: false };
+  var from = p.totalItems === 0 ? 0 : ((p.page - 1) * p.perPage + 1);
+  var to = p.totalItems === 0 ? 0 : Math.min(p.page * p.perPage, p.totalItems);
+%>
+<div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+  <p class="text-sm text-11muted">Zobrazeno <%= from %>-<%= to %> z <%= p.totalItems %> žádostí</p>
+  <% if (p.totalPages > 1) { %>
+  <nav class="flex items-center gap-2" aria-label="Stránkování žádostí">
+    <% if (p.hasPrev) { %>
+    <a href="/administrace/zadosti?page=<%= p.page - 1 %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Předchozí</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Předchozí</span>
+    <% } %>
+    <span class="rounded-lg border border-11accent/40 bg-11accent/10 px-3 py-1.5 text-sm font-semibold text-11accent"><%= p.page %> / <%= p.totalPages %></span>
+    <% if (p.hasNext) { %>
+    <a href="/administrace/zadosti?page=<%= p.page + 1 %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Další</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Další</span>
+    <% } %>
+  </nav>
+  <% } %>
+</div>
+<% } %>
+
+<%- include('../partials/admin-layout-end') %>

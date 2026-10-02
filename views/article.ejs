@@ -1,0 +1,372 @@
+<%- include('partials/header') %>
+
+<main id="main-content" class="flex-1" tabindex="-1">
+<% if (typeof cmsArticle !== 'undefined' && cmsArticle) { %>
+  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+    <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <article class="min-w-0" itemscope itemtype="https://schema.org/NewsArticle">
+        <nav class="mb-4 text-xs text-11muted sm:text-sm" aria-label="Drobečková navigace">
+          <% breadcrumbs.forEach(function (crumb, i) { %>
+            <% if (i > 0) { %><span class="mx-1 text-slate-600" aria-hidden="true">›</span><% } %>
+            <% if (crumb.href) { %>
+              <a href="<%= crumb.href %>" class="hover:text-white"><%= crumb.label %></a>
+            <% } else { %>
+              <span class="text-slate-400"><%= crumb.label %></span>
+            <% } %>
+          <% }); %>
+        </nav>
+        <div id="top-ssp-411555-wrap" class="mb-4" style="display:none;">
+          <div id="ssp-zone-411555" class="home-side-ad-wrap mx-auto h-[210px] w-[970px] overflow-hidden"></div>
+          <script>
+            (function () {
+              var topWrap = document.getElementById('top-ssp-411555-wrap');
+              var topZone = document.getElementById('ssp-zone-411555');
+              var attempts = 0;
+              var maxAttempts = 20;
+              var timerId = null;
+              var started = false;
+              var creativeWatchId = null;
+              var creativeChecks = 0;
+              var maxCreativeChecks = 40;
+
+              function hasCreative() {
+                return !!(topZone && topZone.querySelector('iframe, img, ins, object, embed'));
+              }
+
+              function revealIfCreative() {
+                if (!topWrap) return;
+                if (hasCreative()) {
+                  topWrap.style.display = '';
+                  if (creativeWatchId) {
+                    window.clearInterval(creativeWatchId);
+                    creativeWatchId = null;
+                  }
+                }
+              }
+
+              function startCreativeWatcher() {
+                if (creativeWatchId) return;
+                creativeWatchId = window.setInterval(function () {
+                  creativeChecks += 1;
+                  revealIfCreative();
+                  if (creativeChecks >= maxCreativeChecks) {
+                    window.clearInterval(creativeWatchId);
+                    creativeWatchId = null;
+                  }
+                }, 150);
+              }
+
+              function renderAdOnce() {
+                if (started) return true;
+                if (!window.sssp || typeof window.sssp.getAds !== 'function') return false;
+                started = true;
+                window.sssp.getAds([
+                  {
+                    zoneId: 411555,
+                    id: 'ssp-zone-411555',
+                    width: 970,
+                    height: 210
+                  }
+                ]);
+                startCreativeWatcher();
+                return true;
+              }
+
+              renderAdOnce();
+
+              timerId = window.setInterval(function () {
+                attempts += 1;
+                if (renderAdOnce() || attempts >= maxAttempts) {
+                  window.clearInterval(timerId);
+                }
+              }, 150);
+            })();
+          </script>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-block rounded-full bg-11accent/15 px-3 py-1 text-xs font-semibold text-11accent"><%= category %></span>
+          <% if (typeof tag !== 'undefined' && tag) { %>
+          <span class="inline-block rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200 ring-1 ring-white/10"><%= tag %></span>
+          <% } %>
+        </div>
+        <h1 class="font-article-title mt-3 text-2xl font-bold leading-tight text-white sm:text-3xl lg:text-4xl" itemprop="headline"><%= headline %></h1>
+        <% if (lead) { %>
+        <p class="mt-4 text-base leading-relaxed text-slate-300 sm:text-lg"><%= lead %></p>
+        <% } %>
+
+        <div class="mt-6 flex flex-wrap items-center gap-3 border-b border-white/10 pb-6">
+          <img src="<%= author.avatar %>" alt="<%= author.name %>" loading="lazy" fetchpriority="low" decoding="async" class="h-11 w-11 shrink-0 rounded-full ring-2 ring-white/10 <%= author.useLogoAvatar ? 'bg-11bg object-contain p-1' : 'object-cover' %>" width="44" height="44" />
+          <div class="text-sm">
+            <% if (author && author.id) { %>
+            <a href="/redaktor/<%= encodeURIComponent(author.id) %>" class="font-semibold text-white hover:text-11accent"><%= author.name %></a>
+            <% } else { %>
+            <span class="font-semibold text-white"><%= author.name %></span>
+            <% } %>
+            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-11muted">
+              <time datetime="<%= author.isoDate || '' %>"><%= author.date %></time>
+              <% if (author.readTime) { %>
+              <span aria-hidden="true">·</span>
+              <span class="inline-flex items-center gap-1">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <%= author.readTime %>
+              </span>
+              <% } %>
+            </div>
+          </div>
+        </div>
+
+        <figure class="hero-credit-wrap relative mt-8 overflow-hidden rounded-2xl ring-1 ring-white/10">
+          <img src="<%= featuredImage %>" alt="<%= headline %>" loading="eager" fetchpriority="high" class="aspect-[21/9] w-full object-cover sm:aspect-[2/1]" style="object-position: <%= heroPosition || '50% 50%' %>;" itemprop="image" />
+          <% if (typeof heroCredit !== 'undefined' && heroCredit) { %>
+          <figcaption class="hero-credit-pill pointer-events-none">
+            <%- include('partials/hero-credit-badge', { credit: heroCredit }) %>
+          </figcaption>
+          <% } %>
+        </figure>
+
+        <%- include('partials/article-mobile-ad', { domId: 'ssp-zone-411438-article' }) %>
+
+        <div class="article-body prose-11 perf-cv mt-8 text-sm leading-relaxed text-slate-300 sm:text-base">
+          <%- body_html %>
+        </div>
+        <script>
+          (function () {
+            function fixFig(fig) {
+              var img = fig.querySelector('img');
+              if (!img) return;
+              function apply() {
+                var imgW = (img.style.width || '').trim();
+                // Already normalized (new articles): img fills 100% of figure
+                if (imgW === '100%') return;
+                // Legacy/buggy state: img has % or other width - measure with figure unconstrained
+                var saved = fig.style.width;
+                fig.style.width = '';
+                var w = Math.round(img.getBoundingClientRect().width);
+                if (w > 0) {
+                  fig.style.width = w + 'px';
+                  img.style.width = '100%';
+                  // Center the figure if the img had any auto margin (TinyMCE may set one side to 0px)
+                  var ml = img.style.marginLeft;
+                  var mr = img.style.marginRight;
+                  var centered = ml === 'auto' || mr === 'auto';
+                  fig.style.marginLeft = centered ? 'auto' : (ml || '');
+                  fig.style.marginRight = centered ? 'auto' : (mr || '');
+                  img.style.marginLeft = '';
+                  img.style.marginRight = '';
+                } else {
+                  fig.style.width = saved;
+                }
+              }
+              if (img.complete && img.naturalWidth > 0) apply();
+              else img.addEventListener('load', apply);
+            }
+            function fixAll() {
+              document.querySelectorAll('figure.article-img-credit-wrap').forEach(fixFig);
+            }
+            fixAll();
+            window.addEventListener('load', fixAll);
+          })();
+        </script>
+
+        <% if (typeof sources !== 'undefined' && sources && String(sources).trim()) { %>
+        <section class="mt-8 border-t border-white/10 pt-6" aria-labelledby="article-sources-heading">
+          <h2 id="article-sources-heading" class="text-sm font-semibold uppercase tracking-wide text-11muted">Zdroje</h2>
+          <div class="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-400"><%= sources %></div>
+        </section>
+        <% } %>
+
+        <% if (typeof lineup !== 'undefined' && lineup && lineup.teams && lineup.teams.length) { %>
+        <%- include('partials/article-lineup', { lineup: lineup }) %>
+        <% } %>
+
+        <div class="mt-8 flex flex-wrap items-center gap-3">
+          <span class="text-sm font-medium text-slate-400">Sdílet:</span>
+          <div class="flex gap-2">
+            <a href="<%= shareUrls.facebook %>" target="_blank" rel="noopener noreferrer" class="share-btn" aria-label="Facebook"><svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg></a>
+            <a href="<%= shareUrls.x %>" target="_blank" rel="noopener noreferrer" class="share-btn" aria-label="X"><svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+            <button type="button" class="share-btn js-copy-article-link" data-url="<%= shareUrls.article %>" aria-label="Kopírovat odkaz"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg></button>
+          </div>
+        </div>
+
+        <%- include('partials/article-google-preferred-source') %>
+
+        <%- include('partials/promo-banner', { promoBanner: typeof articleMidPromoAd !== 'undefined' ? articleMidPromoAd : null }) %>
+
+        <%- include('partials/article-penalty-game') %>
+
+        <% if (relatedArticles && relatedArticles.length) { %>
+        <section class="mt-10 perf-cv" aria-labelledby="related-articles-heading">
+          <h2 id="related-articles-heading" class="mb-4 text-xl font-bold text-11accent">Další články</h2>
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <% relatedArticles.forEach(function (item) { %>
+            <article class="card-11 flex flex-col overflow-hidden p-0">
+              <a href="<%= item.href %>" class="block overflow-hidden">
+                <img src="<%= item.image %>" alt="<%= item.title %>" loading="lazy" fetchpriority="low" decoding="async" class="aspect-video w-full object-cover transition duration-300 hover:scale-[1.03]" style="object-position: <%= item.heroPosition || '50% 50%' %>;" />
+              </a>
+              <div class="flex flex-1 flex-col p-4">
+                <h3 class="text-base font-semibold leading-snug text-white">
+                  <a href="<%= item.href %>" class="hover:text-11accent"><%= item.title %></a>
+                </h3>
+                <% if (item.excerpt) { %>
+                <p class="mt-2 line-clamp-2 flex-1 text-sm text-11muted"><%= item.excerpt %></p>
+                <% } %>
+                <time class="mt-3 text-xs text-slate-500" datetime="<%= item.isoTime || '' %>"><%= item.timeAgo %></time>
+              </div>
+            </article>
+            <% }); %>
+          </div>
+        </section>
+        <% } %>
+
+        <% /* Komentáře vypnuté */ %>
+      </article>
+
+      <aside class="space-y-6 lg:sticky lg:top-24">
+        <%- include('partials/sidebar-most-read', { items: sidebarMostRead }) %>
+
+        <%- include('partials/sidebar-ssp-ad') %>
+      </aside>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var btn = document.querySelector('.js-copy-article-link');
+      if (!btn) return;
+      btn.addEventListener('click', async function () {
+        var url = btn.getAttribute('data-url') || '';
+        try {
+          await navigator.clipboard.writeText(url);
+          btn.setAttribute('title', 'Odkaz zkopírován');
+        } catch (e) {
+          window.prompt('Zkopírujte odkaz:', url);
+        }
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      var body = document.querySelector('.article-body');
+      if (!body) return;
+      var media = body.querySelectorAll('img, iframe, video');
+      media.forEach(function (el) {
+        if (!el.getAttribute('loading')) el.setAttribute('loading', 'lazy');
+        if (!el.getAttribute('fetchpriority')) el.setAttribute('fetchpriority', 'low');
+        if (el.tagName === 'IMG' && !el.getAttribute('decoding')) el.setAttribute('decoding', 'async');
+      });
+
+      var lazyEmbeds = body.querySelectorAll('iframe[src]');
+      if (!lazyEmbeds.length) return;
+
+      function activateIframe(frame) {
+        if (!frame || !frame.dataset || !frame.dataset.srcDeferred) return;
+        frame.setAttribute('src', frame.dataset.srcDeferred);
+        frame.removeAttribute('data-src-deferred');
+      }
+
+      if (!('IntersectionObserver' in window)) {
+        lazyEmbeds.forEach(function (frame) {
+          var src = frame.getAttribute('src');
+          if (!src) return;
+          frame.dataset.srcDeferred = src;
+          frame.removeAttribute('src');
+          activateIframe(frame);
+        });
+        return;
+      }
+
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          activateIframe(entry.target);
+          io.unobserve(entry.target);
+        });
+      }, { rootMargin: '350px 0px' });
+
+      lazyEmbeds.forEach(function (frame) {
+        var src = frame.getAttribute('src');
+        if (!src) return;
+        frame.dataset.srcDeferred = src;
+        frame.removeAttribute('src');
+        io.observe(frame);
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      var hasTwitterEmbed = document.querySelector('.article-body .twitter-tweet');
+      if (!hasTwitterEmbed) return;
+      var target = document.querySelector('.article-body');
+      var tries = 0;
+      var maxTries = 40;
+      var started = false;
+
+      function tryRender() {
+        if (window.twttr && window.twttr.widgets && typeof window.twttr.widgets.load === 'function') {
+          window.twttr.widgets.load(target);
+          return true;
+        }
+        return false;
+      }
+
+      function ensureTwitterScript() {
+        if (window.twttr) return;
+        if (document.querySelector('script[data-twitter-widgets="1"]')) return;
+        var script = document.createElement('script');
+        script.async = true;
+        script.src = 'https://platform.twitter.com/widgets.js';
+        script.charset = 'utf-8';
+        script.setAttribute('data-twitter-widgets', '1');
+        document.head.appendChild(script);
+      }
+
+      function startTwitterLoad() {
+        if (started) return;
+        started = true;
+        if (tryRender()) return;
+        ensureTwitterScript();
+        var timer = window.setInterval(function () {
+          tries += 1;
+          if (tryRender() || tries >= maxTries) {
+            window.clearInterval(timer);
+          }
+        }, 50);
+      }
+
+      if (!('IntersectionObserver' in window)) {
+        startTwitterLoad();
+        return;
+      }
+
+      var tweets = Array.prototype.slice.call(document.querySelectorAll('.article-body .twitter-tweet'));
+      if (!tweets.length) {
+        startTwitterLoad();
+        return;
+      }
+
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          io.disconnect();
+          startTwitterLoad();
+        });
+      }, { rootMargin: '350px 0px' });
+
+      tweets.forEach(function (tweet) {
+        io.observe(tweet);
+      });
+
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && !started) {
+          io.disconnect();
+          startTwitterLoad();
+        }
+      });
+    })();
+  </script>
+<% } else { %>
+<%- include('partials/article-legacy') %>
+<% } %>
+</main>
+
+<%- include('partials/footer') %>

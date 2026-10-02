@@ -1,0 +1,101 @@
+<%
+  var rawLineup = (fixture && fixture.lineup) || {};
+  var lineup = {};
+  if (Array.isArray(rawLineup)) {
+    lineup = { home: rawLineup, away: [] };
+  } else {
+    lineup = {
+      home: Array.isArray(rawLineup.home) ? rawLineup.home : [],
+      away: Array.isArray(rawLineup.away) ? rawLineup.away : [],
+    };
+  }
+  var lineupSides = [
+    { key: 'home', label: (fixture && fixture.homeTeam) || 'Domácí' },
+    { key: 'away', label: (fixture && fixture.awayTeam) || 'Hosté' },
+  ];
+  var hasAnyPlayers = lineupSides.some(function (side) {
+    return (lineup[side.key] || []).some(function (groupBlock) {
+      return (groupBlock.positions || []).some(function (positionBlock) {
+        return (positionBlock.players || []).some(function (player) {
+          return player && player.name;
+        });
+      });
+    });
+  });
+%>
+
+<section class="card-11 p-4 sm:p-5">
+  <h2 class="text-base font-semibold text-white">Sestava</h2>
+
+  <% if (!hasAnyPlayers) { %>
+  <p class="mt-3 text-sm text-11muted">Pro tento zápas zatím není sestava vyplněná.</p>
+  <% } else { %>
+  <div class="mt-4 space-y-8">
+    <% lineupSides.forEach(function (side) { %>
+    <%
+      var sideGroups = lineup[side.key] || [];
+      var sideHasPlayers = sideGroups.some(function (groupBlock) {
+        return (groupBlock.positions || []).some(function (positionBlock) {
+          return (positionBlock.players || []).some(function (player) { return player && player.name; });
+        });
+      });
+      if (!sideHasPlayers) return;
+    %>
+    <section>
+      <h3 class="text-sm font-semibold text-white"><%= side.label %></h3>
+      <div class="mt-4 space-y-6">
+        <% sideGroups.forEach(function (groupBlock) { %>
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-wide text-11muted"><%= groupBlock.group %></h4>
+          <div class="zapasy-team-roster mt-3 space-y-4">
+            <% (groupBlock.positions || []).forEach(function (positionBlock) { %>
+            <%
+              var players = (positionBlock.players || []).filter(function (player) { return player && player.name; });
+              if (!players.length) return;
+              var showNumber = groupBlock.group === 'Základní sestava' && positionBlock.section !== 'Trenér';
+              var showReason = groupBlock.group === 'Hrát nebudou';
+              var showInjured = groupBlock.group === 'Hrát nebudou';
+            %>
+            <div class="zapasy-team-roster__section">
+              <div class="zapasy-team-roster__head">
+                <h5 class="zapasy-team-roster__title"><%= positionBlock.section %></h5>
+              </div>
+              <div class="zapasy-team-roster__table-wrap">
+                <table class="zapasy-team-roster__table">
+                  <thead>
+                    <tr>
+                      <% if (showNumber) { %><th>Číslo</th><% } %>
+                      <th>Jméno</th>
+                      <th>Nár.</th>
+                      <th>Věk</th>
+                      <% if (showReason) { %><th>Důvod</th><% } %>
+                      <% if (showInjured) { %><th>✚</th><% } %>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% players.forEach(function (player) { %>
+                    <tr>
+                      <% if (showNumber) { %>
+                      <td><%= player.number || '-' %></td>
+                      <% } %>
+                      <td><%= player.name %></td>
+                      <td><%= player.nationality || '-' %></td>
+                      <td><%= player.age != null ? player.age : '-' %></td>
+                      <% if (showReason) { %><td><%= player.reason || '-' %></td><% } %>
+                      <% if (showInjured) { %><td><%= player.injured ? 'Ano' : '-' %></td><% } %>
+                    </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <% }); %>
+          </div>
+        </div>
+        <% }); %>
+      </div>
+    </section>
+    <% }); %>
+  </div>
+  <% } %>
+</section>

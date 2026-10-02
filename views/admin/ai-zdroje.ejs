@@ -1,0 +1,62 @@
+<%- include('../partials/admin-layout-start') %>
+<% var sources = typeof sources !== 'undefined' && sources ? sources : []; %>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">Zdroje RSS</h1>
+  <p class="mt-1 text-sm text-11muted">Odtud se tahají články do AI fronty. Filtr bere shodu v URL nebo titulku.</p>
+  <%- include('../partials/admin-ai-nav', { aiTab: 'zdroje' }) %>
+</div>
+
+<% if (typeof error !== 'undefined' && error) { %>
+<p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"><%= error %></p>
+<% } %>
+<% if (typeof success !== 'undefined' && success) { %>
+<p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"><%= success %></p>
+<% } %>
+
+<section class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white">Přidat RSS</h2>
+  <form method="post" action="/administrace/ai-clanky/zdroje" class="mt-4 grid gap-3 md:grid-cols-2">
+    <input type="hidden" name="action" value="create" />
+    <input name="name" required placeholder="Název zdroje" class="input-11 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    <input name="url" type="url" required placeholder="https://…/feed/" class="input-11 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    <input name="filter" placeholder="filtr, např. fotbal" class="input-11 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    <button class="rounded-xl bg-11accent px-4 py-2.5 text-sm font-semibold text-11bg md:col-span-2 w-fit" type="submit">Uložit zdroj</button>
+  </form>
+</section>
+
+<div class="mt-6 space-y-4">
+  <% sources.forEach(function (source) { %>
+  <article class="card-11 flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+    <div>
+      <div class="flex flex-wrap items-center gap-2">
+        <h3 class="text-lg font-semibold text-white"><%= source.name %></h3>
+        <span class="rounded-full border px-2.5 py-0.5 text-xs font-semibold <%= source.enabled ? 'border-11accent/40 text-11accent' : 'border-white/15 text-slate-400' %>">
+          <%= source.enabled ? 'zapnuto' : 'vypnuto' %>
+        </span>
+      </div>
+      <p class="mt-1 break-all text-sm text-11muted"><%= source.url %></p>
+      <p class="mt-2 text-xs text-11muted">
+        <%= source.article_count || 0 %> článků
+        <% if (source.filter) { %> · filtr: <%= source.filter %><% } %>
+        <% if (source.last_error) { %> · chyba: <%= source.last_error %><% } %>
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <form method="post" action="/administrace/ai-clanky/zdroje">
+        <input type="hidden" name="id" value="<%= source.id %>" />
+        <input type="hidden" name="action" value="toggle" />
+        <input type="hidden" name="enabled" value="<%= source.enabled ? '0' : '1' %>" />
+        <button class="rounded-xl border border-white/15 px-3 py-2 text-sm text-white" type="submit"><%= source.enabled ? 'Vypnout' : 'Zapnout' %></button>
+      </form>
+      <form method="post" action="/administrace/ai-clanky/zdroje">
+        <input type="hidden" name="id" value="<%= source.id %>" />
+        <input type="hidden" name="action" value="delete" />
+        <button class="rounded-xl border border-red-400/30 px-3 py-2 text-sm text-red-200" type="submit">Smazat</button>
+      </form>
+    </div>
+  </article>
+  <% }); %>
+</div>
+
+<%- include('../partials/admin-layout-end') %>

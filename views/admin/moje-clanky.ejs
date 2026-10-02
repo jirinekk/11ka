@@ -1,0 +1,32 @@
+<%- include('../partials/admin-layout-start') %>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl"><%= all ? 'Články' : 'Moje články' %></h1>
+  <p class="mt-2"><a href="/administrace/clanek/novy" class="text-sm font-medium text-11accent hover:underline">+ Nový článek</a></p>
+</div>
+
+<ul class="mt-8 space-y-2">
+  <% articles.forEach(function (a) { 
+    var del = currentUser && (
+      (typeof hasAnyRole === 'function' ? hasAnyRole(currentUser, 'vedeni', 'sefredaktor') : (currentUser.role === 'vedeni' || currentUser.role === 'sefredaktor'))
+      || ((typeof isRedaktorWorkflow === 'function' ? isRedaktorWorkflow(currentUser) : currentUser.role === 'redaktor') && a.author_id === currentUser.id && a.status === 'draft')
+    );
+  %>
+  <li class="card-11 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+    <div>
+      <span class="font-medium text-white"><%= a.title %></span>
+      <span class="ml-2 text-xs text-11accent"><%= a.status %></span>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <a href="/administrace/clanek/<%= a.id %>/edit" class="text-sm text-11accent hover:underline">Upravit</a>
+      <% if (del) { %>
+      <form method="post" action="/administrace/clanek/<%= a.id %>/smazat" class="inline" onsubmit="return confirm('Smazat článek?');">
+        <button type="submit" class="text-sm text-red-400 hover:underline">Smazat</button>
+      </form>
+      <% } %>
+    </div>
+  </li>
+  <% }); %>
+</ul>
+
+<%- include('../partials/admin-layout-end') %>

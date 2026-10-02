@@ -1,0 +1,874 @@
+<%- include('../partials/admin-layout-start') %>
+
+<%
+  function fmtAdminDateTime(iso) {
+    if (typeof formatPragueDateTime === 'function') return formatPragueDateTime(iso);
+    if (!iso) return '-';
+    var date = new Date(iso);
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleString('cs-CZ', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Prague'
+    });
+  }
+%>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">Správa penalt</h1>
+  <p class="mt-1 text-sm text-11muted">
+    Správa výběru brankářů v penaltové minihře u článků.
+  </p>
+</div>
+
+<% if (error) { %><p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p><% } %>
+<% if (success) { %><p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p><% } %>
+
+<section class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white"><%= editingKeeper ? 'Upravit brankáře' : 'Přidat brankáře' %></h2>
+  <p class="mt-1 text-xs text-11muted">Hráč si vybírá brankáře před penaltami - čím víc bodů za gól, tím vyšší násobitel skóre.</p>
+  <form id="penalty-keeper-form" class="mt-4 grid gap-3 sm:grid-cols-2" method="post" action="/administrace/penalty" enctype="multipart/form-data">
+    <input type="hidden" name="action" value="<%= editingKeeper ? 'update_keeper' : 'create_keeper' %>" />
+    <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+    <% if (editingKeeper) { %><input type="hidden" name="id" value="<%= editingKeeper.id %>" /><% } %>
+    <div>
+      <label class="text-xs text-11muted">Jméno brankáře</label>
+      <input name="name" required value="<%= (editingKeeper && editingKeeper.name) || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="text-xs text-11muted">Název týmu</label>
+      <input name="team_name" value="<%= (editingKeeper && editingKeeper.team_name) || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="text-xs text-11muted">Body za gól</label>
+      <input name="points_per_goal" type="number" min="1" max="99" value="<%= (editingKeeper && editingKeeper.points_per_goal) || 1 %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <%
+      var keeperExp = (editingKeeper && editingKeeper.experience_stars) || 1;
+      var previewThumbScale = (editingKeeper && editingKeeper.thumb_scale) || 1;
+      var previewThumbPosition = (editingKeeper && editingKeeper.thumb_position) || '50% calc(50% + 0px)';
+      var previewThumbMobileScale =
+        editingKeeper && editingKeeper.thumb_mobile_scale != null
+          ? editingKeeper.thumb_mobile_scale
+          : previewThumbScale;
+      var previewThumbMobilePosition =
+        editingKeeper && editingKeeper.thumb_mobile_position
+          ? editingKeeper.thumb_mobile_position
+          : previewThumbPosition;
+      var previewFaceTop = (editingKeeper && editingKeeper.face_top_pct != null) ? editingKeeper.face_top_pct : 14;
+      var previewFaceLeft = (editingKeeper && editingKeeper.face_left_pct != null) ? editingKeeper.face_left_pct : 50;
+      var previewFaceSize = (editingKeeper && editingKeeper.face_size_pct != null) ? editingKeeper.face_size_pct : 100;
+      var previewThumbSrc = (editingKeeper && editingKeeper.thumb_path) || '/images/penalty-keeper.webp';
+      var previewKeeperBodySrc = (penaltySettings && penaltySettings.opponent_stand) || '/images/penalty-keeper.webp';
+      var hasCustomFaceThumb = !!(editingKeeper && editingKeeper.thumb_path && String(editingKeeper.thumb_path).indexOf('/uploads/') === 0);
+      var previewName = (editingKeeper && editingKeeper.name) || 'Jméno brankáře';
+      var previewTeam = (editingKeeper && editingKeeper.team_name) || 'Název týmu';
+    %>
+    <div class="sm:col-span-2">
+      <span class="text-xs text-11muted">Fotka brankáře</span>
+      <div class="mt-1">
+        <input
+          type="file"
+          name="thumb_file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          class="w-full min-w-0 text-sm text-11muted file:mr-3 file:rounded-lg file:border-0 file:bg-11accent file:px-3 file:py-2 file:text-sm file:font-medium file:text-11bg sm:w-auto"
+        />
+      </div>
+      <p class="mt-1 text-xs text-11muted">JPG, PNG, WebP nebo GIF, max. 8 MB.</p>
+    </div>
+    <div class="penalty-admin-pick-preview sm:col-span-2">
+      <p class="text-xs text-11muted">Náhled karty ve výběru brankáře - pro počítač a mobil lze nastavit velikost a svislé zarovnání fotky zvlášť.</p>
+      <div class="penalty-admin-pick-preview__previews">
+        <div class="penalty-admin-pick-preview__device">
+          <p class="penalty-admin-pick-preview__device-label">Počítač</p>
+          <div
+            class="penalty-admin-pick-preview__card penalty-game__pick-option penalty-game__pick-option--active"
+            data-penalty-preview-card
+            aria-hidden="true"
+          >
+            <span
+              class="penalty-game__pick-thumb-wrap js-penalty-preview-desktop-thumb-wrap"
+              style="--penalty-thumb-scale: <%= previewThumbScale %>;"
+            >
+              <img
+                src="<%= previewThumbSrc %>"
+                alt=""
+                class="penalty-game__pick-thumb js-penalty-preview-desktop-thumb"
+                draggable="false"
+                style="object-position: <%= previewThumbPosition %>;"
+              />
+            </span>
+            <span class="penalty-game__pick-copy">
+              <span class="penalty-game__pick-name js-penalty-preview-name"><%= previewName %></span>
+              <span class="penalty-game__pick-stars js-penalty-preview-stars" aria-hidden="true">
+                <% for (var previewStar = 1; previewStar <= 5; previewStar++) { %>
+                <span class="penalty-game__pick-star<%= previewStar <= keeperExp ? ' penalty-game__pick-star--on' : '' %>" data-preview-star="<%= previewStar %>">★</span>
+                <% } %>
+              </span>
+              <span class="penalty-game__pick-team-name js-penalty-preview-team"><%= previewTeam %></span>
+            </span>
+          </div>
+          <div class="penalty-admin-thumb-controls penalty-admin-thumb-controls--desktop">
+            <div class="penalty-admin-thumb-zoom">
+              <span class="penalty-admin-thumb-zoom__label">Velikost fotky</span>
+              <div class="penalty-admin-thumb-zoom__controls">
+                <button type="button" class="penalty-admin-thumb-zoom__btn" data-thumb-zoom-out aria-label="Zmenšit fotku na počítači">−</button>
+                <span class="penalty-admin-thumb-zoom__value" data-thumb-zoom-label><%= Math.round(previewThumbScale * 100) %>%</span>
+                <button type="button" class="penalty-admin-thumb-zoom__btn" data-thumb-zoom-in aria-label="Zvětšit fotku na počítači">+</button>
+              </div>
+            </div>
+            <div class="penalty-admin-thumb-zoom">
+              <span class="penalty-admin-thumb-zoom__label">Pozice nahoru / dolů</span>
+              <div class="penalty-admin-thumb-zoom__controls">
+                <button type="button" class="penalty-admin-thumb-zoom__btn" data-thumb-pos-up aria-label="Posunout fotku nahoru na počítači">↑</button>
+                <button type="button" class="penalty-admin-thumb-zoom__btn" data-thumb-pos-down aria-label="Posunout fotku dolů na počítači">↓</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="penalty-admin-pick-preview__device penalty-admin-pick-preview__device--mobile">
+          <p class="penalty-admin-pick-preview__device-label">Mobil</p>
+          <div class="penalty-admin-pick-preview__phone">
+            <div
+              class="penalty-admin-pick-preview__card penalty-admin-pick-preview__card--mobile penalty-game__pick-option penalty-game__pick-option--active"
+              data-penalty-preview-card-mobile
+              aria-hidden="true"
+            >
+              <span
+                class="penalty-game__pick-thumb-wrap js-penalty-preview-mobile-thumb-wrap"
+                style="--penalty-thumb-scale: <%= previewThumbMobileScale %>;"
+              >
+                <img
+                  src="<%= previewThumbSrc %>"
+                  alt=""
+                  class="penalty-game__pick-thumb js-penalty-preview-mobile-thumb"
+                  draggable="false"
+                  style="object-position: <%= previewThumbMobilePosition %>;"
+                />
+              </span>
+              <span class="penalty-game__pick-copy">
+                <span class="penalty-game__pick-name js-penalty-preview-name"><%= previewName %></span>
+                <span class="penalty-game__pick-stars js-penalty-preview-stars" aria-hidden="true">
+                  <% for (var previewStarMobile = 1; previewStarMobile <= 5; previewStarMobile++) { %>
+                  <span class="penalty-game__pick-star<%= previewStarMobile <= keeperExp ? ' penalty-game__pick-star--on' : '' %>" data-preview-star="<%= previewStarMobile %>">★</span>
+                  <% } %>
+                </span>
+                <span class="penalty-game__pick-team-name js-penalty-preview-team"><%= previewTeam %></span>
+              </span>
+            </div>
+          </div>
+          <div class="penalty-admin-thumb-controls penalty-admin-thumb-controls--mobile">
+            <div class="penalty-admin-thumb-zoom">
+              <span class="penalty-admin-thumb-zoom__label">Velikost fotky</span>
+              <div class="penalty-admin-thumb-zoom__controls">
+                <button type="button" class="penalty-admin-thumb-zoom__btn" data-thumb-mobile-zoom-out aria-label="Zmenšit fotku na mobilu">−</button>
+                <span class="penalty-admin-thumb-zoom__value" data-thumb-mobile-zoom-label><%= Math.round(previewThumbMobileScale * 100) %>%</span>
+                <button type="button" class="penalty-admin-thumb-zoom__btn" data-thumb-mobile-zoom-in aria-label="Zvětšit fotku na mobilu">+</button>
+              </div>
+            </div>
+            <div class="penalty-admin-thumb-zoom">
+              <span class="penalty-admin-thumb-zoom__label">Pozice nahoru / dolů</span>
+              <div class="penalty-admin-thumb-zoom__controls">
+                <button type="button" class="penalty-admin-thumb-zoom__btn" data-thumb-mobile-pos-up aria-label="Posunout fotku nahoru na mobilu">↑</button>
+                <button type="button" class="penalty-admin-thumb-zoom__btn" data-thumb-mobile-pos-down aria-label="Posunout fotku dolů na mobilu">↓</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" name="thumb_position" id="penalty_thumb_position" value="<%= previewThumbPosition %>" />
+      <input type="hidden" name="thumb_scale" id="penalty_thumb_scale" value="<%= previewThumbScale %>" />
+      <input type="hidden" name="thumb_mobile_position" id="penalty_thumb_mobile_position" value="<%= previewThumbMobilePosition %>" />
+      <input type="hidden" name="thumb_mobile_scale" id="penalty_thumb_mobile_scale" value="<%= previewThumbMobileScale %>" />
+    </div>
+    <div class="penalty-admin-face-preview sm:col-span-2">
+      <p class="text-xs text-11muted">Obličej ve hře - nastavte pozici a velikost kruhu na těle brankáře.</p>
+      <div
+        class="penalty-admin-face-preview__stage"
+        data-penalty-face-preview-stage
+        aria-hidden="true"
+      >
+        <div class="penalty-admin-face-preview__keeper penalty-game__keeper--pose-stand penalty-game__keeper--face">
+          <span class="penalty-game__keeper-stack">
+            <img
+              src="<%= previewKeeperBodySrc %>"
+              alt=""
+              class="penalty-game__keeper-img js-penalty-face-preview-body"
+              width="908"
+              height="320"
+              draggable="false"
+            />
+            <span
+              class="penalty-game__keeper-face-wrap js-penalty-face-preview-wrap"
+              style="--penalty-face-top-fraction: <%= previewFaceTop / 100 %>; --penalty-face-left: <%= previewFaceLeft %>%; --penalty-face-size-fraction: <%= previewFaceSize / 100 %>;"
+              <% if (!hasCustomFaceThumb) { %>hidden<% } %>
+            >
+              <img
+                src="<%= hasCustomFaceThumb ? previewThumbSrc : '' %>"
+                alt=""
+                class="penalty-game__keeper-face js-penalty-face-preview-face"
+                draggable="false"
+              />
+            </span>
+          </span>
+        </div>
+      </div>
+      <div class="penalty-admin-face-controls">
+        <div class="penalty-admin-face-controls__group">
+          <span class="penalty-admin-face-controls__label">Pozice kruhu</span>
+          <div class="penalty-admin-face-controls__pad" role="group" aria-label="Pozice kruhu">
+            <button type="button" class="penalty-admin-thumb-zoom__btn penalty-admin-face-controls__btn" data-face-pos-up aria-label="Posunout nahoru">↑</button>
+            <div class="penalty-admin-face-controls__pad-row">
+              <button type="button" class="penalty-admin-thumb-zoom__btn penalty-admin-face-controls__btn" data-face-pos-left aria-label="Posunout vlevo">←</button>
+              <button type="button" class="penalty-admin-thumb-zoom__btn penalty-admin-face-controls__btn" data-face-pos-right aria-label="Posunout vpravo">→</button>
+            </div>
+            <button type="button" class="penalty-admin-thumb-zoom__btn penalty-admin-face-controls__btn" data-face-pos-down aria-label="Posunout dolů">↓</button>
+          </div>
+        </div>
+        <div class="penalty-admin-face-controls__group">
+          <span class="penalty-admin-face-controls__label">Velikost kruhu</span>
+          <div class="penalty-admin-face-controls__size" role="group" aria-label="Velikost kruhu">
+            <button type="button" class="penalty-admin-thumb-zoom__btn penalty-admin-face-controls__btn" data-face-size-out aria-label="Zmenšit kruh">−</button>
+            <span class="penalty-admin-thumb-zoom__value penalty-admin-face-controls__value" data-face-size-label><%= previewFaceSize %>%</span>
+            <button type="button" class="penalty-admin-thumb-zoom__btn penalty-admin-face-controls__btn" data-face-size-in aria-label="Zvětšit kruh">+</button>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" name="face_top_pct" id="penalty_face_top_pct" value="<%= previewFaceTop %>" />
+      <input type="hidden" name="face_left_pct" id="penalty_face_left_pct" value="<%= previewFaceLeft %>" />
+      <input type="hidden" name="face_size_pct" id="penalty_face_size_pct" value="<%= previewFaceSize %>" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="block text-xs text-11muted">Zkušenost brankáře</label>
+      <div class="penalty-admin-stars penalty-admin-stars--field mt-1.5" data-keeper-experience>
+        <input type="hidden" name="experience_stars" value="<%= keeperExp %>" required />
+        <% for (var star = 1; star <= 5; star++) { %>
+        <button
+          type="button"
+          class="penalty-admin-stars__btn<%= star <= keeperExp ? ' is-on' : '' %>"
+          data-star="<%= star %>"
+          aria-label="<%= star %> z 5"
+        >★</button>
+        <% } %>
+      </div>
+    </div>
+    <div class="sm:col-span-2 flex flex-wrap gap-2">
+      <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg"><%= editingKeeper ? 'Uložit změny' : 'Přidat brankáře' %></button>
+      <% if (editingKeeper) { %>
+      <a href="<%= (pagination && pagination.page && pagination.page > 1) ? ('/administrace/penalty?page=' + pagination.page) : '/administrace/penalty' %>" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5">Zrušit úpravu</a>
+      <% } %>
+    </div>
+  </form>
+</section>
+
+<section id="penalty-admin-keepers" class="mt-8 space-y-3">
+  <h2 class="text-xs font-semibold uppercase tracking-wider text-11muted">Brankáři ve výběru</h2>
+  <% if (!(keepers && keepers.length)) { %>
+  <p class="text-sm text-11muted">Zatím žádní brankáři.</p>
+  <% } %>
+  <% (keepers || []).forEach(function (item, index) { %>
+  <article class="card-11 flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+    <span class="text-sm font-semibold text-11accent"><%= ((pagination && pagination.page) ? pagination.page - 1 : 0) * ((pagination && pagination.perPage) || 5) + index + 1 %></span>
+    <div class="min-w-0 flex-1">
+      <p class="text-sm font-semibold text-white"><%= item.name %><% if (item.team_name) { %> <span class="font-normal text-11muted">· <%= item.team_name %></span><% } %></p>
+      <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-11muted">
+        <span class="penalty-admin-stars penalty-admin-stars--readonly" aria-label="Zkušenost <%= item.experience_stars %> z 5">
+          <% for (var star = 1; star <= 5; star++) { %>
+          <span class="penalty-admin-stars__btn<%= star <= item.experience_stars ? ' is-on' : '' %>" aria-hidden="true">★</span>
+          <% } %>
+        </span>
+        <span><%= item.points_per_goal %> bodů za gól</span>
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/administrace/penalty?edit=<%= item.id %><%= (pagination && pagination.page && pagination.page > 1) ? ('&page=' + pagination.page) : '' %>" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10">Upravit</a>
+      <form method="post" action="/administrace/penalty">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="move_up" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-30" <%= index === 0 && (!pagination || pagination.page === 1) ? 'disabled' : '' %>>↑</button>
+      </form>
+      <form method="post" action="/administrace/penalty">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="move_down" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-30" <%= index === keepers.length - 1 && (!pagination || pagination.page === pagination.totalPages) ? 'disabled' : '' %>>↓</button>
+      </form>
+      <form method="post" action="/administrace/penalty" onsubmit="return confirm('Odebrat brankáře?');">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="delete_keeper" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg px-2.5 py-2 text-sm text-red-300 hover:bg-red-500/10">Smazat</button>
+      </form>
+    </div>
+  </article>
+  <% }); %>
+
+  <% if (pagination && pagination.totalPages > 1) { %>
+  <nav class="mt-5 flex flex-wrap items-center justify-center gap-2" aria-label="Stránkování brankářů v administraci">
+    <% if (pagination.prevUrl) { %>
+    <a href="<%= pagination.prevUrl %>#penalty-admin-keepers" rel="prev" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:border-white/20 hover:bg-white/10">Předchozí</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50" aria-disabled="true">Předchozí</span>
+    <% } %>
+    <% pagination.pages.forEach(function (p) { %>
+      <% if (p.current) { %>
+      <span class="min-w-[40px] rounded-lg bg-11accent px-3 py-2 text-center text-sm text-11bg" aria-current="page"><%= p.n %></span>
+      <% } else { %>
+      <a href="<%= p.url %>#penalty-admin-keepers" class="min-w-[40px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-slate-200 hover:border-white/20 hover:bg-white/10"><%= p.n %></a>
+      <% } %>
+    <% }); %>
+    <% if (pagination.nextUrl) { %>
+    <a href="<%= pagination.nextUrl %>#penalty-admin-keepers" rel="next" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:border-white/20 hover:bg-white/10">Další</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50" aria-disabled="true">Další</span>
+    <% } %>
+  </nav>
+  <% } %>
+</section>
+
+<section id="penalty-admin-players" class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white">Registrovaní hráči</h2>
+  <p class="mt-1 text-xs text-11muted">
+    Jména a e-maily z registračního formuláře před výběrem brankáře. E-mail vidí jen správci - pro budoucí soutěže a akce kolem této hry.
+  </p>
+
+  <form method="get" action="/administrace/penalty#penalty-admin-players" class="mt-4 flex flex-wrap items-end gap-2">
+    <% if (pagination && pagination.page > 1) { %>
+    <input type="hidden" name="page" value="<%= pagination.page %>" />
+    <% } %>
+    <% if (leaderboardPagination && leaderboardPagination.page > 1) { %>
+    <input type="hidden" name="leaderboard_page" value="<%= leaderboardPagination.page %>" />
+    <% } %>
+    <div class="min-w-[220px] flex-1">
+      <label for="penalty-players-search" class="text-xs text-11muted">Vyhledávání</label>
+      <input
+        id="penalty-players-search"
+        name="players_q"
+        type="search"
+        value="<%= typeof playersSearch !== 'undefined' ? playersSearch : '' %>"
+        placeholder="Jméno nebo e-mail"
+        class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+      />
+    </div>
+    <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">Hledat</button>
+    <% if (typeof playersSearch !== 'undefined' && playersSearch) { %>
+    <a href="/administrace/penalty#penalty-admin-players" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5">Zrušit filtr</a>
+    <% } %>
+  </form>
+
+  <% if (!players || !players.length) { %>
+  <p class="mt-4 text-sm text-11muted"><%= (typeof playersSearch !== 'undefined' && playersSearch) ? 'Žádný hráč neodpovídá hledání.' : 'Zatím žádné registrace.' %></p>
+  <% } else { %>
+  <div class="mt-4 overflow-x-auto">
+    <table class="min-w-full text-left text-sm text-slate-200">
+      <thead class="border-b border-white/10 text-xs uppercase tracking-wide text-11muted">
+        <tr>
+          <th class="px-2 py-2 font-medium">Jméno</th>
+          <th class="px-2 py-2 font-medium">E-mail</th>
+          <th class="px-2 py-2 font-medium">Datum</th>
+          <th class="px-2 py-2 font-medium"><span class="sr-only">Akce</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% players.forEach(function (player) { %>
+        <tr class="border-b border-white/5">
+          <td class="px-2 py-3 font-medium text-white"><%= player.display_name %></td>
+          <td class="px-2 py-3"><a href="mailto:<%= player.email %>" class="text-11accent hover:underline"><%= player.email %></a></td>
+          <td class="px-2 py-3 whitespace-nowrap text-11muted"><%= fmtAdminDateTime(player.created_at) %></td>
+          <td class="px-2 py-3 text-right">
+            <form method="post" action="/administrace/penalty" onsubmit="return confirm('Odebrat záznam hráče?');">
+              <input type="hidden" name="id" value="<%= player.id %>" />
+              <input type="hidden" name="action" value="delete_player" />
+              <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+              <input type="hidden" name="players_page" value="<%= (playersPagination && playersPagination.page) || 1 %>" />
+              <% if (typeof playersSearch !== 'undefined' && playersSearch) { %>
+              <input type="hidden" name="players_q" value="<%= playersSearch %>" />
+              <% } %>
+              <input type="hidden" name="leaderboard_page" value="<%= (leaderboardPagination && leaderboardPagination.page) || 1 %>" />
+              <button type="submit" class="rounded-lg px-2.5 py-2 text-sm text-red-300 hover:bg-red-500/10">Smazat</button>
+            </form>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+
+  <% if (playersPagination && playersPagination.totalPages > 1) { %>
+  <nav class="mt-5 flex flex-wrap items-center justify-center gap-2" aria-label="Stránkování hráčů v administraci">
+    <% if (playersPagination.prevUrl) { %>
+    <a href="<%= playersPagination.prevUrl %>#penalty-admin-players" rel="prev" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:border-white/20 hover:bg-white/10">Předchozí</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50" aria-disabled="true">Předchozí</span>
+    <% } %>
+    <% playersPagination.pages.forEach(function (p) { %>
+      <% if (p.current) { %>
+      <span class="min-w-[40px] rounded-lg bg-11accent px-3 py-2 text-center text-sm text-11bg" aria-current="page"><%= p.n %></span>
+      <% } else { %>
+      <a href="<%= p.url %>#penalty-admin-players" class="min-w-[40px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-slate-200 hover:border-white/20 hover:bg-white/10"><%= p.n %></a>
+      <% } %>
+    <% }); %>
+    <% if (playersPagination.nextUrl) { %>
+    <a href="<%= playersPagination.nextUrl %>#penalty-admin-players" rel="next" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:border-white/20 hover:bg-white/10">Další</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50" aria-disabled="true">Další</span>
+    <% } %>
+  </nav>
+  <% } %>
+  <% } %>
+</section>
+
+<section id="penalty-admin-leaderboard" class="card-11 mt-8 p-6">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-semibold text-white">Žebříček bodů</h2>
+      <p class="mt-1 text-xs text-11muted">
+        Celkové body hráčů ze všech článků. Můžete vynulovat celý žebříček nebo odebrat jednotlivé hráče.
+      </p>
+    </div>
+    <% if (leaderboardPagination && leaderboardPagination.totalItems > 0) { %>
+    <form method="post" action="/administrace/penalty" onsubmit="return confirm('Vynulovat body všech hráčů v žebříčku?');">
+      <input type="hidden" name="action" value="reset_leaderboard_all" />
+      <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+      <input type="hidden" name="players_page" value="<%= (playersPagination && playersPagination.page) || 1 %>" />
+      <% if (typeof playersSearch !== 'undefined' && playersSearch) { %>
+      <input type="hidden" name="players_q" value="<%= playersSearch %>" />
+      <% } %>
+      <input type="hidden" name="leaderboard_page" value="<%= (leaderboardPagination && leaderboardPagination.page) || 1 %>" />
+      <button type="submit" class="rounded-lg bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-200 hover:bg-amber-500/20">
+        Vynulovat celý žebříček
+      </button>
+    </form>
+    <% } %>
+  </div>
+
+  <% if (!leaderboard || !leaderboard.length) { %>
+  <p class="mt-4 text-sm text-11muted">Zatím žádné body ve žebříčku.</p>
+  <% } else { %>
+  <div class="mt-4 overflow-x-auto">
+    <table class="min-w-full text-left text-sm text-slate-200">
+      <thead class="border-b border-white/10 text-xs uppercase tracking-wide text-11muted">
+        <tr>
+          <th class="px-2 py-2 font-medium">Hráč</th>
+          <th class="px-2 py-2 font-medium">Body</th>
+          <th class="px-2 py-2 font-medium">Aktualizace</th>
+          <th class="px-2 py-2 font-medium"><span class="sr-only">Akce</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% leaderboard.forEach(function (entry) { %>
+        <tr class="border-b border-white/5">
+          <td class="px-2 py-3 font-medium text-white"><%= entry.display_name %></td>
+          <td class="px-2 py-3 font-semibold text-11accent"><%= entry.points %></td>
+          <td class="px-2 py-3 whitespace-nowrap text-11muted"><%= fmtAdminDateTime(entry.updated_at) %></td>
+          <td class="px-2 py-3 text-right">
+            <form method="post" action="/administrace/penalty" onsubmit="return confirm('Odebrat hráče ze žebříčku?');">
+              <input type="hidden" name="action" value="delete_leaderboard_entry" />
+              <input type="hidden" name="player_id" value="<%= entry.player_id %>" />
+              <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+              <input type="hidden" name="players_page" value="<%= (playersPagination && playersPagination.page) || 1 %>" />
+              <% if (typeof playersSearch !== 'undefined' && playersSearch) { %>
+              <input type="hidden" name="players_q" value="<%= playersSearch %>" />
+              <% } %>
+              <input type="hidden" name="leaderboard_page" value="<%= (leaderboardPagination && leaderboardPagination.page) || 1 %>" />
+              <button type="submit" class="rounded-lg px-2.5 py-2 text-sm text-red-300 hover:bg-red-500/10">Smazat</button>
+            </form>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+
+  <% if (leaderboardPagination && leaderboardPagination.totalPages > 1) { %>
+  <nav class="mt-5 flex flex-wrap items-center justify-center gap-2" aria-label="Stránkování žebříčku v administraci">
+    <% if (leaderboardPagination.prevUrl) { %>
+    <a href="<%= leaderboardPagination.prevUrl %>#penalty-admin-leaderboard" rel="prev" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:border-white/20 hover:bg-white/10">Předchozí</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50" aria-disabled="true">Předchozí</span>
+    <% } %>
+    <% leaderboardPagination.pages.forEach(function (p) { %>
+      <% if (p.current) { %>
+      <span class="min-w-[40px] rounded-lg bg-11accent px-3 py-2 text-center text-sm text-11bg" aria-current="page"><%= p.n %></span>
+      <% } else { %>
+      <a href="<%= p.url %>#penalty-admin-leaderboard" class="min-w-[40px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-slate-200 hover:border-white/20 hover:bg-white/10"><%= p.n %></a>
+      <% } %>
+    <% }); %>
+    <% if (leaderboardPagination.nextUrl) { %>
+    <a href="<%= leaderboardPagination.nextUrl %>#penalty-admin-leaderboard" rel="next" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:border-white/20 hover:bg-white/10">Další</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50" aria-disabled="true">Další</span>
+    <% } %>
+  </nav>
+  <% } %>
+  <% } %>
+</section>
+
+<script>
+  (function () {
+    var keeperForm = document.getElementById('penalty-keeper-form');
+    if (!keeperForm) return;
+
+    var nameInput = keeperForm.querySelector('input[name="name"]');
+    var teamInput = keeperForm.querySelector('input[name="team_name"]');
+    var thumbFileInput = keeperForm.querySelector('input[name="thumb_file"]');
+    var previewNames = keeperForm.querySelectorAll('.js-penalty-preview-name');
+    var previewTeams = keeperForm.querySelectorAll('.js-penalty-preview-team');
+    var previewDesktopThumb = keeperForm.querySelector('.js-penalty-preview-desktop-thumb');
+    var previewDesktopThumbWrap = keeperForm.querySelector('.js-penalty-preview-desktop-thumb-wrap');
+    var previewMobileThumb = keeperForm.querySelector('.js-penalty-preview-mobile-thumb');
+    var previewMobileThumbWrap = keeperForm.querySelector('.js-penalty-preview-mobile-thumb-wrap');
+    var previewStars = keeperForm.querySelectorAll('[data-preview-star]');
+    var thumbScaleInput = document.getElementById('penalty_thumb_scale');
+    var thumbPositionInput = document.getElementById('penalty_thumb_position');
+    var thumbMobileScaleInput = document.getElementById('penalty_thumb_mobile_scale');
+    var thumbMobilePositionInput = document.getElementById('penalty_thumb_mobile_position');
+    var faceTopInput = document.getElementById('penalty_face_top_pct');
+    var faceLeftInput = document.getElementById('penalty_face_left_pct');
+    var faceSizeInput = document.getElementById('penalty_face_size_pct');
+    var previewFaceWrap = keeperForm.querySelector('.js-penalty-face-preview-wrap');
+    var previewFaceImg = keeperForm.querySelector('.js-penalty-face-preview-face');
+    var faceSizeLabel = keeperForm.querySelector('[data-face-size-label]');
+    var zoomOutBtn = keeperForm.querySelector('[data-thumb-zoom-out]');
+    var zoomInBtn = keeperForm.querySelector('[data-thumb-zoom-in]');
+    var zoomLabel = keeperForm.querySelector('[data-thumb-zoom-label]');
+    var posUpBtn = keeperForm.querySelector('[data-thumb-pos-up]');
+    var posDownBtn = keeperForm.querySelector('[data-thumb-pos-down]');
+    var mobileZoomOutBtn = keeperForm.querySelector('[data-thumb-mobile-zoom-out]');
+    var mobileZoomInBtn = keeperForm.querySelector('[data-thumb-mobile-zoom-in]');
+    var mobileZoomLabel = keeperForm.querySelector('[data-thumb-mobile-zoom-label]');
+    var mobilePosUpBtn = keeperForm.querySelector('[data-thumb-mobile-pos-up]');
+    var mobilePosDownBtn = keeperForm.querySelector('[data-thumb-mobile-pos-down]');
+    var defaultThumbSrc = <%- JSON.stringify(previewThumbSrc) %>;
+    var hasCustomFaceThumb = <%- JSON.stringify(!!hasCustomFaceThumb) %>;
+    var previewBlobUrl = null;
+    var MIN_THUMB_SCALE = 0.5;
+    var MAX_THUMB_SCALE = 5;
+    var THUMB_SCALE_STEP = 0.1;
+    var THUMB_POS_STEP = 5;
+    var FACE_POS_STEP = 0.5;
+    var FACE_SIZE_STEP = 0.5;
+    var MIN_FACE_SIZE = 3;
+    var MAX_FACE_SIZE = 500;
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function parseScale(raw) {
+      var n = Number(String(raw || '').trim().replace(',', '.'));
+      if (!Number.isFinite(n)) return 1;
+      return Math.round(clamp(n, MIN_THUMB_SCALE, MAX_THUMB_SCALE) * 100) / 100;
+    }
+
+    function parseThumbOffset(raw, frameHeight) {
+      if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+      var s = String(raw || '').trim();
+      var m = s.match(/calc\(50%\s*\+\s*(-?\d+(?:\.\d+)?)px\)/i);
+      if (m) return Number(m[1]);
+      m = s.match(/^50%\s+(-?\d+(?:\.\d+)?)%$/);
+      if (m) {
+        var h = frameHeight || 52;
+        return ((Number(m[1]) - 50) / 100) * h;
+      }
+      return 0;
+    }
+
+    function formatThumbPosition(offsetPx) {
+      var n = Math.round(offsetPx * 10) / 10;
+      return '50% calc(50% + ' + n + 'px)';
+    }
+
+    function parseFacePct(raw, fallback) {
+      var n = Number(String(raw || '').trim().replace(',', '.'));
+      if (!Number.isFinite(n)) return fallback;
+      return Math.round(clamp(n, 0, 100) * 10) / 10;
+    }
+
+    function applyFacePreview() {
+      if (!previewFaceWrap) return;
+      faceTopPct = parseFacePct(faceTopPct, 14);
+      faceLeftPct = parseFacePct(faceLeftPct, 50);
+      faceSizePct = Math.round(clamp(faceSizePct, MIN_FACE_SIZE, MAX_FACE_SIZE) * 10) / 10;
+      previewFaceWrap.style.setProperty('--penalty-face-top-fraction', String(faceTopPct / 100));
+      previewFaceWrap.style.setProperty('--penalty-face-left', faceLeftPct + '%');
+      previewFaceWrap.style.setProperty('--penalty-face-size-fraction', String(faceSizePct / 100));
+      if (faceTopInput) faceTopInput.value = String(faceTopPct);
+      if (faceLeftInput) faceLeftInput.value = String(faceLeftPct);
+      if (faceSizeInput) faceSizeInput.value = String(faceSizePct);
+      if (faceSizeLabel) faceSizeLabel.textContent = faceSizePct + '%';
+    }
+
+    var faceTopPct = parseFacePct(faceTopInput && faceTopInput.value, 14);
+    var faceLeftPct = parseFacePct(faceLeftInput && faceLeftInput.value, 50);
+    var faceSizePct = parseFacePct(faceSizeInput && faceSizeInput.value, 100);
+
+    function changeFacePos(dx, dy) {
+      faceLeftPct = parseFacePct(faceLeftPct + dx, 50);
+      faceTopPct = parseFacePct(faceTopPct + dy, 14);
+      applyFacePreview();
+    }
+
+    function changeFaceSize(delta) {
+      faceSizePct = Math.round(clamp(faceSizePct + delta, MIN_FACE_SIZE, MAX_FACE_SIZE) * 10) / 10;
+      applyFacePreview();
+    }
+
+    function applyDesktopThumbPreview() {
+      if (!previewDesktopThumb) return;
+      thumbScale = parseScale(thumbScale);
+      if (!Number.isFinite(thumbOffsetY)) thumbOffsetY = 0;
+      var thumbPosition = formatThumbPosition(thumbOffsetY);
+      if (previewDesktopThumbWrap) {
+        previewDesktopThumbWrap.style.setProperty('--penalty-thumb-scale', String(thumbScale));
+      }
+      previewDesktopThumb.style.objectPosition = thumbPosition;
+      if (thumbScaleInput) thumbScaleInput.value = String(thumbScale);
+      if (thumbPositionInput) thumbPositionInput.value = thumbPosition;
+      if (zoomLabel) zoomLabel.textContent = Math.round(thumbScale * 100) + '%';
+      if (zoomOutBtn) zoomOutBtn.disabled = thumbScale <= MIN_THUMB_SCALE + 0.001;
+      if (zoomInBtn) zoomInBtn.disabled = thumbScale >= MAX_THUMB_SCALE - 0.001;
+    }
+
+    function applyMobileThumbPreview() {
+      if (!previewMobileThumb) return;
+      thumbMobileScale = parseScale(thumbMobileScale);
+      if (!Number.isFinite(thumbMobileOffsetY)) thumbMobileOffsetY = 0;
+      var thumbMobilePosition = formatThumbPosition(thumbMobileOffsetY);
+      if (previewMobileThumbWrap) {
+        previewMobileThumbWrap.style.setProperty('--penalty-thumb-scale', String(thumbMobileScale));
+      }
+      previewMobileThumb.style.objectPosition = thumbMobilePosition;
+      if (thumbMobileScaleInput) thumbMobileScaleInput.value = String(thumbMobileScale);
+      if (thumbMobilePositionInput) thumbMobilePositionInput.value = thumbMobilePosition;
+      if (mobileZoomLabel) mobileZoomLabel.textContent = Math.round(thumbMobileScale * 100) + '%';
+      if (mobileZoomOutBtn) mobileZoomOutBtn.disabled = thumbMobileScale <= MIN_THUMB_SCALE + 0.001;
+      if (mobileZoomInBtn) mobileZoomInBtn.disabled = thumbMobileScale >= MAX_THUMB_SCALE - 0.001;
+    }
+
+    var thumbScale = parseScale(thumbScaleInput && thumbScaleInput.value);
+    var thumbOffsetY = parseThumbOffset(
+      thumbPositionInput && thumbPositionInput.value,
+      previewDesktopThumbWrap && previewDesktopThumbWrap.offsetHeight
+    );
+    var thumbMobileScale = parseScale(thumbMobileScaleInput && thumbMobileScaleInput.value);
+    var thumbMobileOffsetY = parseThumbOffset(
+      thumbMobilePositionInput && thumbMobilePositionInput.value,
+      previewMobileThumbWrap && previewMobileThumbWrap.offsetHeight
+    );
+
+    function changeThumbPos(delta) {
+      thumbOffsetY += delta;
+      applyDesktopThumbPreview();
+    }
+
+    function changeThumbMobilePos(delta) {
+      thumbMobileOffsetY += delta;
+      applyMobileThumbPreview();
+    }
+
+    function syncPreviewText() {
+      var nameText = nameInput ? String(nameInput.value || '').trim() || 'Jméno brankáře' : 'Jméno brankáře';
+      var teamText = teamInput ? String(teamInput.value || '').trim() || 'Název týmu' : 'Název týmu';
+      previewNames.forEach(function (el) { el.textContent = nameText; });
+      previewTeams.forEach(function (el) { el.textContent = teamText; });
+    }
+
+    function paintPreviewStars(value) {
+      var n = parseInt(value, 10) || 1;
+      previewStars.forEach(function (star) {
+        var v = parseInt(star.getAttribute('data-preview-star'), 10);
+        star.classList.toggle('penalty-game__pick-star--on', v <= n);
+      });
+    }
+
+    function changeThumbScale(delta) {
+      thumbScale = parseScale(thumbScale + delta);
+      applyDesktopThumbPreview();
+    }
+
+    function changeThumbMobileScale(delta) {
+      thumbMobileScale = parseScale(thumbMobileScale + delta);
+      applyMobileThumbPreview();
+    }
+
+    if (nameInput) nameInput.addEventListener('input', syncPreviewText);
+    if (teamInput) teamInput.addEventListener('input', syncPreviewText);
+
+    function setFacePreviewVisible(visible) {
+      if (!previewFaceWrap) return;
+      previewFaceWrap.hidden = !visible;
+    }
+
+    function setPreviewImage(src, showFace) {
+      if (previewDesktopThumb) previewDesktopThumb.src = src;
+      if (previewMobileThumb) previewMobileThumb.src = src;
+      if (previewFaceImg) previewFaceImg.src = showFace ? src : '';
+      setFacePreviewVisible(!!showFace);
+    }
+
+    if (thumbFileInput && (previewDesktopThumb || previewMobileThumb)) {
+      thumbFileInput.addEventListener('change', function () {
+        var file = thumbFileInput.files && thumbFileInput.files[0];
+        if (previewBlobUrl) {
+          URL.revokeObjectURL(previewBlobUrl);
+          previewBlobUrl = null;
+        }
+        if (!file) {
+          setPreviewImage(defaultThumbSrc, hasCustomFaceThumb);
+          return;
+        }
+        previewBlobUrl = URL.createObjectURL(file);
+        setPreviewImage(previewBlobUrl, true);
+        thumbScale = 1;
+        thumbOffsetY = 0;
+        thumbMobileScale = 1;
+        thumbMobileOffsetY = 0;
+        var loadTarget = previewDesktopThumb || previewMobileThumb;
+        loadTarget.onload = function () {
+          loadTarget.onload = null;
+          applyDesktopThumbPreview();
+          applyMobileThumbPreview();
+        };
+        applyDesktopThumbPreview();
+        applyMobileThumbPreview();
+      });
+    }
+
+    function bindPreviewButton(btn, handler) {
+      if (!btn) return;
+      btn.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        handler();
+      });
+    }
+
+    bindPreviewButton(zoomOutBtn, function () {
+      changeThumbScale(-THUMB_SCALE_STEP);
+    });
+
+    bindPreviewButton(zoomInBtn, function () {
+      changeThumbScale(THUMB_SCALE_STEP);
+    });
+
+    bindPreviewButton(posUpBtn, function () {
+      changeThumbPos(-THUMB_POS_STEP);
+    });
+
+    bindPreviewButton(posDownBtn, function () {
+      changeThumbPos(THUMB_POS_STEP);
+    });
+
+    bindPreviewButton(mobileZoomOutBtn, function () {
+      changeThumbMobileScale(-THUMB_SCALE_STEP);
+    });
+
+    bindPreviewButton(mobileZoomInBtn, function () {
+      changeThumbMobileScale(THUMB_SCALE_STEP);
+    });
+
+    bindPreviewButton(mobilePosUpBtn, function () {
+      changeThumbMobilePos(-THUMB_POS_STEP);
+    });
+
+    bindPreviewButton(mobilePosDownBtn, function () {
+      changeThumbMobilePos(THUMB_POS_STEP);
+    });
+
+    keeperForm.querySelectorAll('[data-face-pos-left]').forEach(function (btn) {
+      bindPreviewButton(btn, function () { changeFacePos(-FACE_POS_STEP, 0); });
+    });
+    keeperForm.querySelectorAll('[data-face-pos-right]').forEach(function (btn) {
+      bindPreviewButton(btn, function () { changeFacePos(FACE_POS_STEP, 0); });
+    });
+    keeperForm.querySelectorAll('[data-face-pos-up]').forEach(function (btn) {
+      bindPreviewButton(btn, function () { changeFacePos(0, -FACE_POS_STEP); });
+    });
+    keeperForm.querySelectorAll('[data-face-pos-down]').forEach(function (btn) {
+      bindPreviewButton(btn, function () { changeFacePos(0, FACE_POS_STEP); });
+    });
+    keeperForm.querySelectorAll('[data-face-size-out]').forEach(function (btn) {
+      bindPreviewButton(btn, function () { changeFaceSize(-FACE_SIZE_STEP); });
+    });
+    keeperForm.querySelectorAll('[data-face-size-in]').forEach(function (btn) {
+      bindPreviewButton(btn, function () { changeFaceSize(FACE_SIZE_STEP); });
+    });
+
+    document.querySelectorAll('#penalty-keeper-form [data-keeper-experience]').forEach(function (wrap) {
+      var input = wrap.querySelector('input[name="experience_stars"]');
+      var stars = wrap.querySelectorAll('[data-star]');
+      if (!input || !stars.length) return;
+
+      function paint(value) {
+        var n = parseInt(value, 10) || 1;
+        stars.forEach(function (btn) {
+          var v = parseInt(btn.getAttribute('data-star'), 10);
+          btn.classList.toggle('is-on', v <= n);
+        });
+        paintPreviewStars(n);
+      }
+
+      stars.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var n = parseInt(btn.getAttribute('data-star'), 10);
+          input.value = String(n);
+          paint(n);
+        });
+      });
+
+      paint(input.value);
+    });
+
+    applyDesktopThumbPreview();
+    applyMobileThumbPreview();
+    applyFacePreview();
+    syncPreviewText();
+    paintPreviewStars((keeperForm.querySelector('input[name="experience_stars"]') || {}).value || 1);
+
+    keeperForm.addEventListener('submit', function () {
+      applyDesktopThumbPreview();
+      applyMobileThumbPreview();
+      applyFacePreview();
+    });
+  })();
+</script>
+
+<script>
+  (function () {
+    var section = document.getElementById('penalty-admin-keepers');
+    if (!section) return;
+    var currentPage = <%- JSON.stringify((pagination && pagination.page) || 1) %>;
+    if (window.location.hash === '#penalty-admin-keepers' || currentPage > 1) {
+      section.scrollIntoView({ block: 'start' });
+    }
+  })();
+</script>
+
+<script>
+  (function () {
+    var section = document.getElementById('penalty-admin-players');
+    if (!section) return;
+    var currentPage = <%- JSON.stringify((playersPagination && playersPagination.page) || 1) %>;
+    if (window.location.hash === '#penalty-admin-players' || currentPage > 1) {
+      section.scrollIntoView({ block: 'start' });
+    }
+  })();
+</script>
+
+<script>
+  (function () {
+    var section = document.getElementById('penalty-admin-leaderboard');
+    if (!section) return;
+    var currentPage = <%- JSON.stringify((leaderboardPagination && leaderboardPagination.page) || 1) %>;
+    if (window.location.hash === '#penalty-admin-leaderboard' || currentPage > 1) {
+      section.scrollIntoView({ block: 'start' });
+    }
+  })();
+</script>
+
+<%- include('../partials/admin-layout-end') %>

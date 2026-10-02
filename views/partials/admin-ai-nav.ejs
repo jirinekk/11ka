@@ -1,0 +1,6 @@
+<% var aiTab = typeof aiTab !== 'undefined' ? aiTab : ''; %>
+<nav class="mt-6 flex flex-wrap gap-2" aria-label="AI články">
+  <a href="/administrace/ai-clanky" class="btn-11 btn-11--sm <%= aiTab === 'fronta' ? 'btn-11--primary' : '' %>">Fronta</a>
+  <a href="/administrace/ai-navrhy" class="btn-11 btn-11--sm <%= aiTab === 'navrh' ? 'btn-11--primary' : '' %>">Návrh z podkladu</a>
+  <a href="/administrace/ai-clanky/zdroje" class="btn-11 btn-11--sm <%= aiTab === 'zdroje' ? 'btn-11--primary' : '' %>">Zdroje RSS</a>
+</nav>

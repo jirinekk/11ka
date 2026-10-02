@@ -1,0 +1,29 @@
+<% if (lineup && lineup.teams && lineup.teams.length) { %>
+<section class="lineup-11 mt-10" aria-labelledby="article-lineup-heading">
+  <h2 id="article-lineup-heading" class="mb-4 text-xl font-bold text-11accent">Sestavy</h2>
+  <div class="grid gap-6 <%= lineup.teams.length > 1 ? 'lg:grid-cols-2' : '' %>">
+    <% lineup.teams.forEach(function (team, teamIndex) { %>
+    <article class="lineup-11__team card-11 overflow-hidden p-0<%= teamIndex > 0 ? ' lineup-11__team--away' : '' %>">
+      <header class="border-b border-white/10 px-4 py-3 sm:px-5">
+        <h3 class="text-base font-semibold text-white"><%= team.label %></h3>
+        <p class="mt-0.5 text-xs text-11muted">Formace <%= team.formation %></p>
+      </header>
+      <div class="lineup-pitch p-4 sm:p-5">
+        <% team.rows.slice().reverse().forEach(function (row) { %>
+        <div class="lineup-row">
+          <% row.players.forEach(function (player) { %>
+          <div class="lineup-player">
+            <span class="lineup-player__dot" aria-hidden="true"><% if (player.number != null) { %><%= player.number %><% } %></span>
+            <% if (player.name) { %>
+            <span class="lineup-player__name"><%= player.name %></span>
+            <% } %>
+          </div>
+          <% }); %>
+        </div>
+        <% }); %>
+      </div>
+    </article>
+    <% }); %>
+  </div>
+</section>
+<% } %>

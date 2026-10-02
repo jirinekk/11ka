@@ -1,0 +1,313 @@
+<%
+  var pg = (typeof penaltyGame !== 'undefined' && penaltyGame && penaltyGame.active) ? penaltyGame : null;
+%>
+<% if (pg) {
+  var _assetV = encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1');
+  function penaltyAsset(path) {
+    if (!path) return '';
+    return path + (path.indexOf('?') >= 0 ? '&' : '?') + 'v=' + _assetV;
+  }
+  var opp = pg.opponent || {};
+  var texts = pg.texts || {};
+  var maxRounds = pg.maxRounds || 5;
+  var lb = (typeof penaltyLeaderboard !== 'undefined' && penaltyLeaderboard) ? penaltyLeaderboard : [];
+%>
+<div class="penalty-game-wrap mt-8 min-w-0">
+<section
+  class="penalty-game penalty-game--menu min-w-0"
+  aria-labelledby="penalty-game-heading"
+  data-penalty-game
+  data-max-rounds="<%= maxRounds %>"
+  data-article-slug="<%= typeof articleSlug !== 'undefined' ? articleSlug : '' %>"
+  data-article-title="<%= typeof headline !== 'undefined' ? headline : '' %>"
+  data-register-desc="<%= texts.registerDesc || '' %>"
+  data-login-desc="<%= texts.loginDesc || '' %>"
+  data-register-button="<%= texts.registerButton || 'Pokračovat k výběru brankáře' %>"
+  data-login-button="<%= texts.loginButton || 'Přihlásit se a pokračovat' %>"
+  data-keeper-stand="<%= penaltyAsset(opp.stand) %>"
+  data-keeper-left="<%= penaltyAsset(opp.left) %>"
+  data-keeper-right="<%= penaltyAsset(opp.right) %>"
+  data-keeper-high="<%= penaltyAsset(opp.high) %>"
+>
+  <div class="card-11 penalty-game__card p-5 sm:p-6">
+    <div class="penalty-game__head">
+      <h2 id="penalty-game-heading" class="text-xl font-bold text-11accent">Hra na penalty</h2>
+      <p class="mt-1 text-sm text-11muted"><%= maxRounds %> penalt - vyberte směr střely. Trefíte síť, nebo vás chytí brankář?</p>
+    </div>
+
+    <div class="penalty-game__hud" data-penalty-hud hidden>
+      <span class="penalty-game__stat"><strong data-penalty-goals>0</strong> gólů</span>
+      <span class="penalty-game__stat">Pokus <strong data-penalty-round>1</strong>/<%= maxRounds %></span>
+    </div>
+
+    <div class="penalty-game__arena">
+      <div class="penalty-game__sky" aria-hidden="true"></div>
+      <div class="penalty-game__pitch-lines" aria-hidden="true">
+        <span class="penalty-game__box"></span>
+        <span class="penalty-game__arc"></span>
+      </div>
+
+      <div class="penalty-game__goal-frame" aria-hidden="true">
+        <span class="penalty-game__post penalty-game__post--left"></span>
+        <span class="penalty-game__crossbar"></span>
+        <span class="penalty-game__post penalty-game__post--right"></span>
+        <span class="penalty-game__net"></span>
+      </div>
+
+      <div class="penalty-game__goal" role="group" aria-label="Vyberte směr střely">
+        <button type="button" class="penalty-game__zone" data-zone="tl" aria-label="Vlevo nahoře"></button>
+        <button type="button" class="penalty-game__zone" data-zone="tc" aria-label="Nahoře uprostřed"></button>
+        <button type="button" class="penalty-game__zone" data-zone="tr" aria-label="Vpravo nahoře"></button>
+        <button type="button" class="penalty-game__zone" data-zone="bl" aria-label="Vlevo dole"></button>
+        <button type="button" class="penalty-game__zone" data-zone="bc" aria-label="Dole uprostřed"></button>
+        <button type="button" class="penalty-game__zone" data-zone="br" aria-label="Vpravo dole"></button>
+      </div>
+
+      <div class="penalty-game__keeper penalty-game__keeper--pose-stand" data-penalty-keeper aria-hidden="true">
+        <span class="penalty-game__keeper-stack" data-keeper-stack>
+          <img
+            src="<%= penaltyAsset(opp.stand) %>"
+            alt=""
+            class="penalty-game__keeper-img"
+            data-keeper-body
+            width="908"
+            height="320"
+            loading="lazy"
+            decoding="async"
+            draggable="false"
+          />
+          <span class="penalty-game__keeper-face-wrap" data-keeper-face-wrap hidden>
+            <img
+              src=""
+              alt=""
+              class="penalty-game__keeper-face"
+              data-keeper-face
+              loading="lazy"
+              decoding="async"
+              draggable="false"
+            />
+          </span>
+        </span>
+      </div>
+
+      <div class="penalty-game__ball-wrap" data-penalty-ball aria-hidden="true">
+        <span class="penalty-game__ball-shadow"></span>
+        <img
+          src="/images/penalty-ball.webp?v=<%= _assetV %>"
+          alt=""
+          class="penalty-game__ball-img"
+          width="256"
+          height="256"
+          loading="lazy"
+          decoding="async"
+          draggable="false"
+        />
+      </div>
+
+      <div class="penalty-game__spot" data-penalty-spot aria-hidden="true"></div>
+
+      <div class="penalty-game__menu" data-penalty-menu aria-hidden="false">
+        <div class="penalty-game__menu-panel">
+          <p class="penalty-game__menu-kicker">Interaktivní hra</p>
+          <p class="penalty-game__menu-title"><%= texts.menuTitle || 'Připraven na penalty?' %></p>
+          <p class="penalty-game__menu-desc"><%= texts.menuDesc || '' %></p>
+          <button type="button" class="btn-11 btn-11--primary penalty-game__start" data-penalty-start>
+            Zapnout hru
+          </button>
+        </div>
+      </div>
+
+      <div class="penalty-game__register" data-penalty-register hidden aria-hidden="true">
+        <div class="penalty-game__menu-panel penalty-game__register-panel">
+          <p class="penalty-game__menu-kicker" data-penalty-auth-kicker>Registrace</p>
+          <p class="penalty-game__menu-title"><%= texts.registerTitle || 'Než vstoupíš na hřiště…' %></p>
+          <div class="penalty-game__register-tabs" role="tablist" aria-label="Registrace nebo přihlášení">
+            <button type="button" class="penalty-game__register-tab penalty-game__register-tab--active" data-penalty-auth-tab="register" role="tab" aria-selected="true">
+              <%= texts.registerTab || 'Registrace' %>
+            </button>
+            <button type="button" class="penalty-game__register-tab" data-penalty-auth-tab="login" role="tab" aria-selected="false">
+              <%= texts.loginTab || 'Přihlášení' %>
+            </button>
+          </div>
+          <p class="penalty-game__menu-desc" data-penalty-auth-desc><%= texts.registerDesc || '' %></p>
+          <form class="penalty-game__register-form" data-penalty-register-form novalidate>
+            <label class="penalty-game__register-field" data-penalty-register-name-wrap>
+              <span class="penalty-game__register-label"><%= texts.registerNameLabel || 'Jméno nebo přezdívka' %></span>
+              <input
+                type="text"
+                name="display_name"
+                class="penalty-game__register-input"
+                autocomplete="nickname"
+                maxlength="80"
+                required
+                data-penalty-register-name
+              />
+            </label>
+            <label class="penalty-game__register-field">
+              <span class="penalty-game__register-label"><%= texts.registerEmailLabel || 'E-mail' %></span>
+              <input
+                type="email"
+                name="email"
+                class="penalty-game__register-input"
+                autocomplete="email"
+                maxlength="120"
+                required
+                data-penalty-register-email
+              />
+            </label>
+            <p class="penalty-game__register-error" data-penalty-register-error hidden></p>
+            <button type="submit" class="btn-11 btn-11--primary penalty-game__start" data-penalty-register-submit>
+              <%= texts.registerButton || 'Pokračovat k výběru brankáře' %>
+            </button>
+          </form>
+          <form class="penalty-game__register-form" data-penalty-login-form hidden novalidate>
+            <label class="penalty-game__register-field">
+              <span class="penalty-game__register-label"><%= texts.registerEmailLabel || 'E-mail' %></span>
+              <input
+                type="email"
+                name="email"
+                class="penalty-game__register-input"
+                autocomplete="email"
+                maxlength="120"
+                required
+                data-penalty-login-email
+              />
+            </label>
+            <p class="penalty-game__register-error" data-penalty-login-error hidden></p>
+            <button type="submit" class="btn-11 btn-11--primary penalty-game__start" data-penalty-login-submit>
+              <%= texts.loginButton || 'Přihlásit se a pokračovat' %>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="penalty-game__pick" data-penalty-pick hidden aria-hidden="true">
+        <div class="penalty-game__menu-panel penalty-game__pick-panel">
+          <p class="penalty-game__menu-kicker">Příprava</p>
+          <p class="penalty-game__menu-title"><%= texts.pickTitle || 'Než se pustíš do penalt…' %></p>
+          <p class="penalty-game__menu-desc"><%= texts.pickDesc || '' %></p>
+          <%
+            var keeperPages = [];
+            var keeperList = pg.keepers || [];
+            var keepersPerPage = 3;
+            for (var pageStart = 0; pageStart < keeperList.length; pageStart += keepersPerPage) {
+              keeperPages.push(keeperList.slice(pageStart, pageStart + keepersPerPage));
+            }
+          %>
+          <div class="penalty-game__pick-carousel<%= keeperPages.length <= 1 ? ' penalty-game__pick-carousel--solo' : '' %>" data-pick-carousel role="radiogroup" aria-label="Výběr brankáře">
+            <button type="button" class="penalty-game__pick-nav" data-pick-prev aria-label="Předchozí brankáři" disabled>
+              <span aria-hidden="true">‹</span>
+            </button>
+            <div class="penalty-game__pick-viewport">
+              <div class="penalty-game__pick-track" data-pick-track>
+                <% var keeperGlobalIndex = 0; %>
+                <% keeperPages.forEach(function (page) { %>
+                <div class="penalty-game__pick-page">
+                  <% page.forEach(function (k) {
+                    var keeperIndex = keeperGlobalIndex;
+                    keeperGlobalIndex += 1;
+                  %>
+                  <button
+                    type="button"
+                    class="penalty-game__pick-option<%= keeperIndex === 0 ? ' penalty-game__pick-option--active' : '' %>"
+                    data-pick-keeper
+                    data-keeper-id="<%= k.id %>"
+                    data-points="<%= k.points %>"
+                    data-experience="<%= k.experience %>"
+                    data-use-face-thumb="<%= k.useFaceThumb ? '1' : '0' %>"
+                    data-thumb-position="<%= k.thumbPosition %>"
+                    data-thumb-scale="<%= k.thumbScale %>"
+                    data-thumb-mobile-position="<%= k.thumbMobilePosition %>"
+                    data-thumb-mobile-scale="<%= k.thumbMobileScale %>"
+                    data-face-top="<%= k.faceTopPct %>"
+                    data-face-left="<%= k.faceLeftPct %>"
+                    data-face-size="<%= k.faceSizePct %>"
+                    data-keeper-thumb="<%= penaltyAsset(k.thumb) %>"
+                    data-keeper-stand="<%= penaltyAsset(k.stand) %>"
+                    data-keeper-left="<%= penaltyAsset(k.left) %>"
+                    data-keeper-right="<%= penaltyAsset(k.right) %>"
+                    data-keeper-high="<%= penaltyAsset(k.high) %>"
+                    aria-checked="<%= keeperIndex === 0 ? 'true' : 'false' %>"
+                  >
+                    <span
+                      class="penalty-game__pick-thumb-wrap"
+                      style="--penalty-thumb-scale: <%= k.thumbScale || 1 %>; --penalty-thumb-scale-mobile: <%= k.thumbMobileScale || k.thumbScale || 1 %>;"
+                    >
+                      <img
+                        src="<%= penaltyAsset(k.thumb) %>"
+                        alt=""
+                        class="penalty-game__pick-thumb"
+                        loading="lazy"
+                        decoding="async"
+                        draggable="false"
+                        style="--penalty-thumb-pos: <%= k.thumbPosition || '50% calc(50% + 0px)' %>; --penalty-thumb-pos-mobile: <%= k.thumbMobilePosition || k.thumbPosition || '50% calc(50% + 0px)' %>;"
+                      />
+                    </span>
+                    <span class="penalty-game__pick-copy">
+                      <span class="penalty-game__pick-name"><%= k.name %></span>
+                      <span class="penalty-game__pick-stars" aria-label="Zkušenost <%= k.experience %> z 5">
+                        <% for (var star = 1; star <= 5; star++) { %>
+                        <span class="penalty-game__pick-star<%= star <= k.experience ? ' penalty-game__pick-star--on' : '' %>" aria-hidden="true">★</span>
+                        <% } %>
+                      </span>
+                      <% if (k.teamName) { %>
+                      <span class="penalty-game__pick-team-name"><%= k.teamName %></span>
+                      <% } %>
+                    </span>
+                  </button>
+                  <% }); %>
+                </div>
+                <% }); %>
+              </div>
+            </div>
+            <button type="button" class="penalty-game__pick-nav" data-pick-next aria-label="Další brankáři"<%= keeperPages.length <= 1 ? ' disabled' : '' %>>
+              <span aria-hidden="true">›</span>
+            </button>
+          </div>
+          <button type="button" class="btn-11 btn-11--primary penalty-game__start" data-penalty-pick-confirm>
+            <%= texts.pickButton || 'Do penalt' %>
+          </button>
+        </div>
+      </div>
+
+      <div class="penalty-game__end" data-penalty-end hidden aria-hidden="true">
+        <div class="penalty-game__menu-panel">
+          <p class="penalty-game__menu-kicker">Konec hry</p>
+          <p class="penalty-game__menu-title">Počet získaných bodů</p>
+          <p class="penalty-game__end-result">
+            <strong data-penalty-end-points>0</strong>
+          </p>
+          <p class="penalty-game__end-goals" data-penalty-end-goals>0 z <%= maxRounds %> gólů</p>
+          <button type="button" class="btn-11 btn-11--primary penalty-game__start" data-penalty-restart>
+            Hrát znovu
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="penalty-game__message" data-penalty-message aria-live="polite" hidden>Klikněte na branku.</p>
+
+    <aside class="penalty-leaderboard" data-penalty-leaderboard aria-labelledby="penalty-leaderboard-heading">
+      <div class="penalty-leaderboard__head">
+        <p class="penalty-leaderboard__kicker">Soutěž</p>
+        <h3 id="penalty-leaderboard-heading" class="penalty-leaderboard__title">Žebříček hráčů</h3>
+      </div>
+      <% if (lb.length) { %>
+      <ol class="penalty-leaderboard__list" data-penalty-leaderboard-list>
+        <% lb.forEach(function (entry, index) { %>
+        <li class="penalty-leaderboard__row" data-penalty-leaderboard-row>
+          <span class="penalty-leaderboard__rank"><%= index + 1 %>.</span>
+          <span class="penalty-leaderboard__name"><%= entry.display_name %></span>
+          <span class="penalty-leaderboard__points"><%= entry.points %></span>
+        </li>
+        <% }); %>
+      </ol>
+      <% } else { %>
+      <p class="penalty-leaderboard__empty" data-penalty-leaderboard-empty>Zatím žádné body. Buďte první!</p>
+      <% } %>
+    </aside>
+  </div>
+</section>
+</div>
+<script src="/js/penalty-game.js?v=<%= _assetV %>" defer></script>
+<% } %>

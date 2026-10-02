@@ -1,0 +1,29 @@
+<section id="zapasy-admin-teams" class="mt-8 space-y-3">
+  <h2 class="text-xs font-semibold uppercase tracking-wider text-11muted">Seznam týmů</h2>
+  <% if (!(teamItems && teamItems.length)) { %>
+  <p class="text-sm text-11muted">Zatím žádné týmy.</p>
+  <% } %>
+  <% (teamItems || []).forEach(function (item, index) { %>
+  <article class="card-11 flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+    <span class="text-sm font-semibold text-11accent"><%= index + 1 + ((pagination.page - 1) * pagination.perPage) %></span>
+    <% if (item.logo_path) { %>
+    <img src="<%= item.logo_path %>" alt="" class="h-10 w-10 shrink-0 rounded-lg border border-white/10 bg-white/5 object-contain p-1" />
+    <% } %>
+    <div class="min-w-0 flex-1">
+      <p class="text-sm font-semibold text-white"><%= item.name %></p>
+      <p class="mt-1 text-xs text-11muted">
+        <% if (item.competition) { %><span><%= item.competition %></span><% } %>
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/administrace/zapasy/tymy?edit_team=<%= item.id %><%= (pagination && pagination.page && pagination.page > 1) ? ('&page=' + pagination.page) : '' %>#zapasy-admin-teams" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10">Upravit</a>
+      <form method="post" action="/administrace/zapasy/tymy" onsubmit="return confirm('Odebrat tým?');">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="delete_team" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg px-2.5 py-2 text-sm text-red-300 hover:bg-red-500/10">Smazat</button>
+      </form>
+    </div>
+  </article>
+  <% }); %>
+</section>

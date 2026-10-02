@@ -1,0 +1,38 @@
+<%- include('../partials/admin-layout-start') %>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">Reklamy</h1>
+  <p class="mt-1 text-sm text-11muted">Správa reklamních slotů</p>
+</div>
+
+<% if (success) { %><p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p><% } %>
+
+<form class="mt-8 space-y-8" method="post" action="/administrace/reklamy">
+  <% ads.forEach(function (ad) { %>
+  <section class="card-11 p-6">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h2 class="font-semibold text-11accent"><%= ad.slot %></h2>
+      <label class="flex items-center gap-2 text-sm text-11muted">
+        <input type="checkbox" name="slot_<%= ad.slot %>_active" value="1" <%= ad.active ? 'checked' : '' %> />
+        Aktivní
+      </label>
+    </div>
+    <p class="mt-1 text-xs text-slate-500"><%= ad.label || '' %></p>
+    <div class="mt-4">
+      <label class="text-xs text-11muted">Popisek</label>
+      <input type="text" name="slot_<%= ad.slot %>_label" value="<%= ad.label || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="mt-4">
+      <label class="text-xs text-11muted">Reklamní kód (HTML / Google Ads)</label>
+      <textarea name="slot_<%= ad.slot %>_content_html" rows="5" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 font-mono text-xs text-white" placeholder="&lt;div&gt;…&lt;/div&gt;"><%= ad.content_html || '' %></textarea>
+    </div>
+    <div class="mt-4">
+      <label class="text-xs text-11muted">Odkaz (volitelné)</label>
+      <input type="url" name="slot_<%= ad.slot %>_link_url" value="<%= ad.link_url || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+  </section>
+  <% }); %>
+  <button type="submit" class="rounded-xl bg-11accent px-5 py-2.5 text-sm font-semibold text-11bg">Uložit reklamy</button>
+</form>
+
+<%- include('../partials/admin-layout-end') %>

@@ -1,0 +1,26 @@
+<%- include('partials/header', { title: title, activeNav: 'home', showSearchLogin: false, showNav: false, structuredData: [] }) %>
+
+<main class="flex flex-1 items-center justify-center px-4 py-16">
+  <div class="card-11 w-full max-w-md p-8">
+    <h1 class="text-xl font-bold text-white">Přihlášení</h1>
+    <p class="mt-1 text-sm text-11muted">CMS časopisu 11ka</p>
+    <% if (error) { %>
+    <p class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p>
+    <% } %>
+    <form class="mt-6 space-y-4" method="post" action="/prihlaseni">
+      <input type="hidden" name="next" value="<%= typeof nextUrl !== 'undefined' ? nextUrl : '' %>" />
+      <div>
+        <label class="mb-1 block text-xs font-medium text-11muted" for="email">E-mail</label>
+        <input id="email" name="email" type="email" autocomplete="username" required class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-medium text-11muted" for="password">Heslo</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+      </div>
+      <button type="submit" class="btn-11 btn-11--primary btn-11--block">Přihlásit</button>
+    </form>
+    <p class="mt-6 text-center text-xs text-11muted"><a href="/" class="text-11accent hover:underline">Zpět na web</a></p>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,217 @@
+<%- include('partials/header') %>
+
+<main id="main-content" class="flex-1" tabindex="-1">
+  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+    <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <article class="min-w-0 space-y-6">
+        <header class="card-11 p-6">
+          <div class="grid gap-3 sm:grid-cols-3 sm:items-center">
+            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 p-4">
+              <% if (match.teams.home.logo) { %>
+              <img src="<%= match.teams.home.logo %>" alt="<%= match.teams.home.name %>" class="h-12 w-12 rounded-lg object-contain bg-white/5 p-1" loading="lazy" fetchpriority="low" decoding="async" />
+              <% } else if (match.teams.home.flag) { %>
+              <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/5 text-2xl">
+                <%= match.teams.home.flag %>
+              </div>
+              <% } else { %>
+              <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/5 text-xs font-semibold text-11muted">
+                <%= (match.teams.home.abbreviation || match.teams.home.shortName || '').slice(0, 4) || 'DOM' %>
+              </div>
+              <% } %>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-white"><%= match.teams.home.name %></p>
+                <% if (match.teams.home.abbreviation) { %>
+                <p class="mt-1 text-xs text-11muted"><%= match.teams.home.abbreviation %></p>
+                <% } %>
+              </div>
+            </div>
+
+            <div class="text-center">
+              <% if (match.status) { %>
+              <p class="text-xs font-semibold tracking-wide text-slate-300"><%= match.status %></p>
+              <% } %>
+              <div class="inline-flex items-center gap-3">
+                <span class="rounded-full bg-11accent/15 px-4 py-2 text-lg font-bold text-11accent">
+                  <%= match.teams.home.score %> : <%= match.teams.away.score %>
+                </span>
+              </div>
+              <% if (match.league) { %>
+              <p class="mt-2 text-sm text-11muted"><%= match.league %></p>
+              <% } %>
+              <% if (match.venue && (match.venue.name || match.venue.city)) { %>
+              <p class="mt-1 text-xs text-slate-400">
+                Kde: <%= match.venue.name || 'Stadion' %><% if (match.venue.city || match.venue.country) { %> (<%= [match.venue.city, match.venue.country].filter(Boolean).join(', ') %>)<% } %>
+              </p>
+              <% } %>
+              <% if (match.referee) { %>
+              <p class="mt-1 text-xs text-slate-400">Hlavní rozhodčí: <%= match.referee %></p>
+              <% } %>
+            </div>
+
+            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 p-4 sm:justify-end">
+              <div class="min-w-0 text-right">
+                <p class="truncate text-sm font-semibold text-white"><%= match.teams.away.name %></p>
+                <% if (match.teams.away.abbreviation) { %>
+                <p class="mt-1 text-xs text-11muted"><%= match.teams.away.abbreviation %></p>
+                <% } %>
+              </div>
+              <% if (match.teams.away.logo) { %>
+              <img src="<%= match.teams.away.logo %>" alt="<%= match.teams.away.name %>" class="h-12 w-12 rounded-lg object-contain bg-white/5 p-1" loading="lazy" fetchpriority="low" decoding="async" />
+              <% } else if (match.teams.away.flag) { %>
+              <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/5 text-2xl">
+                <%= match.teams.away.flag %>
+              </div>
+              <% } else { %>
+              <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/5 text-xs font-semibold text-11muted">
+                <%= (match.teams.away.abbreviation || match.teams.away.shortName || '').slice(0, 4) || 'HOS' %>
+              </div>
+              <% } %>
+            </div>
+          </div>
+          <% if (match.date) { %>
+          <p class="mt-3 text-sm text-11muted">
+            <%= new Date(match.date).toLocaleString('cs-CZ', { dateStyle: 'medium', timeStyle: 'short' }) %>
+          </p>
+          <% } %>
+        </header>
+
+        <section class="card-11 p-6" aria-labelledby="match-lineups-heading">
+          <h2 id="match-lineups-heading" class="text-lg font-bold text-11accent">Sestavy</h2>
+          <% var luH = match.lineups && match.lineups.home; var luA = match.lineups && match.lineups.away; %>
+          <% var goals = (match.goals && match.goals.length) ? match.goals : []; %>
+          <% var yc = (match.yellowCards && match.yellowCards.length) ? match.yellowCards : []; %>
+          <% var rc = (match.redCards && match.redCards.length) ? match.redCards : []; %>
+          <% if (luH || luA) { %>
+          <div class="mt-4 grid gap-6 lg:grid-cols-2">
+            <% if (luH) { %>
+            <%- include('partials/lineup-pitch-team', {
+              teamName: match.teams.home.name,
+              lineup: luH,
+              teamFlag: match.teams.home.flag,
+              kitColor: match.teams.home.kitColor,
+              kitStroke: match.teams.home.kitStroke,
+              side: 'home',
+            }) %>
+            <% } %>
+            <% if (luA) { %>
+            <%- include('partials/lineup-pitch-team', {
+              teamName: match.teams.away.name,
+              lineup: luA,
+              teamFlag: match.teams.away.flag,
+              kitColor: match.teams.away.kitColor,
+              kitStroke: match.teams.away.kitStroke,
+              side: 'away',
+            }) %>
+            <% } %>
+          </div>
+          <% if ((luH && !luA) || (!luH && luA)) { %>
+          <p class="mt-4 text-sm text-11muted">Sestava druhého týmu zatím není v datech uvedena.</p>
+          <% } %>
+          <% } else { %>
+          <p class="mt-3 text-sm text-11muted">Sestavy pro tento zápas zatím nejsou k dispozici.</p>
+          <% } %>
+
+          <% if (goals && goals.length) { %>
+          <div class="mt-6 rounded-xl border border-white/10 bg-black/10 p-4">
+            <h3 class="text-sm font-semibold text-white">Góly</h3>
+            <ul class="mt-3 space-y-2">
+              <% goals.forEach(function (g) { %>
+              <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+                <span class="w-12 shrink-0 tabular-nums font-semibold text-11accent"><%= g.clock || '-' %></span>
+                <span class="min-w-0 flex-1 text-slate-200">
+                  <% if (g.scorer) { %><span class="font-semibold text-white"><%= g.scorer %></span><% } else { %><span class="font-semibold text-white">Neznámý střelec</span><% } %>
+                  <% if (g.assist) { %><span class="text-slate-300"> - asistence: <%= g.assist %></span><% } %>
+                </span>
+                <% if (g.team) { %><span class="shrink-0 text-xs font-medium text-11muted"><%= g.team %></span><% } %>
+              </li>
+              <% }); %>
+            </ul>
+          </div>
+          <% } %>
+
+          <% if (yc && yc.length) { %>
+          <div class="mt-4 rounded-xl border border-white/10 bg-black/10 p-4">
+            <h3 class="text-sm font-semibold text-white">Žluté karty</h3>
+            <ul class="mt-3 space-y-2">
+              <% yc.forEach(function (c) { %>
+              <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+                <span class="w-12 shrink-0 tabular-nums font-semibold text-yellow-200"><%= c.clock || '-' %></span>
+                <span class="min-w-0 flex-1 text-slate-200">
+                  <% if (c.player) { %><span class="font-semibold text-white"><%= c.player %></span><% } else { %><span class="font-semibold text-white">Neznámý hráč</span><% } %>
+                  <% if (c.reason) { %><span class="text-slate-300"> - <%= c.reason %></span><% } %>
+                </span>
+                <% if (c.team) { %><span class="shrink-0 text-xs font-medium text-11muted"><%= c.team %></span><% } %>
+              </li>
+              <% }); %>
+            </ul>
+          </div>
+          <% } %>
+
+          <% if (rc && rc.length) { %>
+          <div class="mt-4 rounded-xl border border-white/10 bg-black/10 p-4">
+            <h3 class="text-sm font-semibold text-white">Červené karty</h3>
+            <ul class="mt-3 space-y-2">
+              <% rc.forEach(function (c) { %>
+              <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+                <span class="w-12 shrink-0 tabular-nums font-semibold text-red-200"><%= c.clock || '-' %></span>
+                <span class="min-w-0 flex-1 text-slate-200">
+                  <% if (c.player) { %><span class="font-semibold text-white"><%= c.player %></span><% } else { %><span class="font-semibold text-white">Neznámý hráč</span><% } %>
+                  <% if (c.reason) { %><span class="text-slate-300"> - <%= c.reason %></span><% } %>
+                </span>
+                <% if (c.team) { %><span class="shrink-0 text-xs font-medium text-11muted"><%= c.team %></span><% } %>
+              </li>
+              <% }); %>
+            </ul>
+          </div>
+          <% } %>
+        </section>
+
+        <% var statRows = (match.boxStats && match.boxStats.length) ? match.boxStats : (match.stats || []); %>
+        <section class="card-11 p-6" aria-labelledby="match-stats-heading">
+          <h2 id="match-stats-heading" class="text-lg font-bold text-11accent">Statistiky</h2>
+          <% if (statRows && statRows.length) { %>
+          <div class="mt-4 overflow-x-auto">
+            <table class="w-full min-w-[300px] text-sm">
+              <thead>
+                <tr class="border-b border-white/10 text-left text-11muted">
+                  <th class="pb-3 pr-3 font-medium"></th>
+                  <th class="pb-3 pr-2 text-right font-medium text-slate-300 break-words"><%= match.teams.home.name %></th>
+                  <th class="pb-3 text-right font-medium text-slate-300 break-words"><%= match.teams.away.name %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% statRows.forEach(function (row) { %>
+                <tr class="border-b border-white/5">
+                  <td class="py-2.5 pr-3 text-slate-300"><%= row.label %></td>
+                  <td class="py-2.5 pr-2 text-right font-semibold tabular-nums text-white"><%= (row.home != null && row.home !== '') ? row.home : '-' %></td>
+                  <td class="py-2.5 text-right font-semibold tabular-nums text-white"><%= (row.away != null && row.away !== '') ? row.away : '-' %></td>
+                </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <% } else { %>
+          <p class="mt-3 text-sm text-11muted">Pro tento zápas zatím nejsou k dispozici podrobné statistiky.</p>
+          <% } %>
+        </section>
+      </article>
+
+      <aside class="space-y-6 lg:sticky lg:top-24">
+        <%- include('partials/sidebar-ssp-ad') %>
+
+        <div class="card-11 p-4">
+          <h2 class="mb-2 text-lg font-bold text-11accent">Newsletter</h2>
+          <p class="text-sm text-11muted"><%= newsletter.description %></p>
+          <form class="mt-4 space-y-2" action="/newsletter" method="post">
+            <label class="sr-only" for="newsletter-email">E-mail</label>
+            <input id="newsletter-email" name="email" type="email" required autocomplete="email" placeholder="váš@email.cz" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+            <button type="submit" class="w-full rounded-xl bg-11accent py-2.5 text-sm font-semibold text-11bg transition hover:brightness-110">Přihlásit se</button>
+          </form>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>
+

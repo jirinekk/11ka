@@ -1,0 +1,30 @@
+<% if (typeof error !== 'undefined' && error) { %>
+<div class="mt-6 flex items-start justify-between gap-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200" data-zapasy-alert>
+  <p class="m-0 flex-1"><%= error %></p>
+  <button type="button" class="rounded px-1 text-red-200/80 hover:bg-white/10 hover:text-red-100" data-zapasy-alert-close aria-label="Zavřít upozornění">×</button>
+</div>
+<% } %>
+<% if (typeof success !== 'undefined' && success) { %>
+<div class="mt-6 flex items-start justify-between gap-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200" data-zapasy-alert data-zapasy-success-alert>
+  <p class="m-0 flex-1"><%= success %></p>
+  <button type="button" class="rounded px-1 text-emerald-200/80 hover:bg-white/10 hover:text-emerald-100" data-zapasy-alert-close aria-label="Zavřít upozornění">×</button>
+</div>
+<% } %>
+<% if ((typeof error !== 'undefined' && error) || (typeof success !== 'undefined' && success)) { %>
+<script>
+  (function () {
+    document.addEventListener('click', function (event) {
+      var btn = event.target && event.target.closest ? event.target.closest('[data-zapasy-alert-close]') : null;
+      if (!btn) return;
+      var alertEl = btn.closest('[data-zapasy-alert]');
+      if (alertEl) alertEl.remove();
+    });
+    var successEl = document.querySelector('[data-zapasy-success-alert]');
+    if (successEl) {
+      window.setTimeout(function () {
+        successEl.remove();
+      }, 60000);
+    }
+  })();
+</script>
+<% } %>

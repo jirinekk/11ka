@@ -1,0 +1,305 @@
+<%- include('partials/header') %>
+
+<main id="main-content" class="flex-1" tabindex="-1">
+  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+    <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <div class="min-w-0 space-y-6">
+        <article class="card-11 p-6 sm:p-8">
+          <header class="mb-6">
+            <h1 class="text-2xl font-bold leading-tight text-white sm:text-3xl">Akreditace</h1>
+          </header>
+
+          <% if (typeof formStatus !== 'undefined' && formStatus === 'ok') { %>
+          <div
+            class="akreditace-success flex flex-col items-center rounded-2xl border border-emerald-500/25 bg-gradient-to-b from-emerald-500/[0.12] to-transparent px-6 py-10 text-center sm:px-10 sm:py-12"
+            role="status"
+            aria-live="polite"
+          >
+            <div class="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-500/15 text-emerald-300 shadow-[0_0_32px_-8px_rgba(52,211,153,0.45)]">
+              <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <h2 class="mt-5 text-xl font-bold text-white sm:text-2xl">Žádost byla odeslána</h2>
+            <p class="mt-2 max-w-md text-sm leading-relaxed text-slate-300 sm:text-base">
+              Děkujeme. Vaši žádost o akreditaci jsme přijali a ozveme se vám co nejdříve na uvedený e-mail.
+            </p>
+            <a
+              href="/akreditace"
+              class="mt-8 inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-slate-200 transition hover:border-11accent/40 hover:bg-white/10 hover:text-white"
+            >
+              Odeslat další žádost
+            </a>
+          </div>
+          <% } else { %>
+          <% if (typeof formStatus !== 'undefined' && formStatus === 'invalid') { %>
+          <div class="mb-6 flex gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3.5" role="alert">
+            <span class="mt-0.5 shrink-0 text-amber-400" aria-hidden="true">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </span>
+            <p class="text-sm leading-relaxed text-amber-100/90">
+              Vyplňte prosím všechna pole včetně data zápasu a typu akreditace (Photo nebo Píšící).
+            </p>
+          </div>
+          <% } else if (typeof formStatus !== 'undefined' && formStatus === 'bad') { %>
+          <div class="mb-6 flex gap-3 rounded-xl border border-red-500/30 bg-red-500/[0.08] px-4 py-3.5" role="alert">
+            <span class="mt-0.5 shrink-0 text-red-400" aria-hidden="true">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </span>
+            <p class="text-sm leading-relaxed text-red-100/90">
+              Odeslání se nezdařilo. Zkuste to prosím znovu.
+            </p>
+          </div>
+          <% } %>
+
+          <form class="space-y-5" method="post" action="/akreditace" novalidate>
+            <div>
+              <label class="mb-1 block text-xs font-medium text-11muted" for="akreditace-email">E-mail</label>
+              <input
+                id="akreditace-email"
+                name="email"
+                type="email"
+                required
+                autocomplete="email"
+                value="<%= formValues && formValues.email ? formValues.email : '' %>"
+                class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
+              />
+            </div>
+
+            <div>
+              <label class="mb-1 block text-xs font-medium text-11muted" for="akreditace-phone">Telefonní číslo</label>
+              <input
+                id="akreditace-phone"
+                name="phone"
+                type="tel"
+                required
+                autocomplete="tel"
+                value="<%= formValues && formValues.phone ? formValues.phone : '' %>"
+                class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
+              />
+            </div>
+
+            <div>
+              <label class="mb-1 block text-xs font-medium text-11muted" for="akreditace-name">Jméno</label>
+              <input
+                id="akreditace-name"
+                name="name"
+                type="text"
+                required
+                autocomplete="name"
+                value="<%= formValues && formValues.name ? formValues.name : '' %>"
+                class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
+              />
+            </div>
+
+            <div>
+              <label class="mb-1 block text-xs font-medium text-11muted" for="akreditace-match">Zápas</label>
+              <input
+                id="akreditace-match"
+                name="match"
+                type="text"
+                required
+                value="<%= formValues && formValues.match ? formValues.match : '' %>"
+                placeholder="např. Sparta Praha - Slavia Praha"
+                class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
+              />
+            </div>
+
+            <div>
+              <label class="mb-1 block text-xs font-medium text-11muted" for="akreditace-match-date">Datum zápasu</label>
+              <input
+                id="akreditace-match-date"
+                name="match_date"
+                type="date"
+                required
+                value="<%= formValues && formValues.match_date ? formValues.match_date : '' %>"
+                class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40 [color-scheme:dark]"
+              />
+            </div>
+
+            <fieldset>
+              <legend class="mb-3 block text-xs font-medium text-11muted">Typ akreditace</legend>
+              <div class="flex flex-wrap gap-4">
+                <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+                  <input
+                    type="radio"
+                    name="accreditation_type"
+                    value="photo"
+                    required
+                    <%= formValues && formValues.accreditation_type === 'photo' ? 'checked' : '' %>
+                    class="h-4 w-4 border-white/20 bg-[#111827] text-11accent focus:ring-11accent/40"
+                  />
+                  Photo
+                </label>
+                <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+                  <input
+                    type="radio"
+                    name="accreditation_type"
+                    value="pisi"
+                    required
+                    <%= formValues && formValues.accreditation_type === 'pisi' ? 'checked' : '' %>
+                    class="h-4 w-4 border-white/20 bg-[#111827] text-11accent focus:ring-11accent/40"
+                  />
+                  Píšící
+                </label>
+              </div>
+            </fieldset>
+
+            <button
+              type="submit"
+              class="w-full rounded-xl bg-11accent py-2.5 text-sm font-semibold text-11bg transition hover:brightness-110 sm:w-auto sm:px-8"
+            >
+              Odeslat žádost
+            </button>
+          </form>
+          <% } %>
+        </article>
+
+        <section class="card-11 p-6 sm:p-8" aria-labelledby="akreditace-prehled-heading">
+          <style>
+            @media (max-width: 767.98px) {
+              #akreditace-prehled-heading ~ .akreditace-prehled-desktop-only {
+                display: none !important;
+              }
+            }
+            @media (min-width: 768px) {
+              #akreditace-prehled-heading ~ .akreditace-prehled-mobile-only {
+                display: none !important;
+              }
+            }
+          </style>
+          <h2 id="akreditace-prehled-heading" class="text-xl font-bold text-white sm:text-2xl">Přehled žádostí</h2>
+          <p class="mt-1 text-sm text-11muted">Přehled všech žádostí včetně data zápasu, seřazený od nejbližšího termínu.</p>
+
+          <%
+            function fmtMatchDate(d) {
+              if (!d) return '-';
+              var p = String(d).split('-');
+              if (p.length !== 3) return d;
+              return p[2] + '.' + p[1] + '.' + p[0];
+            }
+          %>
+          <% var requests = typeof accreditationRequests !== 'undefined' ? accreditationRequests : []; %>
+          <% var p = typeof pagination !== 'undefined' ? pagination : { page: 1, perPage: 7, totalPages: 1, totalItems: 0, hasPrev: false, hasNext: false }; %>
+          <% var listTotal = p.totalItems || 0; %>
+          <% if (!listTotal) { %>
+          <p class="mt-6 text-sm text-11muted">Zatím nebyla odeslána žádná žádost.</p>
+          <% } else { %>
+          <div
+            class="mt-6 space-y-3 akreditace-prehled-mobile-only"
+          >
+            <% requests.forEach(function (r) { %>
+            <article class="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <p class="text-base font-semibold text-white"><%= r.name %></p>
+                  <p class="mt-1 text-sm font-medium text-slate-200"><%= r.match_name %></p>
+                  <p class="mt-0.5 text-xs text-11muted">Datum zápasu: <%= fmtMatchDate(r.match_date) %></p>
+                </div>
+                <%- include('partials/accreditation-status', { accStatus: r.status }) %>
+              </div>
+              <dl class="mt-4 space-y-3 text-sm">
+                <div>
+                  <dt class="text-xs font-medium uppercase tracking-wide text-11muted">E-mail</dt>
+                  <dd class="mt-0.5 break-all">
+                    <a href="mailto:<%= r.email %>" class="text-11accent hover:underline"><%= r.email %></a>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs font-medium uppercase tracking-wide text-11muted">Typ akreditace</dt>
+                  <dd class="mt-0.5 text-slate-200"><%= r.accreditation_type === 'photo' ? 'Photo' : 'Píšící' %></dd>
+                </div>
+              </dl>
+            </article>
+            <% }); %>
+          </div>
+
+          <div class="mt-6 akreditace-prehled-desktop-only">
+            <div class="akreditace-requests-table-wrap">
+              <table class="akreditace-requests-table text-left text-sm">
+              <thead>
+                <tr class="border-b border-white/10 text-xs uppercase tracking-wide text-11muted">
+                  <th class="px-4 py-2.5 font-medium whitespace-nowrap">Jméno</th>
+                  <th class="px-4 py-2.5 font-medium whitespace-nowrap">Zápas</th>
+                  <th class="px-4 py-2.5 font-medium whitespace-nowrap">Datum zápasu</th>
+                  <th class="px-4 py-2.5 font-medium whitespace-nowrap">Typ akreditace</th>
+                  <th class="px-4 py-2.5 font-medium whitespace-nowrap">Stav</th>
+                  <th class="px-4 py-2.5 font-medium whitespace-nowrap">E-mail</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% requests.forEach(function (r) { %>
+                <tr class="border-b border-white/5 text-slate-200">
+                  <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.name %></td>
+                  <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.match_name %></td>
+                  <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums"><%= fmtMatchDate(r.match_date) %></td>
+                  <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.accreditation_type === 'photo' ? 'Photo' : 'Píšící' %></td>
+                  <td class="px-4 py-3 align-middle whitespace-nowrap">
+                    <%- include('partials/accreditation-status', { accStatus: r.status, accStatusVariant: 'text', accStatusLong: true }) %>
+                  </td>
+                  <td class="px-4 py-3 align-middle whitespace-nowrap">
+                    <a href="mailto:<%= r.email %>" class="text-11accent hover:underline" title="<%= r.email %>"><%= r.email %></a>
+                  </td>
+                </tr>
+                <% }); %>
+              </tbody>
+              </table>
+            </div>
+          </div>
+
+          <%
+            var from = p.totalItems === 0 ? 0 : ((p.page - 1) * p.perPage + 1);
+            var to = p.totalItems === 0 ? 0 : Math.min(p.page * p.perPage, p.totalItems);
+          %>
+          <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <p class="text-sm text-11muted">Zobrazeno <%= from %>-<%= to %> z <%= p.totalItems %> žádostí</p>
+            <% if (p.totalPages > 1) { %>
+            <nav class="flex items-center gap-2" aria-label="Stránkování žádostí o akreditaci">
+              <% if (p.hasPrev) { %>
+              <a href="/akreditace?page=<%= p.page - 1 %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Předchozí</a>
+              <% } else { %>
+              <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Předchozí</span>
+              <% } %>
+              <span class="rounded-lg border border-11accent/40 bg-11accent/10 px-3 py-1.5 text-sm font-semibold text-11accent"><%= p.page %> / <%= p.totalPages %></span>
+              <% if (p.hasNext) { %>
+              <a href="/akreditace?page=<%= p.page + 1 %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Další</a>
+              <% } else { %>
+              <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Další</span>
+              <% } %>
+            </nav>
+            <% } %>
+          </div>
+          <% } %>
+        </section>
+      </div>
+
+      <aside class="space-y-6 lg:sticky lg:top-24">
+        <%- include('partials/sidebar-ssp-ad') %>
+
+        <%- include('partials/sidebar-live-matches') %>
+
+        <div class="card-11 p-4">
+          <h2 class="mb-2 text-lg font-bold text-11accent">Newsletter</h2>
+          <p class="text-sm text-11muted"><%= newsletter.description %></p>
+          <form class="mt-4 space-y-2" action="/newsletter" method="post">
+            <label class="sr-only" for="newsletter-email-akreditace">E-mail</label>
+            <input
+              id="newsletter-email-akreditace"
+              name="email"
+              type="email"
+              required
+              autocomplete="email"
+              placeholder="váš@email.cz"
+              class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
+            />
+            <button type="submit" class="w-full rounded-xl bg-11accent py-2.5 text-sm font-semibold text-11bg transition hover:brightness-110">
+              Přihlásit se
+            </button>
+          </form>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

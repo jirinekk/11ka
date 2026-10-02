@@ -1,0 +1,39 @@
+<% var accMenuLabel = (currentUser.display_name && String(currentUser.display_name).trim()) ? currentUser.display_name : currentUser.email; %>
+<details class="nav-user-dd relative">
+  <summary
+    class="flex cursor-pointer list-none items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white transition [&::-webkit-details-marker]:hidden"
+    aria-label="Menu účtu"
+  >
+    <span class="max-w-[8.5rem] truncate sm:max-w-[12rem]" title="<%= accMenuLabel %>"><%= accMenuLabel %></span>
+    <svg class="nav-user-dd-chevron h-4 w-4 shrink-0 text-11muted transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </summary>
+  <div
+    class="absolute right-0 top-full z-[70] mt-2 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#111827] py-1 shadow-xl shadow-black/50 ring-1 ring-white/5"
+  >
+    <% if (typeof accountMenuInAdmin !== 'undefined' && accountMenuInAdmin) { %>
+    <a
+      href="/"
+      class="block px-4 py-2.5 text-sm text-white transition hover:bg-white/5"
+    >Zpět na web</a>
+    <div class="my-1 h-px bg-white/10"></div>
+    <% } else { %>
+    <a
+      href="<%= typeof isAkreditaceOnly === 'function' && isAkreditaceOnly(currentUser) ? '/administrace/akreditace' : '/administrace' %>"
+      class="block px-4 py-2.5 text-sm font-medium text-11accent transition hover:bg-11accent/10"
+    >Administrace</a>
+    <% } %>
+    <a
+      href="/ucet"
+      class="block px-4 py-2.5 text-sm text-white transition hover:bg-white/5"
+    >Účet</a>
+    <div class="my-1 h-px bg-white/10"></div>
+    <form action="/odhlaseni" method="post" class="px-2 pb-2 pt-1">
+      <button
+        type="submit"
+        class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-white transition hover:bg-red-500/15 hover:text-red-300"
+      >Odhlásit</button>
+    </form>
+  </div>
+</details>

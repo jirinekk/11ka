@@ -1,0 +1,38 @@
+<%- include('../partials/admin-layout-start') %>
+
+<%
+  var matchesListHref =
+    pagination && pagination.page && pagination.page > 1
+      ? '/administrace/zapasy/seznam?page=' + pagination.page
+      : '/administrace/zapasy/seznam';
+%>
+<%- include('../partials/admin-zapasy-back', { zapasyBackHref: editingFixture ? matchesListHref : undefined }) %>
+<div class="mt-4 border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl"><%= editingFixture ? 'Spravovat zápas' : 'Seznam zápasů' %></h1>
+</div>
+<%- include('../partials/admin-zapasy-alerts') %>
+
+<% if (editingFixture) { %>
+<div class="mt-8">
+  <%- include('../partials/match-fixture-detail', { fixture: editingFixture }) %>
+  <% var _hideLineupEditor = ['Probíhá', 'Poločas', 'Odloženo', 'Zrušeno', 'Odehráno', 'Kontumace'].includes(editingFixture.status); %>
+  <% if (!_hideLineupEditor) { %>
+  <%- include('../partials/admin-zapasy-lineup-editor', { editingFixture: editingFixture, pagination: pagination }) %>
+  <% } %>
+  <%- include('../partials/admin-zapasy-match-actions', { editingFixture: editingFixture, pagination: pagination }) %>
+</div>
+<% } else { %>
+<%- include('../partials/admin-zapasy-match-list') %>
+<%- include('../partials/admin-zapasy-pagination', { listAnchor: '#zapasy-admin-list' }) %>
+
+<script>
+  (function () {
+    if (window.location.hash === '#zapasy-admin-list') {
+      var el = document.getElementById('zapasy-admin-list');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  })();
+</script>
+<% } %>
+
+<%- include('../partials/admin-layout-end') %>

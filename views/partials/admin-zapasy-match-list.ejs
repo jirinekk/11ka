@@ -1,0 +1,36 @@
+<% if (items && items.length) { %>
+<section id="zapasy-admin-list" class="mt-8 space-y-3">
+  <% (items || []).forEach(function (item, index) { %>
+  <article class="card-11 flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+    <span class="text-sm font-semibold text-11accent"><%= index + 1 + ((pagination.page - 1) * pagination.perPage) %></span>
+    <div class="min-w-0 flex-1">
+      <p class="text-sm font-semibold text-white">
+        <%= item.home_team %>
+        <% if (item.home_score != null && item.away_score != null) { %>
+        <span class="text-11accent"><%= item.home_score %> : <%= item.away_score %></span>
+        <% } else { %>
+        <span class="text-11muted">vs</span>
+        <% } %>
+        <%= item.away_team %>
+      </p>
+      <p class="mt-1 text-xs text-11muted">
+        <% if (item.competition) { %><span><%= item.competition %></span><% } %>
+        <% if (item.status) { %><span> · <%= item.status %></span><% } %>
+        <% if (item.kickoff_label || item.kickoff_at) { %><span> · <%= item.kickoff_label || item.kickoff_at %></span><% } %>
+        <% if (item.is_published) { %><span class="text-emerald-300"> · zveřejněno</span><% } else { %><span class="text-amber-300"> · skryto</span><% } %>
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/zapasy/<%= item.id %>" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10" target="_blank" rel="noopener noreferrer">Zobrazit zápas</a>
+      <a href="/administrace/zapasy/seznam?edit=<%= item.id %><%= (pagination && pagination.page && pagination.page > 1) ? ('&page=' + pagination.page) : '' %>#zapasy-admin-list" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10">Spravovat zápas</a>
+      <form method="post" action="/administrace/zapasy/seznam" onsubmit="return confirm('Odebrat zápas?');">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="delete" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg px-2.5 py-2 text-sm text-red-300 hover:bg-red-500/10">Smazat</button>
+      </form>
+    </div>
+  </article>
+  <% }); %>
+</section>
+<% } %>

@@ -1,0 +1,159 @@
+<%- include('../partials/admin-layout-start') %>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">11ka Pomáhá</h1>
+  <p class="mt-1 text-sm text-11muted">
+    Správa akcí „budeme / byli jsme / sponzorujeme“ pro stránku 11ka Pomáhá.
+  </p>
+</div>
+
+<% if (error) { %><p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p><% } %>
+<% if (success) { %><p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p><% } %>
+
+<section class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white">Reklamní prostor na homepage</h2>
+  <p class="mt-1 text-sm text-11muted">Vloží se mezi sekce Analýzy a Světový fotbal.</p>
+  <form class="mt-4 grid gap-3" method="post" action="/administrace/pomaha">
+    <input type="hidden" name="action" value="update_pomaha_ad" />
+    <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+    <div>
+      <label class="text-xs text-11muted">HTML obsah</label>
+      <textarea name="content_html" rows="5" placeholder="<div>...</div>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"><%= (pomahaAd && pomahaAd.content_html) || '' %></textarea>
+    </div>
+    <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+      <input type="checkbox" name="active" value="1" <%= pomahaAd && pomahaAd.active ? 'checked' : '' %> />
+      Aktivní na webu
+    </label>
+    <div>
+      <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">Uložit reklamní prostor</button>
+    </div>
+  </form>
+</section>
+
+<section class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white"><%= editingItem ? 'Upravit akci' : 'Přidat akci' %></h2>
+  <form class="mt-4 grid gap-3 sm:grid-cols-2" method="post" action="/administrace/pomaha">
+    <input type="hidden" name="action" value="<%= editingItem ? 'update' : 'create' %>" />
+    <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+    <% if (editingItem) { %><input type="hidden" name="id" value="<%= editingItem.id %>" /><% } %>
+
+    <div>
+      <label class="text-xs text-11muted">Status</label>
+      <select name="status" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white">
+        <option value="">- bez statusu -</option>
+        <% (statusOptions || []).forEach(function (s) { %>
+        <option value="<%= s %>" <%= ((editingItem && editingItem.status) || '') === s ? 'selected' : '' %>><%= s %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div>
+      <label class="text-xs text-11muted">Datum</label>
+      <input name="event_date" type="text" value="<%= (editingItem && editingItem.event_date) || '' %>" placeholder="např. 15. 6. 2026" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Název akce *</label>
+      <input name="title" required value="<%= (editingItem && editingItem.title) || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Místo</label>
+      <input name="place" value="<%= (editingItem && editingItem.place) || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Poznámka</label>
+      <input name="note" value="<%= (editingItem && editingItem.note) || '' %>" placeholder="např. Fotoreport + stories" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Odkaz</label>
+      <input name="link_url" value="<%= (editingItem && editingItem.link_url) || '' %>" placeholder="https://..." class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+        <input type="checkbox" name="is_published" value="1" <%= editingItem ? (editingItem.is_published ? 'checked' : '') : 'checked' %> />
+        Zveřejnit na webu
+      </label>
+    </div>
+    <div class="sm:col-span-2 flex flex-wrap gap-2">
+      <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg"><%= editingItem ? 'Uložit změny' : 'Přidat akci' %></button>
+      <% if (editingItem) { %>
+      <a href="<%= (pagination && pagination.page && pagination.page > 1) ? ('/administrace/pomaha?page=' + pagination.page) : '/administrace/pomaha' %>" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5">Zrušit úpravu</a>
+      <% } %>
+    </div>
+  </form>
+</section>
+
+<section id="pomaha-admin-events" class="mt-8 space-y-3">
+  <h2 class="text-xs font-semibold uppercase tracking-wider text-11muted">Aktuální akce</h2>
+  <% if (!(items && items.length)) { %>
+  <p class="text-sm text-11muted">Zatím žádné akce.</p>
+  <% } %>
+  <% (items || []).forEach(function (item, index) { %>
+  <article class="card-11 flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+    <span class="text-sm font-semibold text-11accent"><%= index + 1 %></span>
+    <div class="min-w-0 flex-1">
+      <p class="text-sm font-semibold text-white"><%= item.title %></p>
+      <p class="mt-1 text-xs text-11muted">
+        <% if (item.status) { %><span><%= item.status %></span><% } %>
+        <% if (item.event_date) { %><span> · <%= item.event_date %></span><% } %>
+        <% if (item.place) { %><span> · <%= item.place %></span><% } %>
+        <% if (item.is_published) { %><span class="text-emerald-300"> · zveřejněno</span><% } else { %><span class="text-amber-300"> · návrh</span><% } %>
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/administrace/pomaha?edit=<%= item.id %><%= (pagination && pagination.page && pagination.page > 1) ? ('&page=' + pagination.page) : '' %>" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10">Upravit</a>
+      <form method="post" action="/administrace/pomaha">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="move_up" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-30" <%= index === 0 ? 'disabled' : '' %>>↑</button>
+      </form>
+      <form method="post" action="/administrace/pomaha">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="move_down" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-30" <%= index === items.length - 1 ? 'disabled' : '' %>>↓</button>
+      </form>
+      <form method="post" action="/administrace/pomaha" onsubmit="return confirm('Odebrat akci?');">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="delete" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg px-2.5 py-2 text-sm text-red-300 hover:bg-red-500/10">Smazat</button>
+      </form>
+    </div>
+  </article>
+  <% }); %>
+
+  <% if (pagination && pagination.totalPages > 1) { %>
+  <nav class="mt-5 flex flex-wrap items-center justify-center gap-2" aria-label="Stránkování akcí v administraci">
+    <% if (pagination.prevUrl) { %>
+    <a href="<%= pagination.prevUrl %>#pomaha-admin-events" rel="prev" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:border-white/20 hover:bg-white/10">Předchozí</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50" aria-disabled="true">Předchozí</span>
+    <% } %>
+    <% pagination.pages.forEach(function (p) { %>
+      <% if (p.current) { %>
+      <span class="min-w-[40px] rounded-lg bg-11accent px-3 py-2 text-center text-sm text-11bg" aria-current="page"><%= p.n %></span>
+      <% } else { %>
+      <a href="<%= p.url %>#pomaha-admin-events" class="min-w-[40px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-slate-200 hover:border-white/20 hover:bg-white/10"><%= p.n %></a>
+      <% } %>
+    <% }); %>
+    <% if (pagination.nextUrl) { %>
+    <a href="<%= pagination.nextUrl %>#pomaha-admin-events" rel="next" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:border-white/20 hover:bg-white/10">Další</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50" aria-disabled="true">Další</span>
+    <% } %>
+  </nav>
+  <% } %>
+</section>
+
+<script>
+  (function () {
+    var section = document.getElementById('pomaha-admin-events');
+    if (!section) return;
+    var currentPage = <%- JSON.stringify((pagination && pagination.page) || 1) %>;
+    if (window.location.hash === '#pomaha-admin-events' || currentPage > 1) {
+      section.scrollIntoView({ block: 'start' });
+    }
+  })();
+</script>
+
+<%- include('../partials/admin-layout-end') %>

@@ -1,0 +1,147 @@
+<%
+  const seoBase = typeof seoBaseUrl === 'string' && seoBaseUrl ? seoBaseUrl : 'https://11ka.cz';
+  const pagePath = typeof requestPath === 'string' && requestPath ? requestPath : '/';
+  const defaultTitle = typeof title !== 'undefined' ? title : '11ka.cz';
+  const finalMetaTitle = typeof metaTitle === 'string' && metaTitle ? metaTitle : defaultTitle;
+  const finalMetaDescription =
+    typeof metaDescription === 'string' && metaDescription
+      ? metaDescription
+      : '11ka.cz - fotbalovy magazin se zpravami, rozhovory a analyzami.';
+  const finalCanonicalUrl =
+    typeof canonicalUrl === 'string' && canonicalUrl
+      ? canonicalUrl
+      : `${seoBase}${pagePath === '/' ? '' : pagePath}`;
+  const finalOgTitle = typeof ogTitle === 'string' && ogTitle ? ogTitle : finalMetaTitle;
+  const finalOgDescription =
+    typeof ogDescription === 'string' && ogDescription ? ogDescription : finalMetaDescription;
+  const finalOgUrl = typeof ogUrl === 'string' && ogUrl ? ogUrl : finalCanonicalUrl;
+  const finalOgType = typeof ogType === 'string' && ogType ? ogType : 'website';
+  const finalOgImage =
+    typeof ogImage === 'string' && ogImage ? ogImage : `${seoBase}/logo.png`;
+  const finalTwitterCard =
+    typeof twitterCard === 'string' && twitterCard ? twitterCard : 'summary_large_image';
+  const finalMetaRobots =
+    typeof metaRobots === 'string' && metaRobots
+      ? metaRobots
+      : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
+  const finalMetaKeywords =
+    typeof metaKeywords === 'string' && metaKeywords
+      ? metaKeywords
+      : 'fotbal, fotbalové zprávy, 11ka, český fotbal';
+  const finalMetaAuthor =
+    typeof metaAuthor === 'string' && metaAuthor ? metaAuthor : 'Redakce 11ka.cz';
+  const globalStructuredData = [
+    {
+      '@type': 'Organization',
+      name: '11ka.cz',
+      url: seoBase,
+      logo: `${seoBase}/logo.png`,
+    },
+    {
+      '@type': 'WebSite',
+      name: '11ka.cz',
+      url: seoBase,
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: `${seoBase}/hledat?q={search_term_string}`,
+        'query-input': 'required name=search_term_string',
+      },
+    },
+  ];
+  const pageStructuredData =
+    typeof structuredData !== 'undefined' && Array.isArray(structuredData) ? structuredData : [];
+  const allStructuredData = globalStructuredData.concat(
+    pageStructuredData.map((item) => {
+      if (!item || typeof item !== 'object') return item;
+      const copy = Object.assign({}, item);
+      delete copy['@context'];
+      return copy;
+    })
+  );
+  const assetVersion =
+    typeof locals !== 'undefined' && locals && locals.assetVersion
+      ? String(locals.assetVersion)
+      : typeof process !== 'undefined' && process && process.env && process.env.ASSET_VERSION
+        ? process.env.ASSET_VERSION
+        : 'dev';
+  let googleAdsClientId = typeof googleAdsClient !== 'undefined' && googleAdsClient ? googleAdsClient : null;
+  if (typeof adMap !== 'undefined' && adMap) {
+    for (const slotKey of Object.keys(adMap)) {
+      const html = adMap[slotKey] && adMap[slotKey].content_html;
+      if (typeof html === 'string') {
+        const m = html.match(/data-ad-client\s*=\s*["']([^"']+)["']/i);
+        if (m && m[1]) {
+          googleAdsClientId = m[1];
+          break;
+        }
+      }
+    }
+  }
+  const ga4Attr =
+    typeof ga4MeasurementId !== 'undefined' && ga4MeasurementId ? String(ga4MeasurementId) : '';
+  const adsAttr = googleAdsClientId ? String(googleAdsClientId) : '';
+  const ldJson = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': allStructuredData,
+  });
+  const ldBase64 = Buffer.from(ldJson, 'utf8').toString('base64');
+%>
+<!DOCTYPE html>
+<html lang="cs" data-ga4-id="<%= ga4Attr %>" data-ads-client-id="<%= adsAttr %>">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= finalMetaTitle %></title>
+  <meta name="description" content="<%= finalMetaDescription %>" />
+  <meta name="keywords" content="<%= finalMetaKeywords %>" />
+  <meta name="author" content="<%= finalMetaAuthor %>" />
+  <meta name="robots" content="<%= finalMetaRobots %>" />
+  <meta name="11ka-ld" content="<%= ldBase64 %>" />
+  <link rel="canonical" href="<%= finalCanonicalUrl %>" />
+  <link rel="alternate" type="application/rss+xml" title="11ka.cz RSS" href="<%= seoBase %>/feed.xml" />
+  <meta property="og:title" content="<%= finalOgTitle %>" />
+  <meta property="og:description" content="<%= finalOgDescription %>" />
+  <meta property="og:url" content="<%= finalOgUrl %>" />
+  <meta property="og:type" content="<%= finalOgType %>" />
+  <meta property="og:site_name" content="11ka.cz" />
+  <meta property="og:locale" content="cs_CZ" />
+  <meta property="og:image" content="<%= finalOgImage %>" />
+  <meta name="twitter:card" content="<%= finalTwitterCard %>" />
+  <meta name="twitter:title" content="<%= finalOgTitle %>" />
+  <meta name="twitter:description" content="<%= finalOgDescription %>" />
+  <meta name="twitter:image" content="<%= finalOgImage %>" />
+  <meta name="twitter:site" content="@11kacz_" />
+  <% if (typeof googleSiteVerification !== 'undefined' && googleSiteVerification) { %>
+  <meta name="google-site-verification" content="<%= googleSiteVerification %>" />
+  <% } %>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://ssp.seznam.cz" crossorigin />
+  <link rel="dns-prefetch" href="//ssp.seznam.cz" />
+  <% if (typeof sidebarInstagram !== 'undefined' && sidebarInstagram && sidebarInstagram.enabled) { %>
+  <link rel="preconnect" href="https://static.elfsight.com" crossorigin />
+  <link rel="preconnect" href="https://core.service.elfsight.com" crossorigin />
+  <link rel="dns-prefetch" href="//static.elfsight.com" />
+  <script src="<%= sidebarInstagram.platformScript %>" defer></script>
+  <% } %>
+  <link
+    id="google-fonts-inter"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+    media="print"
+  />
+  <noscript>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </noscript>
+  <link rel="stylesheet" href="/css/fonts.css?v=<%= encodeURIComponent(assetVersion) %>" />
+  <link rel="stylesheet" href="/css/tailwind.generated.css?v=<%= encodeURIComponent(assetVersion) %>" />
+  <link rel="stylesheet" href="/css/overrides.css?v=<%= encodeURIComponent(assetVersion) %>" />
+  <meta name="google-adsense-account" content="ca-pub-4456080302068896" />
+  <script src="https://ssp.seznam.cz/static/js/ssp.js" defer></script>
+  <script src="/js/consent-defaults.js?v=<%= encodeURIComponent(assetVersion) %>"></script>
+  <script src="/js/apply-dynamic-styles.js?v=<%= encodeURIComponent(assetVersion) %>" defer></script>
+  <script src="/js/inject-ld.js?v=<%= encodeURIComponent(assetVersion) %>" defer></script>
+</head>

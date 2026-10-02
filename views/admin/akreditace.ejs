@@ -1,0 +1,449 @@
+<%- include('../partials/admin-layout-start') %>
+<%
+  var activeTab = typeof tab !== 'undefined' && (tab === 'skryte' || tab === 'spis') ? tab : 'viditelne';
+  var counts = typeof tabCounts !== 'undefined' && tabCounts ? tabCounts : { viditelne: 0, skryte: 0, spis: 0 };
+  var applicantsList = typeof applicants !== 'undefined' && applicants ? applicants : [];
+  var personList = typeof personRequests !== 'undefined' && personRequests ? personRequests : [];
+  var personInfo = typeof personStats !== 'undefined' ? personStats : null;
+  var selectedEmail = typeof personEmail !== 'undefined' && personEmail ? personEmail : '';
+  var searchQ = typeof spisSearch !== 'undefined' ? spisSearch : '';
+
+  function tabHref(t, pageNum, extra) {
+    var parts = [];
+    if (t === 'skryte') parts.push('tab=skryte');
+    if (t === 'spis') parts.push('tab=spis');
+    if (t === 'spis' && searchQ) parts.push('q=' + encodeURIComponent(searchQ));
+    if (t === 'spis' && selectedEmail && (!extra || !extra.clearPerson)) {
+      parts.push('email=' + encodeURIComponent(selectedEmail));
+    }
+    if (extra && extra.email) parts.push('email=' + encodeURIComponent(extra.email));
+    if (extra && extra.q != null) {
+      // replace q handled by rebuilding - skip, use searchQ unless clear
+    }
+    if (pageNum && pageNum > 1) parts.push('page=' + pageNum);
+    return '/administrace/akreditace' + (parts.length ? ('?' + parts.join('&')) : '');
+  }
+  function spisHref(opts) {
+    opts = opts || {};
+    var parts = ['tab=spis'];
+    var q = opts.q != null ? opts.q : searchQ;
+    if (q) parts.push('q=' + encodeURIComponent(q));
+    if (opts.email) parts.push('email=' + encodeURIComponent(opts.email));
+    if (opts.page && opts.page > 1) parts.push('page=' + opts.page);
+    return '/administrace/akreditace?' + parts.join('&');
+  }
+  function detailHref(id, pageNum) {
+    var parts = [];
+    if (pageNum && pageNum > 1) parts.push('page=' + pageNum);
+    if (activeTab === 'skryte') parts.push('tab=skryte');
+    if (activeTab === 'spis') {
+      parts.push('tab=spis');
+      if (searchQ) parts.push('q=' + encodeURIComponent(searchQ));
+      if (selectedEmail) parts.push('email=' + encodeURIComponent(selectedEmail));
+    }
+    return '/administrace/akreditace/' + id + (parts.length ? ('?' + parts.join('&')) : '');
+  }
+  function fmtMatchDate(d) {
+    if (!d) return '-';
+    var p = String(d).split('-');
+    if (p.length !== 3) return d;
+    return p[2] + '.' + p[1] + '.' + p[0];
+  }
+  function fmtCreated(iso) {
+    if (!iso) return '-';
+    var s = String(iso);
+    if (s.length >= 10) {
+      var p = s.slice(0, 10).split('-');
+      if (p.length === 3) return p[2] + '.' + p[1] + '.' + p[0];
+    }
+    return s;
+  }
+%>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">Žádosti o akreditaci</h1>
+  <p class="mt-1 text-sm text-11muted">
+    <% if (activeTab === 'spis') { %>
+    Spis žadatelů podle e-mailu - kolik žádostí, kolik schváleno / zamítnuto / čeká.
+    <% } else { %>
+    Odeslané formuláře z /akreditace včetně data zápasu, seřazené od nejbližšího termínu.
+    <% } %>
+  </p>
+</div>
+
+<% if (typeof flash !== 'undefined' && flash === 'deleted') { %>
+<p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+  Akreditace byla trvale smazána z administrace i z webu.
+</p>
+<% } else if (typeof flash !== 'undefined' && flash === 'ok') { %>
+<p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+  E-mail byl odeslán.
+</p>
+<% } else if (typeof flash !== 'undefined' && flash === 'fail') { %>
+<p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+  E-mail se nepodařilo odeslat. Zkontrolujte SMTP v .env na serveru (viz návod níže).
+</p>
+<% } %>
+
+<nav class="mt-8 flex flex-wrap gap-2" aria-label="Filtr akreditací">
+  <a
+    href="<%= tabHref('viditelne', 1) %>"
+    class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition <%= activeTab === 'viditelne' ? 'border-11accent/50 bg-11accent/15 text-11accent' : 'border-white/15 text-slate-300 hover:border-white/25 hover:text-white' %>"
+  >
+    Viditelné
+    <span class="rounded-full bg-black/25 px-1.5 py-0.5 text-xs tabular-nums"><%= counts.viditelne %></span>
+  </a>
+  <a
+    href="<%= tabHref('skryte', 1) %>"
+    class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition <%= activeTab === 'skryte' ? 'border-amber-400/50 bg-amber-500/15 text-amber-200' : 'border-white/15 text-slate-300 hover:border-white/25 hover:text-white' %>"
+  >
+    Skryté
+    <span class="rounded-full bg-black/25 px-1.5 py-0.5 text-xs tabular-nums"><%= counts.skryte %></span>
+  </a>
+  <a
+    href="<%= spisHref({ page: 1 }) %>"
+    class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition <%= activeTab === 'spis' ? 'border-sky-400/50 bg-sky-500/15 text-sky-200' : 'border-white/15 text-slate-300 hover:border-white/25 hover:text-white' %>"
+  >
+    Spis
+    <span class="rounded-full bg-black/25 px-1.5 py-0.5 text-xs tabular-nums"><%= counts.spis || 0 %></span>
+  </a>
+</nav>
+
+<style>
+  @media (max-width: 767.98px) {
+    .akreditace-admin-desktop-only {
+      display: none !important;
+    }
+  }
+  @media (min-width: 768px) {
+    .akreditace-admin-mobile-only {
+      display: none !important;
+    }
+  }
+</style>
+
+<% if (activeTab === 'spis') { %>
+
+<form method="get" action="/administrace/akreditace" class="mt-6 flex flex-wrap items-end gap-3">
+  <input type="hidden" name="tab" value="spis" />
+  <div class="min-w-[16rem] flex-1">
+    <label class="text-xs text-11muted" for="spis-q">Hledat žadatele</label>
+    <input
+      id="spis-q"
+      name="q"
+      type="search"
+      value="<%= searchQ %>"
+      placeholder="Jméno, e-mail nebo telefon"
+      class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+    />
+  </div>
+  <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">Hledat</button>
+  <% if (searchQ) { %>
+  <a href="<%= spisHref({ q: '', page: 1 }) %>" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-300 hover:text-white">Zrušit filtr</a>
+  <% } %>
+</form>
+
+<% if (selectedEmail) { %>
+<section class="card-11 mt-8 p-5 sm:p-6">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wide text-sky-300">Kartotéka žadatele</p>
+      <h2 class="mt-1 text-xl font-bold text-white"><%= personInfo ? personInfo.name : selectedEmail %></h2>
+      <% if (personInfo) { %>
+      <p class="mt-1 text-sm text-slate-300">
+        <a href="mailto:<%= personInfo.email %>" class="text-11accent hover:underline"><%= personInfo.email %></a>
+        · <%= personInfo.phone %>
+      </p>
+      <% } %>
+    </div>
+    <a href="<%= spisHref({ page: typeof pagination !== 'undefined' ? pagination.page : 1 }) %>" class="text-sm text-11muted hover:text-white">Zavřít detail</a>
+  </div>
+
+  <% if (personInfo) { %>
+  <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div class="rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+      <p class="text-xs text-11muted">Celkem</p>
+      <p class="mt-1 text-2xl font-bold tabular-nums text-white"><%= personInfo.total %></p>
+    </div>
+    <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-3">
+      <p class="text-xs text-emerald-200/80">Schváleno</p>
+      <p class="mt-1 text-2xl font-bold tabular-nums text-emerald-300"><%= personInfo.approved %></p>
+    </div>
+    <div class="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-3">
+      <p class="text-xs text-red-200/80">Zamítnuto</p>
+      <p class="mt-1 text-2xl font-bold tabular-nums text-red-300"><%= personInfo.rejected %></p>
+    </div>
+    <div class="rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-3">
+      <p class="text-xs text-sky-200/80">Zažádáno</p>
+      <p class="mt-1 text-2xl font-bold tabular-nums text-sky-300"><%= personInfo.requested %></p>
+    </div>
+    <div class="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-3">
+      <p class="text-xs text-amber-200/80">Čeká</p>
+      <p class="mt-1 text-2xl font-bold tabular-nums text-amber-300"><%= personInfo.pending %></p>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (!personList.length) { %>
+  <p class="mt-5 text-sm text-11muted">Pro tohoto žadatele nebyly nalezeny žádné žádosti.</p>
+  <% } else { %>
+  <div class="mt-5 space-y-3 akreditace-admin-mobile-only">
+    <% personList.forEach(function (r) { %>
+    <article class="rounded-xl border border-white/10 bg-[#111827]/55 p-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <p class="font-semibold text-white"><%= r.match_name %></p>
+          <p class="mt-0.5 text-xs text-11muted">Datum zápasu: <%= fmtMatchDate(r.match_date) %></p>
+        </div>
+        <%- include('../partials/accreditation-status', { accStatus: r.status }) %>
+      </div>
+      <p class="mt-3 text-sm text-slate-300"><%= r.accreditation_type === 'photo' ? 'Photo' : 'Píšící' %> · podáno <%= fmtCreated(r.created_at) %></p>
+      <a href="<%= detailHref(r.id, 1) %>" class="mt-3 inline-flex text-sm font-medium text-11accent hover:underline">Zobrazit akreditaci</a>
+    </article>
+    <% }); %>
+  </div>
+  <div class="mt-5 akreditace-admin-desktop-only akreditace-requests-table-wrap">
+    <table class="akreditace-requests-table text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/10 text-xs uppercase tracking-wide text-11muted">
+          <th class="px-4 py-2.5 font-medium whitespace-nowrap">Zápas</th>
+          <th class="px-4 py-2.5 font-medium whitespace-nowrap">Datum zápasu</th>
+          <th class="px-4 py-2.5 font-medium whitespace-nowrap">Typ</th>
+          <th class="px-4 py-2.5 font-medium whitespace-nowrap">Stav</th>
+          <th class="px-4 py-2.5 font-medium whitespace-nowrap">Podáno</th>
+          <th class="px-4 py-2.5 font-medium whitespace-nowrap">Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% personList.forEach(function (r) { %>
+        <tr class="border-b border-white/5 text-slate-200">
+          <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.match_name %></td>
+          <td class="px-4 py-3 align-middle whitespace-nowrap font-medium text-white tabular-nums"><%= fmtMatchDate(r.match_date) %></td>
+          <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.accreditation_type === 'photo' ? 'Photo' : 'Píšící' %></td>
+          <td class="px-4 py-3 align-middle whitespace-nowrap">
+            <%- include('../partials/accreditation-status', { accStatus: r.status, accStatusVariant: 'text' }) %>
+          </td>
+          <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums"><%= fmtCreated(r.created_at) %></td>
+          <td class="px-4 py-3 align-middle whitespace-nowrap">
+            <a href="<%= detailHref(r.id, 1) %>" class="inline-flex rounded-lg border border-11accent/40 px-2.5 py-1 text-xs font-medium text-11accent transition hover:bg-11accent/10">Zobrazit</a>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</section>
+<% } %>
+
+<% if (!applicantsList.length) { %>
+<p class="mt-8 text-11muted"><%= searchQ ? 'Nikdo neodpovídá hledání.' : 'Zatím žádní žadatelé.' %></p>
+<% } else { %>
+<div class="mt-8 space-y-3 akreditace-admin-mobile-only">
+  <% applicantsList.forEach(function (a) { %>
+  <article class="rounded-xl border border-white/10 bg-11card/60 p-4 <%= selectedEmail && a.email_key === String(selectedEmail).trim().toLowerCase() ? 'ring-1 ring-sky-400/40' : '' %>">
+    <p class="text-base font-semibold text-white"><%= a.name %></p>
+    <p class="mt-1 break-all text-sm text-11accent"><%= a.email %></p>
+    <p class="mt-0.5 text-xs text-11muted"><%= a.phone %> · poslední žádost <%= fmtCreated(a.last_created_at) %></p>
+    <dl class="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
+      <div><dt class="text-xs text-11muted">Celkem</dt><dd class="font-semibold tabular-nums text-white"><%= a.total %></dd></div>
+      <div><dt class="text-xs text-11muted">Schváleno</dt><dd class="font-semibold tabular-nums text-emerald-300"><%= a.approved %></dd></div>
+      <div><dt class="text-xs text-11muted">Zamítnuto</dt><dd class="font-semibold tabular-nums text-red-300"><%= a.rejected %></dd></div>
+      <div><dt class="text-xs text-11muted">Zažádáno</dt><dd class="font-semibold tabular-nums text-sky-300"><%= a.requested %></dd></div>
+      <div><dt class="text-xs text-11muted">Čeká</dt><dd class="font-semibold tabular-nums text-amber-300"><%= a.pending %></dd></div>
+    </dl>
+    <a href="<%= spisHref({ email: a.email, page: 1 }) %>" class="mt-4 inline-flex w-full items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-2.5 text-sm font-medium text-sky-200 transition hover:bg-sky-500/20">
+      Otevřít spis
+    </a>
+  </article>
+  <% }); %>
+</div>
+
+<div class="mt-8 akreditace-admin-desktop-only akreditace-requests-table-wrap">
+  <table class="akreditace-requests-table text-left text-sm">
+    <thead>
+      <tr class="border-b border-white/10 text-xs uppercase tracking-wide text-11muted">
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Jméno</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">E-mail</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Telefon</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Celkem</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Schváleno</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Zamítnuto</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Zažádáno</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Čeká</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Poslední</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Spis</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% applicantsList.forEach(function (a) { %>
+      <tr class="border-b border-white/5 text-slate-200 <%= selectedEmail && a.email_key === String(selectedEmail).trim().toLowerCase() ? 'bg-sky-500/10' : '' %>">
+        <td class="px-4 py-3 align-middle whitespace-nowrap font-medium text-white"><%= a.name %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap">
+          <a href="mailto:<%= a.email %>" class="text-11accent hover:underline"><%= a.email %></a>
+        </td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums"><%= a.phone %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums font-semibold text-white"><%= a.total %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums text-emerald-300"><%= a.approved %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums text-red-300"><%= a.rejected %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums text-sky-300"><%= a.requested %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums text-amber-300"><%= a.pending %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums"><%= fmtCreated(a.last_created_at) %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap">
+          <a href="<%= spisHref({ email: a.email, page: 1 }) %>" class="inline-flex rounded-lg border border-sky-400/40 px-2.5 py-1 text-xs font-medium text-sky-200 transition hover:bg-sky-500/10">Otevřít</a>
+        </td>
+      </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<%
+  var p = pagination || { page: 1, perPage: applicantsList.length, totalPages: 1, totalItems: applicantsList.length, hasPrev: false, hasNext: false };
+  var from = p.totalItems === 0 ? 0 : ((p.page - 1) * p.perPage + 1);
+  var to = p.totalItems === 0 ? 0 : Math.min(p.page * p.perPage, p.totalItems);
+%>
+<div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+  <p class="text-sm text-11muted">Zobrazeno <%= from %>-<%= to %> z <%= p.totalItems %> žadatelů</p>
+  <% if (p.totalPages > 1) { %>
+  <nav class="flex items-center gap-2" aria-label="Stránkování spisu">
+    <% if (p.hasPrev) { %>
+    <a href="<%= spisHref({ page: p.page - 1, email: selectedEmail || null }) %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Předchozí</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Předchozí</span>
+    <% } %>
+    <span class="rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-1.5 text-sm font-semibold text-sky-200"><%= p.page %> / <%= p.totalPages %></span>
+    <% if (p.hasNext) { %>
+    <a href="<%= spisHref({ page: p.page + 1, email: selectedEmail || null }) %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Další</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Další</span>
+    <% } %>
+  </nav>
+  <% } %>
+</div>
+<% } %>
+
+<% } else { %>
+
+<% if (!requests.length) { %>
+<p class="mt-8 text-11muted"><%= activeTab === 'skryte' ? 'Žádné skryté akreditace.' : 'Zatím žádné viditelné žádosti.' %></p>
+<% } else { %>
+<div class="mt-8 space-y-3 akreditace-admin-mobile-only">
+  <% requests.forEach(function (r) { %>
+  <article class="rounded-xl border border-white/10 bg-11card/60 p-4">
+    <div class="flex items-start justify-between gap-3">
+      <div class="min-w-0 flex-1">
+        <p class="text-base font-semibold text-white"><%= r.name %></p>
+        <p class="mt-1 text-sm text-slate-200"><%= r.match_name %></p>
+        <p class="mt-0.5 text-xs text-11muted">Datum zápasu: <%= fmtMatchDate(r.match_date) %></p>
+      </div>
+      <%- include('../partials/accreditation-status', { accStatus: r.status }) %>
+    </div>
+    <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+      <div>
+        <dt class="text-xs font-medium uppercase tracking-wide text-11muted">Typ</dt>
+        <dd class="mt-0.5 text-slate-200"><%= r.accreditation_type === 'photo' ? 'Photo' : 'Píšící' %></dd>
+      </div>
+      <div>
+        <dt class="text-xs font-medium uppercase tracking-wide text-11muted">Telefon</dt>
+        <dd class="mt-0.5 text-slate-200">
+          <a href="tel:<%= r.phone %>" class="hover:text-11accent"><%= r.phone %></a>
+        </dd>
+      </div>
+      <div class="sm:col-span-2">
+        <dt class="text-xs font-medium uppercase tracking-wide text-11muted">E-mail</dt>
+        <dd class="mt-0.5 break-all">
+          <a href="mailto:<%= r.email %>" class="text-11accent hover:underline"><%= r.email %></a>
+        </dd>
+      </div>
+    </dl>
+    <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+      <a
+        href="<%= detailHref(r.id, typeof pagination !== 'undefined' ? pagination.page : 1) %>"
+        class="inline-flex flex-1 items-center justify-center rounded-lg border border-11accent/40 bg-11accent/10 px-3 py-2.5 text-sm font-medium text-11accent transition hover:bg-11accent/20"
+      >
+        Zobrazit akreditaci
+      </a>
+      <a
+        href="<%= spisHref({ email: r.email, page: 1 }) %>"
+        class="inline-flex flex-1 items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-2.5 text-sm font-medium text-sky-200 transition hover:bg-sky-500/20"
+      >
+        Spis žadatele
+      </a>
+    </div>
+  </article>
+  <% }); %>
+</div>
+
+<div class="mt-8 akreditace-admin-desktop-only akreditace-requests-table-wrap">
+  <table class="akreditace-requests-table text-left text-sm">
+    <thead>
+      <tr class="border-b border-white/10 text-xs uppercase tracking-wide text-11muted">
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Jméno</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Zápas</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Datum zápasu</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Typ</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Stav žádosti</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">E-mail</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Telefon</th>
+        <th class="px-4 py-2.5 font-medium whitespace-nowrap">Detail</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% requests.forEach(function (r) { %>
+      <tr class="border-b border-white/5 text-slate-200">
+        <td class="px-4 py-3 align-middle whitespace-nowrap">
+          <a href="<%= spisHref({ email: r.email, page: 1 }) %>" class="font-medium text-white hover:text-11accent" title="Otevřít spis"><%= r.name %></a>
+        </td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.match_name %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap font-medium text-white tabular-nums"><%= fmtMatchDate(r.match_date) %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.accreditation_type === 'photo' ? 'Photo' : 'Píšící' %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap">
+          <%- include('../partials/accreditation-status', { accStatus: r.status, accStatusVariant: 'text' }) %>
+        </td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap">
+          <a href="mailto:<%= r.email %>" class="text-11accent hover:underline" title="<%= r.email %>"><%= r.email %></a>
+        </td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums"><%= r.phone %></td>
+        <td class="px-4 py-3 align-middle whitespace-nowrap">
+          <a
+            href="<%= detailHref(r.id, typeof pagination !== 'undefined' ? pagination.page : 1) %>"
+            class="inline-flex rounded-lg border border-11accent/40 px-2.5 py-1 text-xs font-medium text-11accent transition hover:bg-11accent/10"
+          >
+            Zobrazit akreditaci
+          </a>
+        </td>
+      </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<%
+  var p = pagination || { page: 1, perPage: requests.length, totalPages: 1, totalItems: requests.length, hasPrev: false, hasNext: false };
+  var from = p.totalItems === 0 ? 0 : ((p.page - 1) * p.perPage + 1);
+  var to = p.totalItems === 0 ? 0 : Math.min(p.page * p.perPage, p.totalItems);
+%>
+<div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+  <p class="text-sm text-11muted">Zobrazeno <%= from %>-<%= to %> z <%= p.totalItems %> <%= activeTab === 'skryte' ? 'skrytých' : 'viditelných' %> žádostí</p>
+  <% if (p.totalPages > 1) { %>
+  <nav class="flex items-center gap-2" aria-label="Stránkování akreditací">
+    <% if (p.hasPrev) { %>
+    <a href="<%= tabHref(activeTab, p.page - 1) %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Předchozí</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Předchozí</span>
+    <% } %>
+    <span class="rounded-lg border border-11accent/40 bg-11accent/10 px-3 py-1.5 text-sm font-semibold text-11accent"><%= p.page %> / <%= p.totalPages %></span>
+    <% if (p.hasNext) { %>
+    <a href="<%= tabHref(activeTab, p.page + 1) %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Další</a>
+    <% } else { %>
+    <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Další</span>
+    <% } %>
+  </nav>
+  <% } %>
+</div>
+<% } %>
+
+<% } %>
+
+<%- include('../partials/admin-layout-end') %>

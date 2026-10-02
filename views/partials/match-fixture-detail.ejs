@@ -1,0 +1,260 @@
+<%
+  var _showBoard = typeof showBoard === 'boolean' ? showBoard : true;
+  var _showEvents = typeof showEvents === 'boolean' ? showEvents : false;
+  var _scoreHome = fixture.showScore ? fixture.homeScore : '-';
+  var _scoreAway = fixture.showScore ? fixture.awayScore : '-';
+  var _events = Array.isArray(fixture.events) ? fixture.events.slice() : [];
+  _events.sort(function (a, b) {
+    var ta = Date.parse(a && a.at ? a.at : '');
+    var tb = Date.parse(b && b.at ? b.at : '');
+    if (!Number.isFinite(ta) && !Number.isFinite(tb)) return 0;
+    if (!Number.isFinite(ta)) return 1;
+    if (!Number.isFinite(tb)) return -1;
+    return ta - tb;
+  });
+  function _eventAtLabel(iso, details) {
+    var m = details && parseInt(details.minute, 10);
+    if (Number.isFinite(m) && m > 0) {
+      var e = details && parseInt(details.minute_extra, 10);
+      if (Number.isFinite(e) && e > 0) return m + '+' + e + '\'';
+      return m + '\'';
+    }
+    try {
+      var d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso || '';
+      return d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+    } catch (_) {
+      return iso || '';
+    }
+  }
+  function _eventSideLabel(key, homeTeam, awayTeam) {
+    if (/_home$/.test(key || '')) return homeTeam || 'Domácí';
+    if (/_away$/.test(key || '')) return awayTeam || 'Hosté';
+    return null;
+  }
+  function _eventBaseLabel(key, fallback) {
+    if (!key) return fallback || 'Akce';
+    if (/^goal_/.test(key)) return 'Gól';
+    if (/^yellow_/.test(key)) return 'Žlutá karta';
+    if (/^red_/.test(key)) return 'Červená karta';
+    if (/^sub_/.test(key)) return 'Střídání';
+    if (/^disallowed_goal_/.test(key)) return 'Neuznaný gól';
+    if (/^penalty_scored_/.test(key)) return 'Proměněná penalta';
+    if (/^penalty_missed_/.test(key)) return 'Neproměněná penalta';
+    if (/^forfeit_/.test(key)) return 'Kontumace';
+    return fallback || 'Akce';
+  }
+  function _playerLabel(number, name) {
+    var n = number != null && String(number).trim() ? '#' + String(number).trim() + ' ' : '';
+    var p = name != null ? String(name).trim() : '';
+    return (n + p).trim();
+  }
+  function _eventDisplayLabel(event) {
+    if (!event) return '';
+    var details = event.details || {};
+    var base = _eventBaseLabel(event.key, event.label);
+    var scorer = _playerLabel(details.scorer_number, details.scorer_name);
+    var assist = _playerLabel(details.assist_number, details.assist_name);
+    var player = _playerLabel(details.player_number, details.player_name);
+    var off = _playerLabel(details.off_number, details.off_name);
+    var on = _playerLabel(details.on_number, details.on_name);
+    if (scorer) {
+      if (assist) return base + ': ' + scorer + ' (' + assist + ')';
+      return base + ': ' + scorer;
+    }
+    if (player) return base + ': ' + player;
+    if (off || on) return base + ': ' + (off || '-') + ' → ' + (on || '-');
+    return base;
+  }
+  function _eventIcon(key) {
+    if (!key) return '•';
+    if (/goal|penalty_scored/.test(key)) return '⚽';
+    if (/yellow/.test(key)) return '🟨';
+    if (/red/.test(key)) return '🟥';
+    if (/sub/.test(key)) return '🔁';
+    if (/disallowed/.test(key)) return '🚫';
+    if (/penalty_missed/.test(key)) return '❌';
+    if (/forfeit/.test(key)) return '🏳️';
+    return '•';
+  }
+  var _homeTimeline = [];
+  var _awayTimeline = [];
+  _events.forEach(function (event) {
+    if (!event || !event.label) return;
+    var details = event.details || {};
+    var item = {
+      at: _eventAtLabel(event.at, event.details),
+      icon: _eventIcon(event.key),
+      label: _eventDisplayLabel(event),
+      details: details,
+    };
+    if (/_away$/.test(event.key || '')) _awayTimeline.push(item);
+    else _homeTimeline.push(item);
+  });
+%>
+
+<section class="match-board-manage">
+  <% if (_showBoard) { %>
+  <article class="card-11 match-board-manage__card p-4 sm:p-5">
+    <% if (fixture.competition) { %>
+    <div class="match-board-manage__toolbar match-board-manage__toolbar--center">
+      <span class="match-board-manage__competition-text"><%= fixture.competition %></span>
+    </div>
+    <% } %>
+    <% if (fixture.status === 'Zrušeno') { %>
+    <p class="match-board-manage__state-text match-board-manage__state-text--cancelled">Zrušeno</p>
+    <% } else if (fixture.status === 'Kontumace') { %>
+    <p class="match-board-manage__state-text match-board-manage__state-text--cancelled">Kontumace</p>
+    <% } %>
+
+    <div class="match-board-manage__board match-board-manage__board--tv">
+      <div class="match-board-manage__side match-board-manage__side--home">
+        <div class="match-board-manage__logo">
+          <% if (fixture.homeLogo) { %>
+          <img src="<%= fixture.homeLogo %>" alt="" class="match-board-manage__logo-img" />
+          <% } else { %>
+          <span class="match-board-manage__logo-fallback" aria-hidden="true"></span>
+          <% } %>
+        </div>
+        <p class="match-board-manage__team-name"><%= fixture.homeTeam %></p>
+      </div>
+
+      <div class="match-board-manage__center">
+        <% if (fixture.isLive && fixture.liveStartedAt) { %>
+        <div class="match-board-manage__live-clock-wrap">
+          <p
+            class="match-board-manage__live-clock"
+            data-match-live-clock="<%= fixture.liveStartedAt %>"
+            data-match-live-clock-first-half-extra="<%= fixture.firstHalfExtraMinutes != null ? fixture.firstHalfExtraMinutes : '' %>"
+            data-match-live-clock-first-half-set="<%= fixture.firstHalfExtraSet ? '1' : '0' %>"
+            data-match-live-clock-second-half-extra="<%= fixture.secondHalfExtraMinutes != null ? fixture.secondHalfExtraMinutes : '' %>"
+            data-match-live-clock-second-half-set="<%= fixture.secondHalfExtraSet ? '1' : '0' %>"
+            aria-live="polite"
+          >0:00</p>
+          <span class="match-board-manage__live-extra" data-match-live-extra hidden></span>
+        </div>
+        <% } else if (fixture.status === 'Poločas') { %>
+        <p class="match-board-manage__datetime-text">Poločas</p>
+        <% } else if (fixture.kickoffLabel) { %>
+        <p class="match-board-manage__datetime-text"><%= fixture.kickoffLabel %></p>
+        <% } %>
+        <div class="match-board-manage__score" aria-label="Skóre">
+          <span class="match-board-manage__score-text"><%= _scoreHome %></span>
+          <span class="match-board-manage__score-sep" aria-hidden="true">:</span>
+          <span class="match-board-manage__score-text"><%= _scoreAway %></span>
+        </div>
+      </div>
+
+      <div class="match-board-manage__side match-board-manage__side--away">
+        <p class="match-board-manage__team-name"><%= fixture.awayTeam %></p>
+        <div class="match-board-manage__logo">
+          <% if (fixture.awayLogo) { %>
+          <img src="<%= fixture.awayLogo %>" alt="" class="match-board-manage__logo-img" />
+          <% } else { %>
+          <span class="match-board-manage__logo-fallback" aria-hidden="true"></span>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <% if (fixture.venue || fixture.note) { %>
+    <div class="match-board-manage__extras match-board-manage__extras--readonly">
+      <% if (fixture.venue) { %>
+      <p class="match-board-manage__extra-text"><%= fixture.venue %></p>
+      <% } %>
+      <% if (fixture.note) { %>
+      <p class="match-board-manage__extra-text match-board-manage__extra-text--note"><%= fixture.note %></p>
+      <% } %>
+    </div>
+    <% } %>
+  </article>
+  <% } %>
+
+  <% if (_showEvents && _events.length) { %>
+  <%
+    var _svgIcons = {
+      goal:       '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8.3" stroke="currentColor" stroke-width="1.3"/><polygon points="10,6.8 13.05,8.93 11.94,12.27 8.06,12.27 6.95,8.93" fill="currentColor"/><polygon points="9,3.2 10,1.7 11,3.2" fill="currentColor"/><polygon points="15,7.2 17.6,7.8 16.2,10" fill="currentColor"/><polygon points="13.2,14.5 15.4,16 13.5,17.2" fill="currentColor"/><polygon points="6.8,14.5 6.5,17.2 4.6,16" fill="currentColor"/><polygon points="5,7.2 3.8,10 2.4,7.8" fill="currentColor"/><line x1="10" y1="6.8" x2="10" y2="3.2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><line x1="13.05" y1="8.93" x2="15" y2="7.2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><line x1="11.94" y1="12.27" x2="13.2" y2="14.5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><line x1="8.06" y1="12.27" x2="6.8" y2="14.5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><line x1="6.95" y1="8.93" x2="5" y2="7.2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>',
+      yellow:     '<svg viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="3" width="8" height="12" rx="1.5"/></svg>',
+      red:        '<svg viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="3" width="8" height="12" rx="1.5"/></svg>',
+      sub:        '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4v6M7 4L4.5 6.5M7 4l2.5 2.5" stroke="#4ade80" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 16v-6M13 16l2.5-2.5M13 16l-2.5-2.5" stroke="#f87171" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      disallowed: '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8.2" stroke="currentColor" stroke-width="1.4"/><line x1="4" y1="4" x2="16" y2="16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+      missed:     '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="5" y1="5" x2="15" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="15" y1="5" x2="5" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+      forfeit:    '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="5.5" y1="3" x2="5.5" y2="17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M5.5 3.5 L15 7 L5.5 10.5 Z" fill="currentColor"/></svg>',
+      var:        '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 8l1.5 4 1.5-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.5 8h3M11.5 12h3M12.7 8v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+      default:    '<svg viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="3"/></svg>',
+    };
+
+    function _typeClass(key) {
+      if (!key) return 'default';
+      // disallowed must come before goal (key contains "goal")
+      if (/disallowed/.test(key)) return 'disallowed';
+      if (/penalty_missed/.test(key)) return 'missed';
+      if (/penalty_scored/.test(key)) return 'goal';
+      if (/goal/.test(key)) return 'goal';
+      if (/yellow/.test(key)) return 'yellow';
+      if (/red/.test(key)) return 'red';
+      if (/sub/.test(key)) return 'sub';
+      if (/forfeit/.test(key)) return 'forfeit';
+      if (/var/.test(key)) return 'var';
+      return 'default';
+    }
+
+    var _allTimeline = _events.map(function(event) {
+      var details = event.details || {};
+      var key = event.key || '';
+      var side = /_away$/.test(key) ? 'away' : 'home';
+      var tc = _typeClass(key);
+      return {
+        at: _eventAtLabel(event.at, event.details),
+        icon: _svgIcons[tc] || _svgIcons.default,
+        label: _eventDisplayLabel(event),
+        side: side,
+        typeClass: tc,
+        reason: details.reason || '',
+        varUsed: details.var_used ? ' (VAR)' : '',
+      };
+    });
+  %>
+  <article class="card-11 match-overview-events mt-4">
+    <div class="mot-header">
+      <span class="mot-team-label mot-team-label--home"><%= fixture.homeTeam %></span>
+      <span class="mot-header-center"></span>
+      <span class="mot-team-label mot-team-label--away"><%= fixture.awayTeam %></span>
+    </div>
+    <div class="mot-timeline">
+      <% _allTimeline.forEach(function(event, idx) { %>
+      <div class="mot-row mot-row--<%= event.side %> mot-row--<%= event.typeClass %>">
+
+        <%# home side %>
+        <div class="mot-side mot-side--home">
+          <% if (event.side === 'home') { %>
+          <div class="mot-text mot-text--home">
+            <span class="mot-label"><%= event.label %><% if (event.typeClass === 'disallowed' && event.reason) { %> (<%= event.reason %><%= event.varUsed %>)<% } %></span>
+            <% if (event.reason && event.typeClass !== 'disallowed') { %><span class="mot-meta"><%= event.reason %><%= event.varUsed %></span><% } %>
+          </div>
+          <span class="mot-icon mot-icon--<%= event.typeClass %>"><%- event.icon %></span>
+          <% } %>
+        </div>
+
+        <%# center time %>
+        <div class="mot-center">
+          <span class="mot-time-pill"><%= event.at %></span>
+        </div>
+
+        <%# away side %>
+        <div class="mot-side mot-side--away">
+          <% if (event.side === 'away') { %>
+          <span class="mot-icon mot-icon--<%= event.typeClass %>"><%- event.icon %></span>
+          <div class="mot-text mot-text--away">
+            <span class="mot-label"><%= event.label %><% if (event.typeClass === 'disallowed' && event.reason) { %> (<%= event.reason %><%= event.varUsed %>)<% } %></span>
+            <% if (event.reason && event.typeClass !== 'disallowed') { %><span class="mot-meta"><%= event.reason %><%= event.varUsed %></span><% } %>
+          </div>
+          <% } %>
+        </div>
+
+      </div>
+      <% }); %>
+    </div>
+  </article>
+  <% } %>
+</section>

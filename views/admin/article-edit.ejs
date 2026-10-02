@@ -1,0 +1,1105 @@
+<%- include('../partials/admin-layout-start') %>
+<% 
+  var a = article || {}; 
+  var f = typeof form !== 'undefined' && form ? form : {}; 
+  function val(k) { 
+    if (f[k] != null && f[k] !== '') return f[k]; 
+    if (a[k] != null && a[k] !== '') return a[k]; 
+    return ''; 
+  }
+  var st = a.status || 'draft'; 
+  var isNew = !article || !article.id; 
+  var canPub = typeof hasAnyRole === 'function'
+    ? hasAnyRole(currentUser, 'vedeni', 'sefredaktor')
+    : (currentUser && (currentUser.role === 'vedeni' || currentUser.role === 'sefredaktor'));
+  var canRequestPublish = typeof isRedaktorWorkflow === 'function'
+    ? isRedaktorWorkflow(currentUser)
+    : (currentUser && currentUser.role === 'redaktor');
+  var schedVal = typeof scheduledAtLocal !== 'undefined' ? scheduledAtLocal : '';
+  var schedMin = typeof scheduledAtMin !== 'undefined' ? scheduledAtMin : '';
+  var heroPosVal = String(val('hero_position') || a.hero_position || '50% 50%').trim();
+  var heroCardPosVal = String(
+    val('hero_card_position') || a.hero_card_position || val('hero_position') || a.hero_position || '50% 50%'
+  ).trim();
+  var heroSliderMobilePosVal = String(
+    val('hero_slider_mobile_position') || a.hero_slider_mobile_position || val('hero_position') || a.hero_position || '50% 50%'
+  ).trim();
+  var heroSliderDesktopPosVal = String(
+    val('hero_slider_desktop_position') || a.hero_slider_desktop_position || val('hero_position') || a.hero_position || '50% 50%'
+  ).trim();
+  var lineupInitialRaw = val('lineup_json') || a.lineup_json || '';
+  var lineupInitialJson = '';
+  try {
+    if (lineupInitialRaw) {
+      var _parsedLineup = typeof lineupInitialRaw === 'string' ? JSON.parse(lineupInitialRaw) : lineupInitialRaw;
+      lineupInitialJson = JSON.stringify(_parsedLineup);
+    }
+  } catch (e) {
+    lineupInitialJson = '';
+  }
+%>
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl"><%= isNew ? 'Nový článek' : 'Upravit článek' %></h1>
+  <% if (!isNew) { %><p class="mt-2 text-sm text-11muted break-words">Stav: <strong class="text-11accent"><%= st %></strong> · slug <code class="text-slate-400 break-all"><%= a.slug %></code></p><% } %>
+</div>
+
+<% if (error) { %><p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p><% } %>
+<% if (success) { %><p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p><% } %>
+
+<form id="article-form" class="mt-8 space-y-6" method="post" action="<%= isNew ? '/administrace/clanek/novy' : '/administrace/clanek/' + a.id + '/edit' %>" enctype="multipart/form-data">
+  <div class="card-11 space-y-4 p-4 sm:p-6">
+    <div>
+      <label class="text-xs text-11muted" for="title">Nadpis</label>
+      <input id="title" name="title" type="text" required value="<%= val('title') %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="text-xs text-11muted" for="slug">Slug (URL, volitelné)</label>
+      <input id="slug" name="slug" type="text" value="<%= val('slug') %>" placeholder="napr. slavia-vyhrala" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="text-xs text-11muted" for="category">Kategorie</label>
+      <%
+        var cats = (typeof categories !== 'undefined' && Array.isArray(categories)) ? categories : [];
+        var currentCat = String(val('category') || '').trim();
+        var hasCurrent = currentCat && cats.some(function (c) { return String(c || '').trim() === currentCat; });
+      %>
+      <select id="category" name="category" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white">
+        <option value="" <%= !currentCat ? 'selected' : '' %>>- vyberte -</option>
+        <% if (currentCat && !hasCurrent) { %>
+        <option value="<%= currentCat %>" selected><%= currentCat %></option>
+        <% } %>
+        <% cats.forEach(function (c) { %>
+        <option value="<%= c %>" <%= currentCat === String(c) ? 'selected' : '' %>><%= c %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div>
+      <label class="text-xs text-11muted" for="tag">Štítek</label>
+      <%
+        var tgs = (typeof tags !== 'undefined' && Array.isArray(tags)) ? tags : [];
+        var currentTag = String(val('tag') || '').trim();
+        var hasCurrentTag = currentTag && tgs.some(function (t) { return String(t || '').trim() === currentTag; });
+      %>
+      <select id="tag" name="tag" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" data-all-tags="<%= JSON.stringify(tgs) %>">
+        <option value="" <%= !currentTag ? 'selected' : '' %>>- žádný -</option>
+        <% if (currentTag && !hasCurrentTag) { %>
+        <option value="<%= currentTag %>" selected><%= currentTag %></option>
+        <% } %>
+        <% tgs.forEach(function (t) { %>
+        <option value="<%= t %>" <%= currentTag === String(t) ? 'selected' : '' %>><%= t %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div>
+      <label class="text-xs text-11muted" for="excerpt">Perex (krátký úvod)</label>
+      <div class="relative mt-1">
+        <textarea id="excerpt" name="excerpt" rows="3" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"><%= val('excerpt') %></textarea>
+      </div>
+    </div>
+    <%
+      var canPickAuthor = typeof hasRole === 'function'
+        ? hasRole(currentUser, 'vedeni')
+        : (currentUser && currentUser.role === 'vedeni');
+      var authorsList = typeof authors !== 'undefined' && authors ? authors : [];
+      var currentAuthorId = String(val('author_id') || (a.author_id != null ? a.author_id : (currentUser && currentUser.id)) || '');
+    %>
+    <% if (canPickAuthor && authorsList.length) { %>
+    <div>
+      <label class="text-xs text-11muted" for="author_id">Autor článku</label>
+      <select id="author_id" name="author_id" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white">
+        <% authorsList.forEach(function (u) { %>
+        <option value="<%= u.id %>" <%= String(u.id) === currentAuthorId ? 'selected' : '' %>>
+          <%= u.display_name || u.email %> (<%= u.email %>)
+        </option>
+        <% }); %>
+      </select>
+      <p class="mt-1 text-xs text-11muted">Článek se zveřejní pod vybraným účtem.</p>
+    </div>
+    <% } %>
+  </div>
+
+  <div class="card-11 space-y-4 p-4 sm:p-6">
+    <h2 class="text-sm font-semibold text-white">Titulní obrázek</h2>
+    <% if (a.hero_image_path) { %>
+    <div class="hero-credit-wrap relative max-h-48 overflow-hidden rounded-xl ring-1 ring-white/10">
+      <img src="<%= a.hero_image_path %>" alt="" class="js-hero-preview-thumb max-h-48 w-full object-cover" style="object-position: <%= heroPosVal %>;" />
+      <% if (a.hero_credit) { %>
+      <figcaption class="hero-credit-pill pointer-events-none">
+        <%- include('../partials/hero-credit-badge', { credit: a.hero_credit }) %>
+      </figcaption>
+      <% } %>
+    </div>
+    <% } %>
+    <div>
+      <label class="text-xs text-11muted" for="hero"><%= a.hero_image_path ? 'Nahradit obrázkem' : 'Nahrát obrázek' %></label>
+      <input id="hero" name="hero" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="mt-1 block w-full min-w-0 text-sm text-11muted file:mr-3 file:rounded-lg file:border-0 file:bg-11accent file:px-3 file:py-2 file:text-sm file:font-medium file:text-11bg sm:w-auto" />
+    </div>
+    <div class="hero-admin-previews rounded-xl border border-white/10 bg-[#0f1729]/70 p-3">
+      <p class="text-xs text-11muted">Každý náhled má vlastní výřez - táhněte myší přímo v náhledu.</p>
+      <div class="hero-admin-previews__grid mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="hero-admin-previews__item">
+          <p class="mb-1.5 text-xs font-medium text-slate-300">V článku</p>
+          <div id="hero-live-frame" class="hero-admin-preview hero-admin-preview--article relative w-full cursor-move">
+            <img
+              id="hero-live-image"
+              src="<%= a.hero_image_path || '' %>"
+              alt=""
+              class="js-hero-preview-img aspect-[21/9] w-full object-cover select-none sm:aspect-[2/1]"
+              style="object-position: <%= heroPosVal %>; <%= a.hero_image_path ? '' : 'display:none;' %>"
+              draggable="false"
+            />
+            <div id="hero-live-empty" class="js-hero-preview-empty hero-admin-preview__empty <%= a.hero_image_path ? 'hidden' : '' %>">
+              Zatím není vybraná titulní fotka
+            </div>
+          </div>
+        </div>
+        <div class="hero-admin-previews__item">
+          <p class="mb-1.5 text-xs font-medium text-slate-300">Hlavní stránka - mobil</p>
+          <div id="hero-slider-mobile-frame" class="hero-admin-preview hero-admin-preview--home-slider relative w-full cursor-move">
+            <img
+              src="<%= a.hero_image_path || '' %>"
+              alt=""
+              class="js-hero-preview-img hero-admin-preview__img"
+              data-hero-preview="slider-mobile"
+              style="object-position: <%= heroSliderMobilePosVal %>; <%= a.hero_image_path ? '' : 'display:none;' %>"
+              draggable="false"
+            />
+            <div class="js-hero-preview-empty hero-admin-preview__empty <%= a.hero_image_path ? 'hidden' : '' %>">
+              Zatím není vybraná titulní fotka
+            </div>
+          </div>
+        </div>
+        <div class="hero-admin-previews__item">
+          <p class="mb-1.5 text-xs font-medium text-slate-300">Hlavní stránka - desktop</p>
+          <div id="hero-slider-desktop-frame" class="hero-admin-preview hero-admin-preview--home-slider-desktop relative w-full cursor-move">
+            <img
+              src="<%= a.hero_image_path || '' %>"
+              alt=""
+              class="js-hero-preview-img hero-admin-preview__img"
+              data-hero-preview="slider-desktop"
+              style="object-position: <%= heroSliderDesktopPosVal %>; <%= a.hero_image_path ? '' : 'display:none;' %>"
+              draggable="false"
+            />
+            <div class="js-hero-preview-empty hero-admin-preview__empty <%= a.hero_image_path ? 'hidden' : '' %>">
+              Zatím není vybraná titulní fotka
+            </div>
+          </div>
+        </div>
+        <div class="hero-admin-previews__item">
+          <p class="mb-1.5 text-xs font-medium text-slate-300">Karta článku (výpis)</p>
+          <div id="hero-card-frame" class="hero-admin-preview hero-admin-preview--card relative w-full cursor-move">
+            <img
+              src="<%= a.hero_image_path || '' %>"
+              alt=""
+              class="js-hero-preview-img js-hero-preview-card hero-admin-preview__img"
+              data-hero-preview="card"
+              style="object-position: <%= heroCardPosVal %>; <%= a.hero_image_path ? '' : 'display:none;' %>"
+              draggable="false"
+            />
+            <div class="js-hero-preview-empty hero-admin-preview__empty <%= a.hero_image_path ? 'hidden' : '' %>">
+              Zatím není vybraná titulní fotka
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <label class="text-xs text-11muted" for="hero_credit">Credit / autor fotky (povinné u titulního obrázku)</label>
+      <input id="hero_credit" name="hero_credit" type="text" value="<%= val('hero_credit') %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+  </div>
+
+  <div class="card-11 p-4 sm:p-6">
+    <h2 class="text-sm font-semibold text-white">Obsah článku</h2>
+    <p class="mt-1 text-xs text-11muted">Toolbar: <strong class="text-slate-400">Embed</strong> vloží náhled z X / YouTube (URL). U obrázku můžete měnit velikost a zarovnání.</p>
+    <textarea id="body_html" name="body_html" rows="14" class="input-11 mt-3 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 font-mono text-sm text-white"><%= val('body_html') %></textarea>
+  </div>
+
+  <div class="card-11 space-y-4 p-4 sm:p-6">
+    <div>
+      <label class="text-xs text-11muted" for="sources">Zdroje</label>
+      <p class="mt-0.5 text-xs text-11muted">Zobrazí se na konci článku na webu (odkazy, média, citace).</p>
+      <textarea id="sources" name="sources" rows="4" placeholder="např. FIFA.com&#10;Reuters - https://…" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"><%= val('sources') %></textarea>
+    </div>
+  </div>
+
+  <div class="card-11 space-y-4 p-4 sm:p-6" id="lineup-admin-card">
+    <h2 class="text-sm font-semibold text-white">Sestava</h2>
+    <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+      <input id="lineup_enabled" type="checkbox" class="rounded border-white/20 bg-[#111827]" />
+      Zobrazit sestavu v článku
+    </label>
+
+    <div id="lineup-teams-wrap" class="space-y-6 hidden">
+      <div class="lineup-admin-team rounded-xl border border-white/10 bg-[#0f1729]/70 p-4" data-team-index="0">
+        <p class="text-xs font-medium uppercase tracking-wide text-11muted">Tým 1</p>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="text-xs text-11muted">Název týmu</label>
+            <input type="text" data-lineup-label class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" placeholder="např. Sparta Praha" />
+          </div>
+          <div>
+            <label class="text-xs text-11muted">Formace</label>
+            <input type="text" data-lineup-formation class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+          </div>
+        </div>
+        <p class="lineup-player-count mt-2 text-xs text-11muted"></p>
+        <div class="lineup-players-grid mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"></div>
+      </div>
+
+      <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+        <input id="lineup_second_team" type="checkbox" class="rounded border-white/20 bg-[#111827]" />
+        Přidat druhý tým (hosté)
+      </label>
+
+      <div id="lineup-team-2" class="lineup-admin-team hidden rounded-xl border border-white/10 bg-[#0f1729]/70 p-4" data-team-index="1">
+        <p class="text-xs font-medium uppercase tracking-wide text-11muted">Tým 2</p>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="text-xs text-11muted">Název týmu</label>
+            <input type="text" data-lineup-label class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" placeholder="např. Slavia Praha" />
+          </div>
+          <div>
+            <label class="text-xs text-11muted">Formace</label>
+            <input type="text" data-lineup-formation class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+          </div>
+        </div>
+        <p class="lineup-player-count mt-2 text-xs text-11muted"></p>
+        <div class="lineup-players-grid mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <% if (canPub) { %>
+  <div class="card-11 space-y-3 p-4 sm:p-6">
+    <h2 class="text-sm font-semibold text-white">Naplánovat publikaci</h2>
+    <input type="datetime-local" name="scheduled_at" value="<%= schedVal %>"<% if (schedMin) { %> min="<%= schedMin %>"<% } %> class="input-11 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    <p class="text-xs text-11muted">Čas v časové zóně Praha (CET/CEST). Vyberte datum a použijte tlačítko „Naplánovat“ níže.</p>
+  </div>
+  <% } %>
+
+  <input id="hero_position" name="hero_position" type="hidden" value="<%= heroPosVal %>" />
+  <input id="hero_card_position" name="hero_card_position" type="hidden" value="<%= heroCardPosVal %>" />
+  <input id="hero_slider_mobile_position" name="hero_slider_mobile_position" type="hidden" value="<%= heroSliderMobilePosVal %>" />
+  <input id="hero_slider_desktop_position" name="hero_slider_desktop_position" type="hidden" value="<%= heroSliderDesktopPosVal %>" />
+  <input id="lineup_json" name="lineup_json" type="hidden" value="" />
+  <input type="hidden" name="action" id="article-form-action" value="save" />
+
+  <div class="flex flex-wrap gap-3">
+    <button type="submit" data-article-action="save" class="btn-11 btn-11--ghost">Uložit</button>
+    <% if (st === 'draft' && canRequestPublish) { %>
+    <button type="submit" data-article-action="submit" class="rounded-xl bg-amber-500/90 px-4 py-2.5 text-sm font-semibold text-11bg hover:brightness-110">Zažádat o vydání</button>
+    <% } %>
+    <% if (canPub) { %>
+    <button type="submit" data-article-action="submit" class="rounded-xl border border-amber-500/50 px-4 py-2.5 text-sm font-medium text-amber-200 hover:bg-amber-500/10">Poslat do fronty (pending)</button>
+    <button type="submit" data-article-action="publish" class="btn-11 btn-11--primary">Vydat nyní</button>
+    <button type="submit" data-article-action="schedule" class="btn-11 btn-11--ghost btn-11--accent-outline">Naplánovat</button>
+    <% } %>
+  </div>
+</form>
+
+<% if (typeof canDelete !== 'undefined' && canDelete && article && article.id) { %>
+<form method="post" action="/administrace/clanek/<%= article.id %>/smazat" class="mt-6" onsubmit="return confirm('Opravdu trvale smazat tento článek?');">
+  <button type="submit" class="rounded-xl border border-red-500/50 px-4 py-2.5 text-sm font-medium text-red-300 transition hover:bg-red-500/10">Smazat článek</button>
+</form>
+<% } %>
+
+<script>
+  (function () {
+    var catEl = document.getElementById('category');
+    var tagEl = document.getElementById('tag');
+    if (!catEl || !tagEl) return;
+
+    var ALL_TAGS = [];
+    try { ALL_TAGS = JSON.parse(tagEl.getAttribute('data-all-tags') || '[]') || []; } catch (e) { ALL_TAGS = []; }
+
+    var FIXED_TAGS_BY_CATEGORY = {
+      'Český Fotbal': ['Chance Liga', 'Chance Národní liga', 'Reprezentace', 'Ostatní'],
+      'Ženský Fotbal': ['Fortuna Liga', 'Reprezentace', 'Ostatní'],
+      'Světový Fotbal': ['Svět', 'Evropa', 'Ostatní'],
+    };
+    var STRICT_FIXED_TAGS_CATEGORIES = {
+      'Český Fotbal': true,
+      'Světový Fotbal': true,
+      'Ženský Fotbal': true,
+    };
+    var USE_ALL_TAGS_CATEGORIES = {
+      'Zápasy': true,
+      'Rozhovory': true,
+      'Analýzy': true,
+    };
+    var EXTRA_TAGS_BY_CATEGORY = {
+      'Zápasy': ['Svět', 'Evropa', 'Ostatní'],
+      'Rozhovory': ['Svět', 'Evropa', 'Ostatní'],
+      'Analýzy': ['Svět', 'Evropa', 'Ostatní'],
+    };
+
+    function uniq(arr) {
+      var out = [];
+      var seen = {};
+      for (var i = 0; i < arr.length; i++) {
+        var v = String(arr[i] || '').trim();
+        if (!v) continue;
+        if (seen[v]) continue;
+        seen[v] = true;
+        out.push(v);
+      }
+      return out;
+    }
+
+    function setOptions(values, selected) {
+      var sel = selected != null ? String(selected) : '';
+      tagEl.innerHTML = '';
+
+      var opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = '- žádný -';
+      if (!sel) opt0.selected = true;
+      tagEl.appendChild(opt0);
+
+      if (sel && values.indexOf(sel) === -1) {
+        var o = document.createElement('option');
+        o.value = sel;
+        o.textContent = sel;
+        o.selected = true;
+        tagEl.appendChild(o);
+      }
+
+      for (var i = 0; i < values.length; i++) {
+        var v = values[i];
+        var opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        if (sel && v === sel) opt.selected = true;
+        tagEl.appendChild(opt);
+      }
+    }
+
+    function refreshTags() {
+      var cat = String(catEl.value || '').trim();
+      var fixed = FIXED_TAGS_BY_CATEGORY[cat];
+      var extra = EXTRA_TAGS_BY_CATEGORY[cat] || [];
+      var values = [];
+      if (STRICT_FIXED_TAGS_CATEGORIES[cat] && fixed && fixed.length) {
+        values = uniq(fixed);
+      } else {
+        values = uniq(
+          USE_ALL_TAGS_CATEGORIES[cat]
+            ? ALL_TAGS.concat(extra)
+            : (fixed && fixed.length ? fixed.concat(ALL_TAGS, extra) : ALL_TAGS.concat(extra))
+        );
+      }
+      setOptions(values, tagEl.value);
+    }
+
+    catEl.addEventListener('change', refreshTags);
+    refreshTags();
+  })();
+</script>
+
+<script>
+  (function () {
+    var input = document.getElementById('hero');
+    var img = document.getElementById('hero-live-image');
+    var previewEmpties = document.querySelectorAll('.js-hero-preview-empty');
+    if (!input || !img) return;
+
+    function parsePosition(raw) {
+      var m = String(raw || '').trim().match(/^(\d{1,3}(?:\.\d+)?)%\s+(\d{1,3}(?:\.\d+)?)%$/);
+      if (!m) return { x: 50, y: 50 };
+      var x = Number(m[1]);
+      var y = Number(m[2]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return { x: 50, y: 50 };
+      return { x: clamp(x, 0, 100), y: clamp(y, 0, 100) };
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function formatPos(v) {
+      return Math.round(v * 10) / 10;
+    }
+
+    function hasPreviewImage() {
+      return img.style.display !== 'none' && !!img.getAttribute('src');
+    }
+
+    var previewConfigs = [
+      {
+        frame: document.getElementById('hero-live-frame'),
+        input: document.getElementById('hero_position'),
+        targets: [img].concat(Array.prototype.slice.call(document.querySelectorAll('.js-hero-preview-thumb'))),
+      },
+      {
+        frame: document.getElementById('hero-slider-mobile-frame'),
+        input: document.getElementById('hero_slider_mobile_position'),
+        targets: [document.querySelector('[data-hero-preview="slider-mobile"]')].filter(Boolean),
+      },
+      {
+        frame: document.getElementById('hero-slider-desktop-frame'),
+        input: document.getElementById('hero_slider_desktop_position'),
+        targets: [document.querySelector('[data-hero-preview="slider-desktop"]')].filter(Boolean),
+      },
+      {
+        frame: document.getElementById('hero-card-frame'),
+        input: document.getElementById('hero_card_position'),
+        targets: [document.querySelector('[data-hero-preview="card"]')].filter(Boolean),
+      },
+    ].filter(function (cfg) {
+      return cfg.frame && cfg.input && cfg.targets.length;
+    });
+
+    if (!previewConfigs.length) return;
+
+    var states = previewConfigs.map(function (cfg) {
+      var start = parsePosition(cfg.input.value);
+      return {
+        cfg: cfg,
+        x: start.x,
+        y: start.y,
+      };
+    });
+
+    var activeState = null;
+    var lastX = 0;
+    var lastY = 0;
+
+    function applyState(state) {
+      state.x = formatPos(clamp(state.x, 0, 100));
+      state.y = formatPos(clamp(state.y, 0, 100));
+      var pos = state.x + '% ' + state.y + '%';
+      state.cfg.targets.forEach(function (el) {
+        el.style.objectPosition = pos;
+      });
+      state.cfg.input.value = pos;
+    }
+
+    function syncAllHeroPositionsBeforeSubmit() {
+      states.forEach(applyState);
+      window.dispatchEvent(new CustomEvent('hero-preview-updated'));
+    }
+
+    window.syncHeroPositionBeforeSubmit = syncAllHeroPositionsBeforeSubmit;
+    window.syncHeroCardPositionBeforeSubmit = syncAllHeroPositionsBeforeSubmit;
+
+    function showPreviews(url) {
+      document.querySelectorAll('.js-hero-preview-img').forEach(function (el) {
+        el.src = url;
+        el.style.display = '';
+      });
+      document.querySelectorAll('.js-hero-preview-thumb').forEach(function (el) {
+        el.src = url;
+      });
+      previewEmpties.forEach(function (el) {
+        el.classList.add('hidden');
+      });
+    }
+
+    function bindDrag(state) {
+      var frame = state.cfg.frame;
+
+      frame.addEventListener('mousedown', function (e) {
+        if (!hasPreviewImage()) return;
+        activeState = state;
+        lastX = e.clientX;
+        lastY = e.clientY;
+      });
+
+      frame.addEventListener('touchstart', function (e) {
+        if (!hasPreviewImage()) return;
+        if (!e.touches || !e.touches[0]) return;
+        activeState = state;
+        lastX = e.touches[0].clientX;
+        lastY = e.touches[0].clientY;
+      }, { passive: true });
+    }
+
+    window.addEventListener('mousemove', function (e) {
+      if (!activeState) return;
+      var dx = e.clientX - lastX;
+      var dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      activeState.x = clamp(activeState.x + dx * 0.22, 0, 100);
+      activeState.y = clamp(activeState.y + dy * 0.22, 0, 100);
+      applyState(activeState);
+    });
+
+    window.addEventListener('touchmove', function (e) {
+      if (!activeState) return;
+      var touch = e.touches && e.touches[0];
+      if (!touch) return;
+      var dx = touch.clientX - lastX;
+      var dy = touch.clientY - lastY;
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+      activeState.x = clamp(activeState.x + dx * 0.22, 0, 100);
+      activeState.y = clamp(activeState.y + dy * 0.22, 0, 100);
+      applyState(activeState);
+    });
+
+    window.addEventListener('mouseup', function () {
+      activeState = null;
+    });
+
+    window.addEventListener('touchend', function () {
+      activeState = null;
+    }, { passive: true });
+
+    states.forEach(function (state) {
+      bindDrag(state);
+      applyState(state);
+    });
+
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var url = URL.createObjectURL(file);
+      showPreviews(url);
+      states.forEach(function (state) {
+        state.x = 50;
+        state.y = 50;
+        applyState(state);
+      });
+    });
+  })();
+</script>
+
+<script src="/js/lineup-positions.js"></script>
+<script>
+  (function () {
+    var enabledEl = document.getElementById('lineup_enabled');
+    var teamsWrap = document.getElementById('lineup-teams-wrap');
+    var secondTeamEl = document.getElementById('lineup_second_team');
+    var team2Wrap = document.getElementById('lineup-team-2');
+    var hiddenInput = document.getElementById('lineup_json');
+    var initialRaw = <%- lineupInitialJson ? lineupInitialJson : 'null' %>;
+
+    if (!enabledEl || !teamsWrap || !hiddenInput) return;
+
+    function parseFormation(str) {
+      var raw = String(str || '').trim();
+      if (!raw || !/^\d+(?:-\d+)*$/.test(raw)) return null;
+      var parts = raw.split('-');
+      var lines = [];
+      for (var i = 0; i < parts.length; i += 1) {
+        var n = parseInt(parts[i], 10);
+        if (!Number.isFinite(n) || n < 1 || n > 9) return null;
+        lines.push(n);
+      }
+      return lines.length ? lines : null;
+    }
+
+    function playerCount(lines) {
+      if (!lines || !lines.length) return 0;
+      var sum = 0;
+      for (var i = 0; i < lines.length; i += 1) sum += lines[i];
+      return 1 + sum;
+    }
+
+    function playerAt(prev, index) {
+      var p = prev[index];
+      if (!p) return { name: '', number: '' };
+      if (typeof p === 'string') return { name: p, number: '' };
+      return {
+        name: p.name != null ? p.name : '',
+        number: p.number != null && p.number !== '' ? String(p.number) : '',
+      };
+    }
+
+    function collectPlayers(container) {
+      var rows = container.querySelectorAll('[data-lineup-player]');
+      var players = [];
+      for (var i = 0; i < rows.length; i += 1) {
+        var row = rows[i];
+        var nameEl = row.querySelector('[data-lineup-player-name]');
+        var numberEl = row.querySelector('[data-lineup-player-number]');
+        var name = nameEl ? nameEl.value.trim() : '';
+        var numberRaw = numberEl ? numberEl.value.trim() : '';
+        var number = numberRaw ? parseInt(numberRaw, 10) : null;
+        players.push({
+          name: name,
+          number: Number.isFinite(number) && number >= 1 && number <= 99 ? number : null,
+        });
+      }
+      return players;
+    }
+
+    function renderPlayers(teamEl, players) {
+      var formationInput = teamEl.querySelector('[data-lineup-formation]');
+      var grid = teamEl.querySelector('.lineup-players-grid');
+      var countEl = teamEl.querySelector('.lineup-player-count');
+      if (!formationInput || !grid || !countEl) return;
+
+      var lines = parseFormation(formationInput.value);
+      var prev = players || collectPlayers(teamEl);
+      grid.innerHTML = '';
+
+      if (!lines) {
+        countEl.textContent = 'Zadejte platnou formaci.';
+        return;
+      }
+
+      var total = playerCount(lines);
+      var outfield = total - 1;
+      if (outfield !== 10) {
+        countEl.textContent = 'Formace má ' + outfield + ' hráčů v poli - musí být 10 (+ brankář).';
+        return;
+      }
+
+      countEl.textContent = 'Formace ' + formationInput.value.trim() + ' = ' + total + ' hráčů';
+
+      var positionLabels =
+        window.LineupPositions && typeof window.LineupPositions.positionLabelsForFormation === 'function'
+          ? window.LineupPositions.positionLabelsForFormation(lines)
+          : ['Brankář'];
+
+      function addField(label, index) {
+        var data = playerAt(prev, index);
+        var wrap = document.createElement('div');
+        wrap.setAttribute('data-lineup-player', '1');
+
+        var lab = document.createElement('label');
+        lab.className = 'text-xs text-11muted';
+        lab.textContent = label;
+
+        var row = document.createElement('div');
+        row.className = 'mt-1 flex gap-2';
+
+        var numberInput = document.createElement('input');
+        numberInput.type = 'number';
+        numberInput.min = '1';
+        numberInput.max = '99';
+        numberInput.setAttribute('data-lineup-player-number', '1');
+        numberInput.className =
+          'input-11 w-16 shrink-0 rounded-xl border border-white/10 bg-[#111827] px-2 py-2 text-center text-sm text-white';
+        numberInput.value = data.number !== '' ? data.number : String(index + 1);
+        numberInput.placeholder = '#';
+        numberInput.title = 'Číslo dresu';
+
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.setAttribute('data-lineup-player-name', '1');
+        nameInput.className =
+          'input-11 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white';
+        nameInput.value = data.name;
+        nameInput.placeholder = 'Jméno hráče';
+
+        row.appendChild(numberInput);
+        row.appendChild(nameInput);
+        wrap.appendChild(lab);
+        wrap.appendChild(row);
+        grid.appendChild(wrap);
+      }
+
+      for (var idx = 0; idx < positionLabels.length; idx += 1) {
+        addField(positionLabels[idx], idx);
+      }
+    }
+
+    function getTeamEls() {
+      var teams = [document.querySelector('.lineup-admin-team[data-team-index="0"]')];
+      if (secondTeamEl && secondTeamEl.checked && team2Wrap) teams.push(team2Wrap);
+      return teams.filter(Boolean);
+    }
+
+    function syncLineupJson() {
+      if (!enabledEl.checked) {
+        hiddenInput.value = JSON.stringify({ enabled: false, teams: [] });
+        return;
+      }
+
+      var teams = [];
+      var teamEls = getTeamEls();
+      for (var i = 0; i < teamEls.length; i += 1) {
+        var teamEl = teamEls[i];
+        var label = teamEl.querySelector('[data-lineup-label]').value.trim();
+        var formation = teamEl.querySelector('[data-lineup-formation]').value.trim();
+        var lines = parseFormation(formation);
+        if (!lines) continue;
+        teams.push({
+          label: label,
+          formation: formation,
+          players: collectPlayers(teamEl),
+        });
+      }
+
+      hiddenInput.value = JSON.stringify({ enabled: true, teams: teams });
+    }
+
+    window.syncLineupBeforeSubmit = syncLineupJson;
+
+    function toggleEnabled() {
+      teamsWrap.classList.toggle('hidden', !enabledEl.checked);
+      syncLineupJson();
+    }
+
+    function toggleSecondTeam() {
+      if (!team2Wrap || !secondTeamEl) return;
+      team2Wrap.classList.toggle('hidden', !secondTeamEl.checked);
+      syncLineupJson();
+    }
+
+    function bindTeam(teamEl) {
+      var formationInput = teamEl.querySelector('[data-lineup-formation]');
+      if (formationInput) {
+        formationInput.addEventListener('input', function () {
+          renderPlayers(teamEl);
+          syncLineupJson();
+        });
+      }
+      teamEl.addEventListener('input', syncLineupJson);
+    }
+
+    document.querySelectorAll('.lineup-admin-team').forEach(bindTeam);
+    enabledEl.addEventListener('change', toggleEnabled);
+    if (secondTeamEl) secondTeamEl.addEventListener('change', toggleSecondTeam);
+
+    if (initialRaw && initialRaw.enabled !== false && Array.isArray(initialRaw.teams) && initialRaw.teams.length) {
+      enabledEl.checked = true;
+      teamsWrap.classList.remove('hidden');
+      var t0 = initialRaw.teams[0];
+      if (t0) {
+        var team0 = document.querySelector('.lineup-admin-team[data-team-index="0"]');
+        if (team0) {
+          team0.querySelector('[data-lineup-label]').value = t0.label || '';
+          team0.querySelector('[data-lineup-formation]').value = t0.formation || '';
+          renderPlayers(team0, t0.players || []);
+        }
+      }
+      if (initialRaw.teams.length > 1 && secondTeamEl && team2Wrap) {
+        secondTeamEl.checked = true;
+        team2Wrap.classList.remove('hidden');
+        var t1 = initialRaw.teams[1];
+        team2Wrap.querySelector('[data-lineup-label]').value = t1.label || '';
+        team2Wrap.querySelector('[data-lineup-formation]').value = t1.formation || '';
+        renderPlayers(team2Wrap, t1.players || []);
+      }
+    } else {
+      document.querySelectorAll('.lineup-admin-team').forEach(function (teamEl) {
+        renderPlayers(teamEl, []);
+      });
+    }
+
+    syncLineupJson();
+  })();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6/tinymce.min.js"></script>
+<script>
+(function () {
+  var form = document.getElementById('article-form');
+  var source = document.getElementById('body_html');
+
+  var isCompactViewport = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
+  tinymce.init({
+    selector: '#body_html',
+    height: isCompactViewport ? 360 : 480,
+    min_height: isCompactViewport ? 360 : 480,
+    resize: true,
+    plugins: 'link lists image code',
+    toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline | alignleft aligncenter alignright alignjustify | link image | bullist numlist | imgleft imgcenter imgright imgsmaller imgbigger | imgcredit | embedbtn | code',
+    images_upload_url: '/administrace/upload-inline',
+    automatic_uploads: true,
+    images_upload_credentials: true,
+    images_upload_handler: function (blobInfo, progress) {
+      return new Promise(function (resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/administrace/upload-inline');
+        xhr.withCredentials = true;
+        xhr.upload.onprogress = function (e) {
+          if (e.lengthComputable && progress) {
+            progress((e.loaded / e.total) * 100);
+          }
+        };
+        xhr.onload = function () {
+          if (xhr.status === 403 || xhr.status === 401) {
+            reject('Nejste přihlášeni nebo nemáte oprávnění nahrát obrázek (HTTP ' + xhr.status + '). Obnovte stránku a zkuste to znovu.');
+            return;
+          }
+          if (xhr.status < 200 || xhr.status >= 300) {
+            var msg = 'HTTP ' + xhr.status;
+            try {
+              var errJson = JSON.parse(xhr.responseText);
+              if (errJson && errJson.error) msg = errJson.error;
+            } catch (e) {
+              if (xhr.responseText) msg = String(xhr.responseText).slice(0, 200);
+            }
+            reject('Nahrání selhalo: ' + msg);
+            return;
+          }
+          try {
+            var json = JSON.parse(xhr.responseText);
+            if (!json || typeof json.location !== 'string') {
+              reject('Neplatná odpověď serveru při nahrávání.');
+              return;
+            }
+            resolve(json.location);
+          } catch (e) {
+            reject('Neplatná odpověď serveru při nahrávání.');
+          }
+        };
+        xhr.onerror = function () {
+          reject('Síťová chyba při nahrávání obrázku.');
+        };
+        var formData = new FormData();
+        formData.append('file', blobInfo.blob(), blobInfo.filename());
+        xhr.send(formData);
+      });
+    },
+    object_resizing: 'img',
+    image_dimensions: true,
+    extended_valid_elements: 'img[src|alt|title|width|height|style|class|data-credit|data-mce-src|data-mce-style]',
+    block_formats: 'Odstavec=p; Nadpis 2=h2; Nadpis 3=h3; Nadpis 4=h4',
+    font_family_formats: '11ka Article=11ka Article,Inter,sans-serif; Inter=Inter,system-ui,sans-serif; Arial=arial,helvetica,sans-serif; Georgia=georgia,serif',
+    fontsize_formats: '12px 14px 16px 18px 20px 24px 28px 32px',
+    content_style: '@import url("/css/fonts.css"); @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"); body { font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 1.75; color: #000; } h1,h2,h3,h4 { font-family: Inter, system-ui, sans-serif; color: #000; font-weight: 700; line-height: 1.25; margin-top: 1.2rem; margin-bottom: 0.6rem; } h1 { font-size: 2rem; } h2 { font-size: 1.5rem; } h3 { font-size: 1.25rem; } h4 { font-size: 1.1rem; } p { margin: 0.85rem 0; } ul,ol { margin: 0.85rem 0; padding-left: 1.35rem; } li + li { margin-top: 0.35rem; } img { max-width: 100%; height: auto; border-radius: 0.75rem; display: block; } figure.article-img-credit-wrap { position: relative; display: block; max-width: 100%; margin: 0; padding: 0; line-height: 0; } figure.article-img-credit-wrap img { display: block; max-width: 100%; height: auto; width: 100%; border-radius: 0.75rem; } figcaption.article-img-credit-pill { position: absolute; display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.3rem 0.55rem; font-size: 0.6875rem; line-height: 1.2; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.72); color: #e2e8f0; pointer-events: none; white-space: nowrap; } figcaption.article-img-credit-pill::before { content: "©"; color: #16dffb; font-size: 0.75rem; margin-right: 0.2rem; } .article-img-credit-pill--br { right: 0.6rem; bottom: 0.6rem; left: auto; top: auto; } .article-img-credit-pill--bl { left: 0.6rem; bottom: 0.6rem; right: auto; top: auto; } .article-img-credit-pill--tr { right: 0.6rem; top: 0.6rem; left: auto; bottom: auto; } .article-img-credit-pill--tl { left: 0.6rem; top: 0.6rem; right: auto; bottom: auto; }',
+    setup: function (editor) {
+      editor.on('init', function () {
+        var obs = new MutationObserver(function (mutations) {
+          mutations.forEach(function (m) {
+            m.addedNodes.forEach(function (node) {
+              var imgs = [];
+              if (node.nodeName === 'IMG') imgs.push(node);
+              else if (node.querySelectorAll) imgs = Array.from(node.querySelectorAll('img'));
+              imgs.forEach(function (img) {
+                if (!img.style.marginLeft && !img.style.float) {
+                  img.style.display = 'block';
+                  img.style.marginLeft = 'auto';
+                  img.style.marginRight = 'auto';
+                }
+              });
+            });
+          });
+        });
+        obs.observe(editor.getBody(), { childList: true, subtree: true });
+      });
+
+      function selectedImage() {
+        return editor.dom.getParent(editor.selection.getNode(), 'img');
+      }
+
+      function ensureImageBase(img) {
+        if (!img) return;
+        editor.dom.setStyles(img, {
+          display: 'block',
+          maxWidth: '100%',
+          height: 'auto',
+          float: 'none',
+        });
+      }
+
+      function requireImage() {
+        var img = selectedImage();
+        if (!img) {
+          alert('Nejprve klikněte na obrázek v editoru.');
+          return null;
+        }
+        return img;
+      }
+
+      function setImageAlign(mode) {
+        var img = requireImage();
+        if (!img) return;
+        ensureImageBase(img);
+        if (mode === 'left') {
+          editor.dom.setStyles(img, { marginLeft: '0', marginRight: 'auto' });
+        } else if (mode === 'right') {
+          editor.dom.setStyles(img, { marginLeft: 'auto', marginRight: '0' });
+        } else {
+          editor.dom.setStyles(img, { marginLeft: 'auto', marginRight: 'auto' });
+        }
+        editor.nodeChanged();
+      }
+
+      function resizeImage(step) {
+        var img = requireImage();
+        if (!img) return;
+        ensureImageBase(img);
+        var current = img.style.width ? parseInt(img.style.width, 10) : 100;
+        if (!Number.isFinite(current) || current <= 0) current = 100;
+        var next = Math.max(20, Math.min(100, current + step));
+        editor.dom.setStyle(img, 'width', next + '%');
+        editor.nodeChanged();
+      }
+
+      editor.ui.registry.addButton('imgleft', {
+        text: 'Img vlevo',
+        onAction: function () { setImageAlign('left'); },
+      });
+
+      editor.ui.registry.addButton('imgcenter', {
+        text: 'Img střed',
+        onAction: function () { setImageAlign('center'); },
+      });
+
+      editor.ui.registry.addButton('imgright', {
+        text: 'Img vpravo',
+        onAction: function () { setImageAlign('right'); },
+      });
+
+      editor.ui.registry.addButton('imgsmaller', {
+        text: 'Img -',
+        onAction: function () { resizeImage(-10); },
+      });
+
+      editor.ui.registry.addButton('imgbigger', {
+        text: 'Img +',
+        onAction: function () { resizeImage(10); },
+      });
+
+      function applyCredit(img, credit, pos) {
+        var fig = editor.dom.getParent(img, 'figure.article-img-credit-wrap');
+        if (!credit) {
+          if (fig) {
+            // Restore img styles from figure and unwrap
+            var innerImg = editor.dom.select('img', fig)[0];
+            if (innerImg && fig.style.width) editor.dom.setStyle(innerImg, 'width', fig.style.width);
+            if (innerImg && fig.style.marginLeft) editor.dom.setStyle(innerImg, 'margin-left', fig.style.marginLeft);
+            if (innerImg && fig.style.marginRight) editor.dom.setStyle(innerImg, 'margin-right', fig.style.marginRight);
+            editor.dom.setOuterHTML(fig, editor.dom.getOuterHTML(innerImg));
+            editor.nodeChanged();
+          }
+          return;
+        }
+        var posClass = 'article-img-credit-pill--' + (pos || 'br');
+        if (fig) {
+          var cap = editor.dom.select('figcaption', fig)[0];
+          if (cap) {
+            cap.textContent = credit;
+            cap.className = 'article-img-credit-pill ' + posClass;
+          }
+        } else {
+          // Use actual rendered pixel width so figure always matches image exactly
+          var iStyle = img.style;
+          var figPx = img.offsetWidth;
+          // Detect centering: TinyMCE may compute auto→0px on one side
+          var rawML = iStyle.marginLeft || '';
+          var rawMR = iStyle.marginRight || '';
+          var isCentered = (rawML === 'auto' && rawMR === 'auto') ||
+                           (rawML === 'auto' || rawMR === 'auto') ||
+                           (rawML === '0px' && rawMR === 'auto') ||
+                           (rawML === 'auto' && rawMR === '0px');
+          var figML = isCentered ? 'auto' : rawML;
+          var figMR = isCentered ? 'auto' : rawMR;
+          var figFl = iStyle.float || '';
+          var figStyleStr = (figPx ? 'width:' + figPx + 'px;' : '') +
+            (figML ? 'margin-left:' + figML + ';' : '') +
+            (figMR ? 'margin-right:' + figMR + ';' : '') +
+            (figFl ? 'float:' + figFl + ';' : '');
+          // Strip layout styles from img, set width:100% so img fills the figure
+          var imgHTML = editor.dom.getOuterHTML(img).replace(/style="([^"]*)"/, function(_, s) {
+            s = s.replace(/(?<![a-z-])width\s*:[^;]+;?\s*/gi, '')
+                 .replace(/margin-left\s*:[^;]+;?\s*/gi, '')
+                 .replace(/margin-right\s*:[^;]+;?\s*/gi, '')
+                 .replace(/float\s*:[^;]+;?\s*/gi, '');
+            return 'style="' + s + 'width:100%;"';
+          });
+          editor.dom.setOuterHTML(img, '<figure class="article-img-credit-wrap" style="' + figStyleStr + '">' + imgHTML + '<figcaption class="article-img-credit-pill ' + posClass + '">' + credit + '</figcaption></figure>');
+        }
+        editor.nodeChanged();
+      }
+
+      editor.ui.registry.addButton('imgcredit', {
+        text: 'Credit',
+        onAction: function () {
+          var img = requireImage();
+          if (!img) return;
+          var fig = editor.dom.getParent(img, 'figure.article-img-credit-wrap');
+          var cap = fig ? editor.dom.select('figcaption', fig)[0] : null;
+          var currentText = cap ? cap.textContent.trim() : '';
+          var currentPos = cap ? (cap.className.match(/--(\w{2})\b/) || [,'br'])[1] : 'br';
+
+          editor.windowManager.open({
+            title: 'Credit fotky',
+            body: {
+              type: 'panel',
+              items: [
+                { type: 'input', name: 'credit', label: 'Autor / zdroj', placeholder: 'např. Reuters / AP' },
+                {
+                  type: 'selectbox',
+                  name: 'pos',
+                  label: 'Pozice',
+                  items: [
+                    { value: 'br', text: 'Vpravo dole' },
+                    { value: 'bl', text: 'Vlevo dole' },
+                    { value: 'tr', text: 'Vpravo nahoře' },
+                    { value: 'tl', text: 'Vlevo nahoře' },
+                  ],
+                },
+              ],
+            },
+            initialData: { credit: currentText, pos: currentPos },
+            buttons: [
+              { type: 'cancel', text: 'Zrušit' },
+              ...(fig ? [{ type: 'custom', name: 'remove', text: 'Odebrat credit' }] : []),
+              { type: 'submit', text: 'Uložit', primary: true },
+            ],
+            onAction: function (api, details) {
+              if (details.name === 'remove') {
+                applyCredit(editor.dom.select('img', fig)[0], '', '');
+                api.close();
+              }
+            },
+            onSubmit: function (api) {
+              var data = api.getData();
+              applyCredit(fig ? editor.dom.select('img', fig)[0] : img, data.credit.trim(), data.pos);
+              api.close();
+            },
+          });
+        },
+      });
+
+      editor.ui.registry.addButton('embedbtn', {
+        text: 'Embed',
+        onAction: function () {
+          var url = window.prompt('URL příspěvku (X, YouTube, Vimeo):');
+          if (!url) return;
+          fetch('/api/oembed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url }),
+            credentials: 'same-origin',
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+              if (j.html) editor.insertContent(j.html);
+              else alert(j.error || 'Chyba');
+            })
+            .catch(function () { alert('Chyba sítě'); });
+        },
+      });
+    },
+  });
+  form.addEventListener('submit', function () {
+    if (typeof window.syncHeroPositionBeforeSubmit === 'function') {
+      window.syncHeroPositionBeforeSubmit();
+    }
+    if (typeof window.syncHeroCardPositionBeforeSubmit === 'function') {
+      window.syncHeroCardPositionBeforeSubmit();
+    }
+    if (typeof window.syncLineupBeforeSubmit === 'function') {
+      window.syncLineupBeforeSubmit();
+    }
+    if (window.tinymce && tinymce.get('body_html')) tinymce.get('body_html').save();
+  });
+  var actionInput = document.getElementById('article-form-action');
+  form.querySelectorAll('button[type="submit"][data-article-action]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (actionInput) actionInput.value = btn.getAttribute('data-article-action') || 'save';
+      if (typeof window.syncHeroPositionBeforeSubmit === 'function') {
+        window.syncHeroPositionBeforeSubmit();
+      }
+      if (typeof window.syncHeroCardPositionBeforeSubmit === 'function') {
+        window.syncHeroCardPositionBeforeSubmit();
+      }
+      if (typeof window.syncLineupBeforeSubmit === 'function') {
+        window.syncLineupBeforeSubmit();
+      }
+    });
+  });
+})();
+</script>
+
+<%- include('../partials/admin-layout-end') %>

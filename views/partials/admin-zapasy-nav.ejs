@@ -1,0 +1,20 @@
+<% var _section = (typeof zapasySection !== 'undefined' && zapasySection) ? zapasySection : 'hub'; %>
+<section class="<%= typeof zapasyNavMargin !== 'undefined' ? zapasyNavMargin : 'mt-6' %>">
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <% [
+      { id: 'create-team', href: '/administrace/zapasy/vytvorit-tym', title: 'Vytvořit tým', desc: 'Nový tým do databáze' },
+      { id: 'teams', href: '/administrace/zapasy/tymy', title: 'Seznam týmů', desc: 'Přehled a úpravy týmů' },
+      { id: 'create-match', href: '/administrace/zapasy/vytvorit-zapas', title: 'Vytvořit zápas', desc: 'Nové utkání na web' },
+      { id: 'matches', href: '/administrace/zapasy/seznam', title: 'Seznam zápasů', desc: 'Přehled a úpravy zápasů' },
+    ].forEach(function (item) { %>
+    <a
+      href="<%= item.href %>"
+      class="card-11 group flex min-h-[5.5rem] flex-col justify-center p-5 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]<%= _section === item.id ? ' border-11accent/40 bg-11accent/5' : '' %>"
+      <%= _section === item.id ? 'aria-current="page"' : '' %>
+    >
+      <h3 class="font-semibold text-white group-hover:text-11accent"><%= item.title %></h3>
+      <p class="mt-1 text-sm text-11muted"><%= item.desc %></p>
+    </a>
+    <% }); %>
+  </div>
+</section>

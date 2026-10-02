@@ -1,0 +1,46 @@
+<!--
+následující element nebo elementy reprezentují každý jednu reklamní plochu (zónu);
+vložte je prosím jednotlivě na místa ve stránce, kde chcete zobrazit reklamu odpovídajících
+rozměrů (parametry width [maximální šířka] a height [maximální výška] jsou uvedeny v definici
+reklamních zón níže); element s konkrétním ID smí být na stránce vždy jen jednou
+-->
+<div id="ssp-zone-411438"></div>
+<script>
+/* Robustní snippet: zajistí načtení ssp.js a zavolá getAds až poté. */
+(function () {
+  var zoneId = 411438;
+  var id = 'ssp-zone-411438';
+  var width = 300;
+  var height = 600;
+
+  function tryLoad() {
+    if (!window.sssp || typeof window.sssp.getAds !== 'function') return false;
+    window.sssp.getAds([
+      {
+        "zoneId": zoneId,
+        "id": id,
+        "width": width,
+        "height": height
+      }
+    ]);
+    return true;
+  }
+
+  if (tryLoad()) return;
+
+  var src = 'https://ssp.seznam.cz/static/js/ssp.js';
+  var existing = document.querySelector('script[src="' + src + '"]');
+  if (existing) {
+    existing.addEventListener('load', function () { tryLoad(); }, { once: true });
+  } else {
+    var script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = function () { tryLoad(); };
+    script.onerror = function () {
+      console.error('SSP script failed to load:', src);
+    };
+    document.head.appendChild(script);
+  }
+})();
+</script>

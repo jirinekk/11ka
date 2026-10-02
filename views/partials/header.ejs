@@ -1,0 +1,147 @@
+<%- include('head') %>
+<body class="min-h-screen bg-11bg font-sans text-slate-200 antialiased flex flex-col">
+  <% var showBar = typeof showSearchLogin === 'undefined' || showSearchLogin; %>
+  <% var showNav = typeof showNav === 'undefined' ? true : !!showNav; %>
+  <% var _activeNav = (typeof activeNav !== 'undefined') ? activeNav : 'home'; %>
+  <% var _mainNav = (typeof getMainNav === 'function') ? getMainNav(_activeNav) : []; %>
+  <header class="header11 sticky top-0 z-50<%= showNav ? '' : ' header11--minimal' %>" data-header11>
+    <div class="header11__bar">
+      <div class="header11__inner mx-auto max-w-7xl px-4 lg:px-6">
+        <a href="/" class="header11__logo shrink-0" aria-label="11ka domů">
+          <img src="/logo.png" alt="11ka" class="h-8 w-auto md:h-9" width="120" height="36" />
+        </a>
+
+        <% if (showNav || showBar) { %>
+        <div class="header11__cluster">
+          <% if (showNav) { %>
+          <nav class="header11__nav hidden md:flex" aria-label="Hlavní navigace">
+            <div class="header11__track" data-nav-track>
+              <span class="header11__glider" data-nav-glider aria-hidden="true"></span>
+              <% _mainNav.forEach(function (item) { %>
+              <a
+                href="<%= item.href %>"
+                class="header11__link <%= item.active ? 'header11__link--active' : '' %>"
+                data-nav-link
+                title="<%= item.label %>"
+                <%= item.active ? 'aria-current="page"' : '' %>
+              ><%- item.labelHtml || item.label %></a>
+              <% }); %>
+            </div>
+          </nav>
+          <% } %>
+
+          <% if (showBar) { %>
+          <div class="header11__actions-desktop">
+            <form action="/hledat" method="get" class="header11__search header11__search--desktop" aria-label="Vyhledávání">
+              <svg class="header11__search-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3" stroke-linecap="round"/></svg>
+              <input
+                type="search"
+                name="q"
+                value="<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>"
+                placeholder="Hledat…"
+                title="Vyhledávání"
+                class="header11__search-input"
+                autocomplete="off"
+              />
+            </form>
+            <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+            <div class="header11__account">
+              <%- include('user-account-menu') %>
+            </div>
+            <% } else { %>
+            <a href="/prihlaseni" class="header11__login">Přihlásit se</a>
+            <% } %>
+          </div>
+          <% } %>
+        </div>
+        <% } %>
+
+        <% if (showBar) { %>
+        <div class="header11__actions-mobile md:hidden">
+            <button
+              type="button"
+              class="header11__icon-btn"
+              aria-label="Vyhledávání"
+              aria-controls="header11-mobile-search"
+              aria-expanded="false"
+              data-mobile-search-toggle
+            >
+              <svg class="header11__icon-svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3" stroke-linecap="round"/></svg>
+            </button>
+            <% if (showNav) { %>
+            <button
+              type="button"
+              class="header11__icon-btn header11__icon-btn--menu"
+              aria-label="Menu"
+              aria-expanded="false"
+              aria-controls="header11-mobile-menu"
+              data-mobile-menu-open
+            >
+              <span class="header11__burger" aria-hidden="true"><span></span><span></span></span>
+            </button>
+            <% } %>
+        </div>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (showBar) { %>
+    <div id="header11-mobile-search" class="header11__mobile-search" hidden aria-hidden="true" data-mobile-search-wrap>
+      <form action="/hledat" method="get" class="header11__search header11__search--full">
+        <svg class="header11__search-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3" stroke-linecap="round"/></svg>
+        <input
+          type="text"
+          name="q"
+          value="<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>"
+          placeholder="Vyhledávání…"
+          class="header11__search-input"
+          autocomplete="off"
+          inputmode="search"
+          enterkeyhint="search"
+          autocapitalize="off"
+          spellcheck="false"
+          data-mobile-search-input
+        />
+      </form>
+    </div>
+    <% } %>
+
+  </header>
+  <% if (showBar && showNav) { %>
+  <div id="header11-mobile-menu" class="header11__menu" data-mobile-menu data-header11-menu aria-hidden="true" inert>
+    <div class="header11__menu-backdrop" data-mobile-menu-close tabindex="-1" aria-hidden="true"></div>
+    <div class="header11__menu-panel">
+      <div class="header11__menu-head">
+        <a href="/" class="header11__menu-brand" aria-label="11ka domů">
+          <img src="/logo.png" alt="" class="header11__menu-logo" width="72" height="22" />
+        </a>
+        <button type="button" class="header11__icon-btn" aria-label="Zavřít menu" data-mobile-menu-close>
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 6l12 12M6 18 18 6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <nav class="header11__menu-nav" aria-label="Mobilní navigace">
+        <% _mainNav.forEach(function (item) { %>
+        <a
+          href="<%= item.href %>"
+          class="header11__menu-link <%= item.active ? 'header11__menu-link--active' : '' %>"
+          <%= item.active ? 'aria-current="page"' : '' %>
+        ><%= item.label %></a>
+        <% }); %>
+      </nav>
+      <div class="header11__menu-foot">
+        <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+        <% var _menuUser = (currentUser.display_name && String(currentUser.display_name).trim()) ? currentUser.display_name : currentUser.email; %>
+        <p class="mb-1 truncate text-xs text-11muted"><%= _menuUser %></p>
+        <a href="/administrace" class="header11__login header11__login--block">Administrace</a>
+        <a href="/ucet" class="header11__menu-sub">Můj účet</a>
+        <form action="/odhlaseni" method="post">
+          <button type="submit" class="header11__menu-sub w-full text-left">Odhlásit</button>
+        </form>
+        <% } else { %>
+        <a href="/prihlaseni" class="header11__login header11__login--block">Přihlásit se</a>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <% } %>
+  <script src="/js/header-nav.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>

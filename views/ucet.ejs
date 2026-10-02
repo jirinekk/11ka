@@ -1,0 +1,64 @@
+<%- include('partials/header', { title: title, activeNav: 'home', showSearchLogin: false, showNav: false, structuredData: [] }) %>
+
+<main class="mx-auto max-w-lg flex-1 px-4 py-10">
+  <div class="card-11 p-6">
+    <h1 class="text-xl font-bold text-white">Správa účtu</h1>
+    <p class="mt-1 text-sm text-11muted"><%= user.email %></p>
+    <% if (error) { %>
+    <p class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p>
+    <% } %>
+    <% if (success) { %>
+    <p class="mt-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p>
+    <% } %>
+    <form class="mt-6 space-y-5" method="post" action="/ucet" enctype="multipart/form-data">
+      <div>
+        <label class="mb-1 block text-xs font-medium text-11muted" for="display_name">Zobrazované jméno</label>
+        <input id="display_name" name="display_name" type="text" value="<%= user.display_name || '' %>" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+      </div>
+      <div class="border-t border-white/10 pt-5">
+        <h2 class="text-sm font-semibold text-white">O autorovi</h2>
+        <p class="mt-1 text-xs text-11muted">
+          Krátký text o vás na stránce s vašimi články (max. <%= typeof authorBioMax !== 'undefined' ? authorBioMax : 1500 %> znaků).
+          Po uložení ho schválí nebo upraví vedení - na webu se zobrazí až po schválení.
+        </p>
+        <% if (typeof bioLive !== 'undefined' && bioLive && !bioPending) { %>
+        <p class="mt-2 rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          Váš text je zveřejněný na profilu autora.
+        </p>
+        <% } %>
+        <textarea
+          id="author_bio"
+          name="author_bio"
+          rows="5"
+          maxlength="<%= typeof authorBioMax !== 'undefined' ? authorBioMax : 1500 %>"
+          placeholder="Kdo jste, čemu se věnujete, co na 11ce píšete…"
+          class="input-11 mt-3 w-full resize-y rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm leading-relaxed text-white placeholder:text-slate-500 focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
+        ><%= typeof bioDraft !== 'undefined' ? bioDraft : '' %></textarea>
+      </div>
+      <div>
+        <span class="mb-1 block text-xs font-medium text-11muted">Profilová fotka</span>
+        <div class="flex flex-wrap items-center gap-4">
+          <% if (user.avatar_path) { %>
+          <img src="<%= user.avatar_path %>" alt="" class="h-16 w-16 rounded-full object-cover ring-2 ring-white/10" width="64" height="64" />
+          <% } else { %>
+          <img src="/logo.png" alt="" class="h-16 w-16 rounded-full bg-11bg object-contain p-1.5 ring-2 ring-white/10" width="64" height="64" />
+          <% } %>
+          <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp,image/gif" class="w-full min-w-0 text-sm text-11muted file:mr-3 file:rounded-lg file:border-0 file:bg-11accent file:px-3 file:py-2 file:text-sm file:font-medium file:text-11bg sm:w-auto" />
+        </div>
+      </div>
+      <div class="border-t border-white/10 pt-5">
+        <h2 class="text-sm font-semibold text-white">Změna hesla</h2>
+        <p class="mt-1 text-xs text-11muted">Nechte prázdné, pokud heslo neměníte.</p>
+        <div class="mt-3 space-y-3">
+          <input name="current_password" type="password" autocomplete="current-password" placeholder="Současné heslo" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+          <input name="new_password" type="password" autocomplete="new-password" placeholder="Nové heslo (min. 8 znaků)" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+          <input name="new_password_confirm" type="password" autocomplete="new-password" placeholder="Potvrzení nového hesla" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+        </div>
+      </div>
+      <button type="submit" class="w-full rounded-xl bg-11accent py-2.5 text-sm font-semibold text-11bg transition hover:brightness-110">Uložit</button>
+    </form>
+    <p class="mt-6 text-center"><a href="/administrace" class="text-sm text-11accent hover:underline">Administrace</a></p>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

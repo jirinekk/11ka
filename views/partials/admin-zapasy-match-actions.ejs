@@ -1,0 +1,1788 @@
+<%
+  var _page = (pagination && pagination.page) || 1;
+  var _status = editingFixture.status || 'Nadcházející';
+  var _canStart = _status !== 'Probíhá' && _status !== 'Poločas' && _status !== 'Odehráno' && _status !== 'Kontumace' && _status !== 'Zrušeno';
+  var _canPostpone = _status !== 'Probíhá' && _status !== 'Odloženo' && _status !== 'Odehráno' && _status !== 'Kontumace' && _status !== 'Zrušeno';
+  var _canCancel = _status !== 'Probíhá' && _status !== 'Poločas' && _status !== 'Kontumace' && _status !== 'Zrušeno' && _status !== 'Odehráno';
+  var _lineup = (editingFixture && editingFixture.lineup) || {};
+  var _lineupHomeGroups = Array.isArray(_lineup.home) ? _lineup.home : (Array.isArray(_lineup) ? _lineup : []);
+  var _lineupAwayGroups = Array.isArray(_lineup.away) ? _lineup.away : [];
+  function _collectLineupPlayers(groups, outPlayers, outByNumber) {
+    (groups || []).forEach(function (groupBlock) {
+      if (!groupBlock || groupBlock.group === 'Hrát nebudou') return;
+      (groupBlock.positions || []).forEach(function (positionBlock) {
+        (positionBlock.players || []).forEach(function (player) {
+          if (!player || !player.name) return;
+          var number = player.number != null ? String(player.number).trim() : '';
+          var name = String(player.name || '').trim();
+          if (!name) return;
+          outPlayers.push({ number: number, name: name });
+          if (number && !outByNumber[number]) outByNumber[number] = name;
+        });
+      });
+    });
+  }
+  function _collectLineupGroup(groups, groupName, outPlayers, outByNumber) {
+    (groups || []).forEach(function (groupBlock) {
+      if (!groupBlock || groupBlock.group !== groupName) return;
+      (groupBlock.positions || []).forEach(function (positionBlock) {
+        (positionBlock.players || []).forEach(function (player) {
+          if (!player || !player.name) return;
+          var number = player.number != null ? String(player.number).trim() : '';
+          var name = String(player.name || '').trim();
+          if (!name) return;
+          outPlayers.push({ number: number, name: name });
+          if (number && !outByNumber[number]) outByNumber[number] = name;
+        });
+      });
+    });
+  }
+  var _lineupHomePlayers = [];
+  var _lineupAwayPlayers = [];
+  var _lineupHomeByNumber = {};
+  var _lineupAwayByNumber = {};
+  var _lineupHomeStarters = [];
+  var _lineupHomeStartersByNumber = {};
+  var _lineupHomeSubs = [];
+  var _lineupHomeSubsByNumber = {};
+  var _lineupAwayStarters = [];
+  var _lineupAwayStartersByNumber = {};
+  var _lineupAwaySubs = [];
+  var _lineupAwaySubsByNumber = {};
+  var _homeTeamLabel = (editingFixture && editingFixture.homeTeam) || 'Domácí';
+  var _awayTeamLabel = (editingFixture && editingFixture.awayTeam) || 'Hosté';
+  var _events = Array.isArray(editingFixture && editingFixture.events) ? editingFixture.events : [];
+  var _homeGoalEvents = [];
+  var _awayGoalEvents = [];
+  var _allGoalEvents = [];
+  function _normalizeEventKey(rawKey) {
+    if (rawKey == null) return '';
+    var k = String(rawKey).trim();
+    if (!k) return '';
+    while (k.length >= 2 && ((k[0] === '"' && k[k.length - 1] === '"') || (k[0] === "'" && k[k.length - 1] === "'"))) {
+      k = k.slice(1, -1).trim();
+    }
+    k = k.replace(/^["'\\]+|["'\\]+$/g, '').trim();
+    return k;
+  }
+  _collectLineupPlayers(_lineupHomeGroups, _lineupHomePlayers, _lineupHomeByNumber);
+  _collectLineupPlayers(_lineupAwayGroups, _lineupAwayPlayers, _lineupAwayByNumber);
+  _collectLineupGroup(_lineupHomeGroups, 'Základní sestava', _lineupHomeStarters, _lineupHomeStartersByNumber);
+  _collectLineupGroup(_lineupHomeGroups, 'Náhradníci', _lineupHomeSubs, _lineupHomeSubsByNumber);
+  _collectLineupGroup(_lineupAwayGroups, 'Základní sestava', _lineupAwayStarters, _lineupAwayStartersByNumber);
+  _collectLineupGroup(_lineupAwayGroups, 'Náhradníci', _lineupAwaySubs, _lineupAwaySubsByNumber);
+  _events.forEach(function (event) {
+    if (!event || !event.key || !event.at) return;
+    var key = _normalizeEventKey(event.key);
+    var isHomeGoal = key === 'goal_home' || key === 'penalty_scored_home';
+    var isAwayGoal = key === 'goal_away' || key === 'penalty_scored_away';
+    if (!isHomeGoal && !isAwayGoal) return;
+    var d = new Date(event.at);
+    var timeLabel = Number.isNaN(d.getTime())
+      ? event.at
+      : d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+    var details = event.details || {};
+    if (details.disallowed) return;
+    var scorer = details.scorer_name || details.player_name || null;
+    var number = details.scorer_number || details.player_number || null;
+    var scorerLabel = scorer
+      ? (number ? '#' + number + ' ' + scorer : scorer)
+      : event.label;
+    var item = { at: event.at, label: timeLabel + ' - ' + scorerLabel };
+    if (isHomeGoal) {
+      _homeGoalEvents.push(item);
+      _allGoalEvents.push({ at: item.at, label: _homeTeamLabel + ' - ' + item.label });
+    }
+    if (isAwayGoal) {
+      _awayGoalEvents.push(item);
+      _allGoalEvents.push({ at: item.at, label: _awayTeamLabel + ' - ' + item.label });
+    }
+  });
+  _homeGoalEvents.reverse();
+  _awayGoalEvents.reverse();
+  _allGoalEvents.reverse();
+%>
+<% if (_canStart || _canPostpone || _canCancel) { %>
+<div class="match-manage-actions mt-6 flex flex-wrap justify-center gap-3">
+  <% if (_canStart) { %>
+  <form method="post" action="/administrace/zapasy/seznam">
+    <input type="hidden" name="action" value="start_match" />
+    <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+    <input type="hidden" name="page" value="<%= _page %>" />
+    <button type="submit" class="match-manage-actions__btn match-manage-actions__btn--start rounded-xl bg-11accent px-4 py-2.5 text-sm font-semibold text-11bg">
+      Startnout zápas
+    </button>
+  </form>
+  <% } %>
+
+  <% if (_canPostpone) { %>
+  <button
+    type="button"
+    class="match-manage-actions__btn match-manage-actions__btn--postpone rounded-xl bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-200 hover:bg-amber-500/15"
+    data-match-action-open="postpone_match"
+    data-match-action-title="Odložit zápas"
+    data-match-action-label="Důvod odložení"
+    data-match-action-submit="Odložit zápas"
+  >
+    Odložit zápas
+  </button>
+  <% } %>
+
+  <% if (_canCancel) { %>
+  <button
+    type="button"
+    class="match-manage-actions__btn match-manage-actions__btn--cancel rounded-xl bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/15"
+    data-match-action-open="cancel_match"
+    data-match-action-title="Zrušit zápas"
+    data-match-action-label="Důvod zrušení"
+    data-match-action-submit="Zrušit zápas"
+  >
+    Zrušit zápas
+  </button>
+  <% } %>
+</div>
+<% } %>
+
+<% if (_status === 'Probíhá' || _status === 'Poločas') { %>
+<%
+  var _homeTeam = editingFixture.homeTeam || 'Domácí';
+  var _awayTeam = editingFixture.awayTeam || 'Hosté';
+  var _homeEvents = [
+    ['goal_home', 'Gól'],
+    ['yellow_home', 'Žlutá karta'],
+    ['red_home', 'Červená karta'],
+    ['sub_home', 'Střídání'],
+    ['disallowed_goal_home', 'Neuznaný gól'],
+    ['penalty_scored_home', 'Proměněná penalta'],
+    ['penalty_missed_home', 'Neproměněná penalta'],
+    ['forfeit_home', 'Kontumace']
+  ];
+  var _awayEvents = [
+    ['goal_away', 'Gól'],
+    ['yellow_away', 'Žlutá karta'],
+    ['red_away', 'Červená karta'],
+    ['sub_away', 'Střídání'],
+    ['disallowed_goal_away', 'Neuznaný gól'],
+    ['penalty_scored_away', 'Proměněná penalta'],
+    ['penalty_missed_away', 'Neproměněná penalta'],
+    ['forfeit_away', 'Kontumace']
+  ];
+%>
+<section class="match-live-events mt-5 card-11 p-4">
+  <h3 class="match-live-events__title">Akce v zápase</h3>
+  <div class="match-live-events__phase-actions mt-3">
+    <% if (_status === 'Probíhá') { %>
+    <form method="post" action="/administrace/zapasy/seznam" class="match-live-events__item">
+      <input type="hidden" name="action" value="halftime_match" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <button type="submit" class="match-live-events__btn">Poločas</button>
+    </form>
+    <% } %>
+    <% if (_status === 'Poločas') { %>
+    <form method="post" action="/administrace/zapasy/seznam" class="match-live-events__item">
+      <input type="hidden" name="action" value="resume_match" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <button type="submit" class="match-live-events__btn">Pokračovat v zápase (od 45')</button>
+    </form>
+    <% } %>
+    <button type="button" class="match-live-events__btn" data-finish-match-open>Konec zápasu</button>
+    <button type="button" class="match-live-events__btn" data-clock-edit-open>Upravit čas</button>
+  </div>
+  <%
+    var _fhSet = editingFixture.firstHalfExtraSet && editingFixture.firstHalfExtraMinutes != null;
+    var _shSet = editingFixture.secondHalfExtraSet && editingFixture.secondHalfExtraMinutes != null;
+  %>
+  <% if (_fhSet || _shSet) { %>
+  <div class="flex flex-wrap gap-2 mt-2">
+    <% if (_fhSet) { %>
+    <span class="rounded-lg bg-white/5 border border-white/10 px-3 py-1 text-xs text-slate-300">
+      1. pol. nastavení: <strong class="text-white"><%= editingFixture.firstHalfExtraMinutes %>'</strong>
+    </span>
+    <% } %>
+    <% if (_shSet) { %>
+    <span class="rounded-lg bg-white/5 border border-white/10 px-3 py-1 text-xs text-slate-300">
+      2. pol. nastavení: <strong class="text-white"><%= editingFixture.secondHalfExtraMinutes %>'</strong>
+    </span>
+    <% } %>
+  </div>
+  <% } %>
+  <% if (_status === 'Probíhá') { %>
+  <div class="match-live-events__groups mt-3">
+    <div class="match-live-events__group match-live-events__group--home">
+      <h4 class="match-live-events__group-title"><%= _homeTeam %></h4>
+      <div class="match-live-events__grid">
+        <% _homeEvents.forEach(function (item) { %>
+        <form method="post" action="/administrace/zapasy/seznam?mk=<%= encodeURIComponent(item[0]) %>" class="match-live-events__item">
+          <input type="hidden" name="action" value="add_match_event" />
+          <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+          <input type="hidden" name="page" value="<%= _page %>" />
+          <input type="hidden" name="mk" value="<%= item[0] %>" />
+          <button
+            type="<%= (item[0] === 'goal_home' || item[0] === 'yellow_home' || item[0] === 'red_home' || item[0] === 'sub_home' || item[0] === 'disallowed_goal_home' || item[0] === 'forfeit_home' || item[0] === 'penalty_scored_home' || item[0] === 'penalty_missed_home') ? 'button' : 'submit' %>"
+            class="match-live-events__btn <%= item[0] === 'forfeit_home' ? 'match-live-events__btn--danger' : '' %>"
+            <%- item[0] === 'goal_home' ? 'data-goal-event-open="goal_home"' : '' %>
+            <%- item[0] === 'yellow_home' ? 'data-yellow-event-open="yellow_home"' : '' %>
+            <%- item[0] === 'red_home' ? 'data-red-event-open="red_home"' : '' %>
+            <%- item[0] === 'sub_home' ? 'data-sub-event-open="sub_home"' : '' %>
+            <%- item[0] === 'disallowed_goal_home' ? 'data-disallowed-open="disallowed_goal_home"' : '' %>
+            <%- item[0] === 'forfeit_home' ? 'data-forfeit-open="forfeit_home"' : '' %>
+            <%- item[0] === 'penalty_scored_home' ? 'data-penalty-event-open="penalty_scored_home"' : '' %>
+            <%- item[0] === 'penalty_missed_home' ? 'data-penalty-event-open="penalty_missed_home"' : '' %>
+          ><%= item[1] %></button>
+        </form>
+        <% }); %>
+      </div>
+    </div>
+    <div class="match-live-events__group match-live-events__group--away">
+      <h4 class="match-live-events__group-title"><%= _awayTeam %></h4>
+      <div class="match-live-events__grid">
+        <% _awayEvents.forEach(function (item) { %>
+        <form method="post" action="/administrace/zapasy/seznam?mk=<%= encodeURIComponent(item[0]) %>" class="match-live-events__item">
+          <input type="hidden" name="action" value="add_match_event" />
+          <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+          <input type="hidden" name="page" value="<%= _page %>" />
+          <input type="hidden" name="mk" value="<%= item[0] %>" />
+          <button
+            type="<%= (item[0] === 'goal_away' || item[0] === 'yellow_away' || item[0] === 'red_away' || item[0] === 'sub_away' || item[0] === 'disallowed_goal_away' || item[0] === 'forfeit_away' || item[0] === 'penalty_scored_away' || item[0] === 'penalty_missed_away') ? 'button' : 'submit' %>"
+            class="match-live-events__btn <%= item[0] === 'forfeit_away' ? 'match-live-events__btn--danger' : '' %>"
+            <%- item[0] === 'goal_away' ? 'data-goal-event-open="goal_away"' : '' %>
+            <%- item[0] === 'yellow_away' ? 'data-yellow-event-open="yellow_away"' : '' %>
+            <%- item[0] === 'red_away' ? 'data-red-event-open="red_away"' : '' %>
+            <%- item[0] === 'sub_away' ? 'data-sub-event-open="sub_away"' : '' %>
+            <%- item[0] === 'disallowed_goal_away' ? 'data-disallowed-open="disallowed_goal_away"' : '' %>
+            <%- item[0] === 'forfeit_away' ? 'data-forfeit-open="forfeit_away"' : '' %>
+            <%- item[0] === 'penalty_scored_away' ? 'data-penalty-event-open="penalty_scored_away"' : '' %>
+            <%- item[0] === 'penalty_missed_away' ? 'data-penalty-event-open="penalty_missed_away"' : '' %>
+          ><%= item[1] %></button>
+        </form>
+        <% }); %>
+      </div>
+    </div>
+  </div>
+  <% } %>
+</section>
+
+<div
+  id="match-goal-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-goal-modal-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="match-manage-modal__panel card-11"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="match-goal-modal-title"
+  >
+    <h2 id="match-goal-modal-title" class="match-manage-modal__title text-lg font-semibold text-white">Zapsat gól</h2>
+    <form method="post" action="/administrace/zapasy/seznam?mk=goal_home" class="match-manage-modal__form mt-4 space-y-4" id="match-goal-modal-form">
+      <input type="hidden" name="action" value="add_match_event" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <input type="hidden" name="mk" id="match-goal-event-key" value="goal_home" />
+      <div class="flex gap-2">
+        <div class="flex-1">
+          <label class="text-xs text-11muted" for="match-goal-minute">Minuta</label>
+          <input id="match-goal-minute" name="minute" type="number" min="1" max="90" placeholder="např. 45" required class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div class="w-24">
+          <label class="text-xs text-11muted" for="match-goal-minute-extra">+ nastavení</label>
+          <input id="match-goal-minute-extra" name="minute_extra" type="number" min="0" max="20" placeholder="0" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label class="text-xs text-11muted" for="match-goal-scorer-number">Číslo střelce</label>
+          <input id="match-goal-scorer-number" name="scorer_number" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="text-xs text-11muted" for="match-goal-scorer-name">Jméno střelce</label>
+          <input id="match-goal-scorer-name" name="scorer_name" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="text-xs text-11muted" for="match-goal-assist-number">Číslo asistence</label>
+          <input id="match-goal-assist-number" name="assist_number" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="text-xs text-11muted" for="match-goal-assist-name">Jméno asistence</label>
+          <input id="match-goal-assist-name" name="assist_name" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <datalist id="match-goal-player-list-home">
+        <% _lineupHomePlayers.forEach(function (player) { %>
+        <% if (!player.number) return; %>
+        <option value="<%= player.number %>"><%= player.name %></option>
+        <% }); %>
+      </datalist>
+      <datalist id="match-goal-player-list-away">
+        <% _lineupAwayPlayers.forEach(function (player) { %>
+        <% if (!player.number) return; %>
+        <option value="<%= player.number %>"><%= player.name %></option>
+        <% }); %>
+      </datalist>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5" data-goal-modal-close>
+          Zavřít
+        </button>
+        <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">
+          Uložit gól
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  id="match-yellow-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-yellow-modal-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="match-manage-modal__panel card-11"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="match-yellow-modal-title"
+  >
+    <h2 id="match-yellow-modal-title" class="match-manage-modal__title text-lg font-semibold text-white">Zapsat žlutou kartu</h2>
+    <form method="post" action="/administrace/zapasy/seznam?mk=yellow_home" class="match-manage-modal__form mt-4 space-y-4" id="match-yellow-modal-form">
+      <input type="hidden" name="action" value="add_match_event" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <input type="hidden" name="mk" id="match-yellow-event-key" value="yellow_home" />
+      <div class="flex gap-2">
+        <div class="flex-1">
+          <label class="text-xs text-11muted" for="match-yellow-minute">Minuta</label>
+          <input id="match-yellow-minute" name="minute" type="number" min="1" max="90" placeholder="např. 45" required class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div class="w-24">
+          <label class="text-xs text-11muted" for="match-yellow-minute-extra">+ nastavení</label>
+          <input id="match-yellow-minute-extra" name="minute_extra" type="number" min="0" max="20" placeholder="0" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label class="text-xs text-11muted" for="match-yellow-player-number">Číslo hráče</label>
+          <input id="match-yellow-player-number" name="player_number" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="text-xs text-11muted" for="match-yellow-player-name">Jméno hráče</label>
+          <input id="match-yellow-player-name" name="player_name" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5" data-yellow-modal-close>
+          Zavřít
+        </button>
+        <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">
+          Uložit žlutou kartu
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  id="match-red-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-red-modal-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="match-manage-modal__panel card-11"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="match-red-modal-title"
+  >
+    <h2 id="match-red-modal-title" class="match-manage-modal__title text-lg font-semibold text-white">Zapsat červenou kartu</h2>
+    <form method="post" action="/administrace/zapasy/seznam?mk=red_home" class="match-manage-modal__form mt-4 space-y-4" id="match-red-modal-form">
+      <input type="hidden" name="action" value="add_match_event" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <input type="hidden" name="mk" id="match-red-event-key" value="red_home" />
+      <div class="flex gap-2">
+        <div class="flex-1">
+          <label class="text-xs text-11muted" for="match-red-minute">Minuta</label>
+          <input id="match-red-minute" name="minute" type="number" min="1" max="90" placeholder="např. 45" required class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div class="w-24">
+          <label class="text-xs text-11muted" for="match-red-minute-extra">+ nastavení</label>
+          <input id="match-red-minute-extra" name="minute_extra" type="number" min="0" max="20" placeholder="0" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label class="text-xs text-11muted" for="match-red-player-number">Číslo hráče</label>
+          <input id="match-red-player-number" name="player_number" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="text-xs text-11muted" for="match-red-player-name">Jméno hráče</label>
+          <input id="match-red-player-name" name="player_name" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5" data-red-modal-close>
+          Zavřít
+        </button>
+        <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">
+          Uložit červenou kartu
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  id="match-sub-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-sub-modal-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="match-manage-modal__panel card-11"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="match-sub-modal-title"
+  >
+    <h2 id="match-sub-modal-title" class="match-manage-modal__title text-lg font-semibold text-white">Zapsat střídání</h2>
+    <form method="post" action="/administrace/zapasy/seznam?mk=sub_home" class="match-manage-modal__form mt-4 space-y-4" id="match-sub-modal-form">
+      <input type="hidden" name="action" value="add_match_event" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <input type="hidden" name="mk" id="match-sub-event-key" value="sub_home" />
+      <datalist id="match-sub-off-list-home">
+        <% _lineupHomeStarters.forEach(function (player) { %>
+        <% if (!player.number) return; %>
+        <option value="<%= player.number %>"><%= player.name %></option>
+        <% }); %>
+      </datalist>
+      <datalist id="match-sub-on-list-home">
+        <% _lineupHomeSubs.forEach(function (player) { %>
+        <option value="<%= player.number || '' %>"><%= (player.number ? '#' + player.number + ' ' : '') + player.name %></option>
+        <% }); %>
+      </datalist>
+      <datalist id="match-sub-off-list-away">
+        <% _lineupAwayStarters.forEach(function (player) { %>
+        <% if (!player.number) return; %>
+        <option value="<%= player.number %>"><%= player.name %></option>
+        <% }); %>
+      </datalist>
+      <datalist id="match-sub-on-list-away">
+        <% _lineupAwaySubs.forEach(function (player) { %>
+        <option value="<%= player.number || '' %>"><%= (player.number ? '#' + player.number + ' ' : '') + player.name %></option>
+        <% }); %>
+      </datalist>
+      <div class="flex gap-2">
+        <div class="flex-1">
+          <label class="text-xs text-11muted" for="match-sub-minute">Minuta</label>
+          <input id="match-sub-minute" name="minute" type="number" min="1" max="90" placeholder="např. 45" required class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div class="w-24">
+          <label class="text-xs text-11muted" for="match-sub-minute-extra">+ nastavení</label>
+          <input id="match-sub-minute-extra" name="minute_extra" type="number" min="0" max="20" placeholder="0" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label class="text-xs text-11muted" for="match-sub-off-number">Ze hry - číslo</label>
+          <input id="match-sub-off-number" name="off_number" list="match-sub-off-list-home" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="text-xs text-11muted" for="match-sub-off-name">Ze hry - jméno</label>
+          <input id="match-sub-off-name" name="off_name" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="text-xs text-11muted" for="match-sub-on-number">Na hřiště - číslo</label>
+          <input id="match-sub-on-number" name="on_number" list="match-sub-on-list-home" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="text-xs text-11muted" for="match-sub-on-name">Na hřiště - jméno</label>
+          <input id="match-sub-on-name" name="on_name" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5" data-sub-modal-close>
+          Zavřít
+        </button>
+        <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">
+          Uložit střídání
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  id="match-penalty-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-penalty-modal-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="match-manage-modal__panel card-11"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="match-penalty-modal-title"
+  >
+    <h2 id="match-penalty-modal-title" class="match-manage-modal__title text-lg font-semibold text-white">Zapsat penaltu</h2>
+    <form method="post" action="/administrace/zapasy/seznam?mk=penalty_scored_home" class="match-manage-modal__form mt-4 space-y-4" id="match-penalty-modal-form">
+      <input type="hidden" name="action" value="add_match_event" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <input type="hidden" name="mk" id="match-penalty-event-key" value="penalty_scored_home" />
+      <div class="flex gap-2">
+        <div class="flex-1">
+          <label class="text-xs text-11muted" for="match-penalty-minute">Minuta</label>
+          <input id="match-penalty-minute" name="minute" type="number" min="1" max="90" placeholder="např. 45" required class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div class="w-24">
+          <label class="text-xs text-11muted" for="match-penalty-minute-extra">+ nastavení</label>
+          <input id="match-penalty-minute-extra" name="minute_extra" type="number" min="0" max="20" placeholder="0" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label class="text-xs text-11muted" for="match-penalty-scorer-number">Číslo hráče</label>
+          <input id="match-penalty-scorer-number" name="scorer_number" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="text-xs text-11muted" for="match-penalty-scorer-name">Jméno hráče</label>
+          <input id="match-penalty-scorer-name" name="scorer_name" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <datalist id="match-penalty-player-list-home">
+        <% _lineupHomePlayers.forEach(function (player) { %>
+        <% if (!player.number) return; %>
+        <option value="<%= player.number %>"><%= player.name %></option>
+        <% }); %>
+      </datalist>
+      <datalist id="match-penalty-player-list-away">
+        <% _lineupAwayPlayers.forEach(function (player) { %>
+        <% if (!player.number) return; %>
+        <option value="<%= player.number %>"><%= player.name %></option>
+        <% }); %>
+      </datalist>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5" data-penalty-modal-close>
+          Zavřít
+        </button>
+        <button type="submit" id="match-penalty-submit-btn" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">
+          Uložit penaltu
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  id="match-disallowed-pick-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-disallowed-pick-close tabindex="-1" aria-hidden="true"></div>
+  <div class="match-manage-modal__panel card-11" role="dialog" aria-modal="true" aria-labelledby="match-disallowed-pick-title">
+    <h2 id="match-disallowed-pick-title" class="match-manage-modal__title text-lg font-semibold text-white">Vyber gól</h2>
+    <div class="mt-4 space-y-4">
+      <div>
+        <label for="match-disallowed-target-select" class="text-xs text-11muted">Gól k neuznání</label>
+        <select id="match-disallowed-target-select" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white">
+          <% if (_allGoalEvents.length) { %>
+            <% _allGoalEvents.forEach(function (goal) { %>
+            <option value="<%= goal.at || '' %>"><%= goal.label || goal.at || 'Gól' %></option>
+            <% }); %>
+          <% } else { %>
+            <option value="">Není k dispozici žádný gól</option>
+          <% } %>
+        </select>
+      </div>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5" data-disallowed-pick-close>Zavřít</button>
+        <button type="button" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg" id="match-disallowed-pick-next">Pokračovat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div
+  id="match-disallowed-details-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-disallowed-details-close tabindex="-1" aria-hidden="true"></div>
+  <div class="match-manage-modal__panel card-11" role="dialog" aria-modal="true" aria-labelledby="match-disallowed-details-title">
+    <h2 id="match-disallowed-details-title" class="match-manage-modal__title text-lg font-semibold text-white">Neuznaný gól</h2>
+    <form method="post" action="/administrace/zapasy/seznam?mk=disallowed_goal_home" class="match-manage-modal__form mt-4 space-y-4" id="match-disallowed-details-form">
+      <input type="hidden" name="action" value="add_match_event" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <input type="hidden" name="mk" id="match-disallowed-event-key" value="disallowed_goal_home" />
+      <input type="hidden" name="target_event_at" id="match-disallowed-target-at" value="" />
+      <div>
+        <label class="text-xs text-11muted" for="match-disallowed-reason">Důvod neuznání</label>
+        <input id="match-disallowed-reason" name="reason" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+      </div>
+      <label class="inline-flex items-center gap-2 text-sm text-slate-200">
+        <input type="checkbox" name="var_used" value="1" class="rounded border-white/20 bg-[#111827]" />
+        Byl použit VAR
+      </label>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5" data-disallowed-details-close>Zavřít</button>
+        <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">Uložit neuznaný gól</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  id="match-first-half-extra-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-first-half-extra-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="match-manage-modal__panel card-11"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="match-first-half-extra-title"
+  >
+    <h2 id="match-first-half-extra-title" class="match-manage-modal__title text-lg font-semibold text-white">Nastavení 1. poločasu</h2>
+    <form method="post" action="/administrace/zapasy/seznam" class="match-manage-modal__form mt-4 space-y-4">
+      <input type="hidden" name="action" value="save_first_half_extra" id="match-extra-action" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <div class="space-y-2 text-sm text-slate-200">
+        <label class="flex items-center gap-2">
+          <input type="radio" name="extra_mode" value="set" checked data-first-half-extra-mode />
+          Nastavuje se
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" name="extra_mode" value="none" data-first-half-extra-mode />
+          Nic se nenastavuje
+        </label>
+      </div>
+      <div>
+        <label for="match-first-half-extra-minutes" class="text-xs text-11muted">Počet minut nastavení</label>
+        <input
+          id="match-first-half-extra-minutes"
+          type="number"
+          min="0"
+          max="20"
+          step="1"
+          name="extra_minutes"
+          value="<%= editingFixture.firstHalfExtraMinutes != null ? editingFixture.firstHalfExtraMinutes : 0 %>"
+          class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+          data-first-half-extra-minutes
+        />
+      </div>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5" data-first-half-extra-close>
+          Zavřít
+        </button>
+        <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">
+          Uložit nastavení
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  id="match-forfeit-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-forfeit-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="match-manage-modal__panel card-11"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="match-forfeit-modal-title"
+  >
+    <h2 id="match-forfeit-modal-title" class="match-manage-modal__title text-lg font-semibold text-white">Potvrzení kontumace</h2>
+    <p id="match-forfeit-modal-text" class="mt-3 text-sm text-slate-200"></p>
+    <form method="post" action="/administrace/zapasy/seznam?mk=forfeit_home" class="match-manage-modal__form mt-5" id="match-forfeit-modal-form">
+      <input type="hidden" name="action" value="add_match_event" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <input type="hidden" name="mk" id="match-forfeit-event-key" value="forfeit_home" />
+      <div class="flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5"
+          data-forfeit-close
+        >
+          Ne
+        </button>
+        <button type="submit" class="rounded-xl bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500">
+          Ano
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  id="match-finish-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-finish-match-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="match-manage-modal__panel card-11"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="match-finish-modal-title"
+  >
+    <h2 id="match-finish-modal-title" class="match-manage-modal__title text-lg font-semibold text-white">Potvrzení ukončení zápasu</h2>
+    <p class="mt-3 text-sm text-slate-200">Potvrzujete, že zápas je zapsaný podle reálného zápasu?</p>
+    <form method="post" action="/administrace/zapasy/seznam" class="match-manage-modal__form mt-5">
+      <input type="hidden" name="action" value="finish_match" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <div class="flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5"
+          data-finish-match-close
+        >
+          Ne
+        </button>
+        <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">
+          Ano
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  id="match-clock-edit-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-clock-edit-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="match-manage-modal__panel card-11"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="match-clock-edit-title"
+  >
+    <h2 id="match-clock-edit-title" class="match-manage-modal__title text-lg font-semibold text-white">Upravit čas zápasu</h2>
+    <form method="post" action="/administrace/zapasy/seznam" class="match-manage-modal__form mt-4 space-y-4" id="match-clock-edit-form">
+      <input type="hidden" name="action" value="set_match_clock" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-[#111827] px-4 py-3">
+        <span class="text-xs text-11muted">Aktuální čas:</span>
+        <span id="match-clock-edit-live" class="text-2xl font-mono font-bold text-11accent">-</span>
+      </div>
+      <p class="text-sm text-slate-300">Zadejte minutu, na kterou chcete hodiny nastavit.</p>
+      <div class="flex gap-2 items-end">
+        <div class="flex-1">
+          <label class="text-xs text-11muted" for="match-clock-edit-minute">Minuta</label>
+          <input
+            id="match-clock-edit-minute"
+            name="clock_total_minutes"
+            type="number"
+            min="0"
+            max="200"
+            placeholder="např. 23"
+            class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+          />
+        </div>
+        <div id="match-clock-edit-preview" class="rounded-xl border border-white/10 bg-[#111827] px-4 py-2 text-sm font-mono text-11accent min-w-[5rem] text-center">-</div>
+      </div>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5" data-clock-edit-close>
+          Zavřít
+        </button>
+        <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">
+          Nastavit čas
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var FORFEIT_TEAM_LABELS = {
+      forfeit_home: <%- JSON.stringify(_homeTeam) %>,
+      forfeit_away: <%- JSON.stringify(_awayTeam) %>
+    };
+
+    var modal = document.getElementById('match-forfeit-modal');
+    if (!modal) return;
+
+    var form = document.getElementById('match-forfeit-modal-form');
+    var textEl = document.getElementById('match-forfeit-modal-text');
+    var keyInput = document.getElementById('match-forfeit-event-key');
+    var lastFocus = null;
+
+    function openModal(btn) {
+      if (!btn || !form) return;
+      var key = btn.getAttribute('data-forfeit-open') || 'forfeit_home';
+      var team = FORFEIT_TEAM_LABELS[key] || 'tým';
+      lastFocus = btn;
+      keyInput.value = key;
+      form.action = '/administrace/zapasy/seznam?mk=' + encodeURIComponent(key);
+      if (textEl) {
+        textEl.textContent =
+          'Potvrzujete kontumaci ve prospěch ' + team + ' podle reálného zápasu?';
+      }
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('match-manage-modal-open');
+      var confirmBtn = modal.querySelector('button[type="submit"]');
+      if (confirmBtn) confirmBtn.focus();
+    }
+
+    function closeModal() {
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('match-manage-modal-open');
+      if (lastFocus && typeof lastFocus.focus === 'function') {
+        lastFocus.focus();
+      }
+    }
+
+    document.querySelectorAll('[data-forfeit-open]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openModal(btn);
+      });
+    });
+
+    modal.querySelectorAll('[data-forfeit-close]').forEach(function (el) {
+      el.addEventListener('click', closeModal);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (modal.hidden) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeModal();
+      }
+    });
+
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal.querySelector('.match-manage-modal__backdrop')) {
+        closeModal();
+      }
+    });
+  })();
+</script>
+
+<script>
+  (function () {
+    var modal = document.getElementById('match-finish-modal');
+    if (!modal) return;
+
+    var panel = modal.querySelector('.match-manage-modal__panel');
+    var lastFocus = null;
+
+    function openModal(btn) {
+      lastFocus = btn || null;
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('match-manage-modal-open');
+      var confirmBtn = modal.querySelector('button[type="submit"]');
+      if (confirmBtn) confirmBtn.focus();
+    }
+
+    function closeModal() {
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('match-manage-modal-open');
+      if (lastFocus && typeof lastFocus.focus === 'function') {
+        lastFocus.focus();
+      }
+    }
+
+    document.querySelectorAll('[data-finish-match-open]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openModal(btn);
+      });
+    });
+
+    modal.querySelectorAll('[data-finish-match-close]').forEach(function (el) {
+      el.addEventListener('click', closeModal);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (modal.hidden) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeModal();
+      }
+    });
+
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal.querySelector('.match-manage-modal__backdrop')) {
+        closeModal();
+      }
+    });
+  })();
+</script>
+<% } %>
+<% if (_status === 'Probíhá') { %>
+<script>
+  (function () {
+    var MATCH_EVENT_POST_BASE = '/administrace/zapasy/seznam';
+    function setEventFormAction(form, key) {
+      if (!form || !key) return;
+      form.action = MATCH_EVENT_POST_BASE + '?mk=' + encodeURIComponent(key);
+    }
+
+    var goalModal = document.getElementById('match-goal-modal');
+    if (!goalModal) return;
+
+    var goalEventInput = document.getElementById('match-goal-event-key');
+    var scorerNumberInput = document.getElementById('match-goal-scorer-number');
+    var scorerNameInput = document.getElementById('match-goal-scorer-name');
+    var assistNumberInput = document.getElementById('match-goal-assist-number');
+    var assistNameInput = document.getElementById('match-goal-assist-name');
+    var goalForm = document.getElementById('match-goal-modal-form');
+    var goalTitle = document.getElementById('match-goal-modal-title');
+    var numberToNameHome = <%- JSON.stringify(_lineupHomeByNumber) %>;
+    var numberToNameAway = <%- JSON.stringify(_lineupAwayByNumber) %>;
+    var numberToName = numberToNameHome;
+    var goalLastFocus = null;
+
+    function applyGoalLineup(eventKey) {
+      numberToName = eventKey === 'goal_away' ? numberToNameAway : numberToNameHome;
+      var listId = eventKey === 'goal_away' ? 'match-goal-player-list-away' : 'match-goal-player-list-home';
+      if (scorerNumberInput) scorerNumberInput.setAttribute('list', listId);
+      if (assistNumberInput) assistNumberInput.setAttribute('list', listId);
+    }
+
+    function syncName(numberInput, nameInput) {
+      if (!numberInput || !nameInput) return;
+      var n = String(numberInput.value || '').trim();
+      if (!n || !numberToName[n]) return;
+      if (!String(nameInput.value || '').trim()) nameInput.value = numberToName[n];
+    }
+
+    function openGoalModal(eventKey, trigger) {
+      goalLastFocus = trigger || null;
+      var key = eventKey || 'goal_home';
+      goalModal.setAttribute('data-current-key', key);
+      if (goalEventInput) goalEventInput.value = key;
+      setEventFormAction(goalForm, key);
+      applyGoalLineup(key);
+      if (goalTitle) goalTitle.textContent = key === 'goal_away' ? 'Zapsat gól hostů' : 'Zapsat gól domácích';
+      if (scorerNumberInput) scorerNumberInput.value = '';
+      if (scorerNameInput) scorerNameInput.value = '';
+      if (assistNumberInput) assistNumberInput.value = '';
+      if (assistNameInput) assistNameInput.value = '';
+      var gMinute = document.getElementById('match-goal-minute');
+      var gMinuteExtra = document.getElementById('match-goal-minute-extra');
+      if (gMinute) gMinute.value = '';
+      if (gMinuteExtra) gMinuteExtra.value = '';
+      goalModal.hidden = false;
+      goalModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('match-manage-modal-open');
+      window.setTimeout(function () {
+        if (scorerNumberInput) scorerNumberInput.focus();
+      }, 0);
+    }
+
+    function closeGoalModal() {
+      goalModal.hidden = true;
+      goalModal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('match-manage-modal-open');
+      if (goalLastFocus && typeof goalLastFocus.focus === 'function') goalLastFocus.focus();
+    }
+
+    document.querySelectorAll('[data-goal-event-open]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openGoalModal(btn.getAttribute('data-goal-event-open') || 'goal_home', btn);
+      });
+    });
+
+    goalModal.querySelectorAll('[data-goal-modal-close]').forEach(function (el) {
+      el.addEventListener('click', closeGoalModal);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (goalModal.hidden) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeGoalModal();
+      }
+    });
+
+    if (scorerNumberInput && scorerNameInput) {
+      scorerNumberInput.addEventListener('input', function () {
+        syncName(scorerNumberInput, scorerNameInput);
+      });
+    }
+    if (assistNumberInput && assistNameInput) {
+      assistNumberInput.addEventListener('input', function () {
+        syncName(assistNumberInput, assistNameInput);
+      });
+    }
+
+    if (goalForm) {
+      goalForm.addEventListener('submit', function () {
+        var key = goalModal.getAttribute('data-current-key') || 'goal_home';
+        if (goalEventInput) goalEventInput.value = key;
+        setEventFormAction(goalForm, key);
+      });
+    }
+
+    var yellowModal = document.getElementById('match-yellow-modal');
+    if (yellowModal) {
+      var yellowForm = document.getElementById('match-yellow-modal-form');
+      var yellowEventInput = document.getElementById('match-yellow-event-key');
+      var yellowPlayerNumberInput = document.getElementById('match-yellow-player-number');
+      var yellowPlayerNameInput = document.getElementById('match-yellow-player-name');
+      var yellowTitle = document.getElementById('match-yellow-modal-title');
+      var yellowNumberToName = numberToNameHome;
+      var yellowLastFocus = null;
+
+      function applyYellowLineup(eventKey) {
+        yellowNumberToName = eventKey === 'yellow_away' ? numberToNameAway : numberToNameHome;
+        var listId = eventKey === 'yellow_away' ? 'match-goal-player-list-away' : 'match-goal-player-list-home';
+        if (yellowPlayerNumberInput) yellowPlayerNumberInput.setAttribute('list', listId);
+      }
+
+      function syncYellowName() {
+        if (!yellowPlayerNumberInput || !yellowPlayerNameInput) return;
+        var n = String(yellowPlayerNumberInput.value || '').trim();
+        if (!n || !yellowNumberToName[n]) return;
+        if (!String(yellowPlayerNameInput.value || '').trim()) yellowPlayerNameInput.value = yellowNumberToName[n];
+      }
+
+      function openYellowModal(eventKey, trigger) {
+        yellowLastFocus = trigger || null;
+        var key = eventKey || 'yellow_home';
+        yellowModal.setAttribute('data-current-key', key);
+        if (yellowEventInput) yellowEventInput.value = key;
+        setEventFormAction(yellowForm, key);
+        applyYellowLineup(key);
+        if (yellowTitle) yellowTitle.textContent = key === 'yellow_away' ? 'Zapsat žlutou kartu hostů' : 'Zapsat žlutou kartu domácích';
+        if (yellowPlayerNumberInput) yellowPlayerNumberInput.value = '';
+        if (yellowPlayerNameInput) yellowPlayerNameInput.value = '';
+        var yMinute = document.getElementById('match-yellow-minute');
+        var yMinuteExtra = document.getElementById('match-yellow-minute-extra');
+        if (yMinute) yMinute.value = '';
+        if (yMinuteExtra) yMinuteExtra.value = '';
+        yellowModal.hidden = false;
+        yellowModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('match-manage-modal-open');
+        window.setTimeout(function () {
+          if (yellowPlayerNumberInput) yellowPlayerNumberInput.focus();
+        }, 0);
+      }
+
+      function closeYellowModal() {
+        yellowModal.hidden = true;
+        yellowModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('match-manage-modal-open');
+        if (yellowLastFocus && typeof yellowLastFocus.focus === 'function') yellowLastFocus.focus();
+      }
+
+      document.querySelectorAll('[data-yellow-event-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openYellowModal(btn.getAttribute('data-yellow-event-open') || 'yellow_home', btn);
+        });
+      });
+
+      yellowModal.querySelectorAll('[data-yellow-modal-close]').forEach(function (el) {
+        el.addEventListener('click', closeYellowModal);
+      });
+
+      if (yellowPlayerNumberInput) {
+        yellowPlayerNumberInput.addEventListener('input', syncYellowName);
+      }
+
+      if (yellowForm) {
+        yellowForm.addEventListener('submit', function () {
+          var key = yellowModal.getAttribute('data-current-key') || 'yellow_home';
+          if (yellowEventInput) yellowEventInput.value = key;
+          setEventFormAction(yellowForm, key);
+        });
+      }
+
+      document.addEventListener('keydown', function (e) {
+        if (yellowModal.hidden) return;
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeYellowModal();
+        }
+      });
+    }
+
+    var redModal = document.getElementById('match-red-modal');
+    if (redModal) {
+      var redForm = document.getElementById('match-red-modal-form');
+      var redEventInput = document.getElementById('match-red-event-key');
+      var redPlayerNumberInput = document.getElementById('match-red-player-number');
+      var redPlayerNameInput = document.getElementById('match-red-player-name');
+      var redTitle = document.getElementById('match-red-modal-title');
+      var redNumberToName = numberToNameHome;
+      var redLastFocus = null;
+
+      function applyRedLineup(eventKey) {
+        redNumberToName = eventKey === 'red_away' ? numberToNameAway : numberToNameHome;
+        var listId = eventKey === 'red_away' ? 'match-goal-player-list-away' : 'match-goal-player-list-home';
+        if (redPlayerNumberInput) redPlayerNumberInput.setAttribute('list', listId);
+      }
+
+      function syncRedName() {
+        if (!redPlayerNumberInput || !redPlayerNameInput) return;
+        var n = String(redPlayerNumberInput.value || '').trim();
+        if (!n || !redNumberToName[n]) return;
+        if (!String(redPlayerNameInput.value || '').trim()) redPlayerNameInput.value = redNumberToName[n];
+      }
+
+      function openRedModal(eventKey, trigger) {
+        redLastFocus = trigger || null;
+        var key = eventKey || 'red_home';
+        redModal.setAttribute('data-current-key', key);
+        if (redEventInput) redEventInput.value = key;
+        setEventFormAction(redForm, key);
+        applyRedLineup(key);
+        if (redTitle) redTitle.textContent = key === 'red_away' ? 'Zapsat červenou kartu hostů' : 'Zapsat červenou kartu domácích';
+        if (redPlayerNumberInput) redPlayerNumberInput.value = '';
+        if (redPlayerNameInput) redPlayerNameInput.value = '';
+        var rMinute = document.getElementById('match-red-minute');
+        var rMinuteExtra = document.getElementById('match-red-minute-extra');
+        if (rMinute) rMinute.value = '';
+        if (rMinuteExtra) rMinuteExtra.value = '';
+        redModal.hidden = false;
+        redModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('match-manage-modal-open');
+        window.setTimeout(function () {
+          if (redPlayerNumberInput) redPlayerNumberInput.focus();
+        }, 0);
+      }
+
+      function closeRedModal() {
+        redModal.hidden = true;
+        redModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('match-manage-modal-open');
+        if (redLastFocus && typeof redLastFocus.focus === 'function') redLastFocus.focus();
+      }
+
+      document.querySelectorAll('[data-red-event-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openRedModal(btn.getAttribute('data-red-event-open') || 'red_home', btn);
+        });
+      });
+
+      redModal.querySelectorAll('[data-red-modal-close]').forEach(function (el) {
+        el.addEventListener('click', closeRedModal);
+      });
+
+      if (redPlayerNumberInput) {
+        redPlayerNumberInput.addEventListener('input', syncRedName);
+      }
+
+      if (redForm) {
+        redForm.addEventListener('submit', function () {
+          var key = redModal.getAttribute('data-current-key') || 'red_home';
+          if (redEventInput) redEventInput.value = key;
+          setEventFormAction(redForm, key);
+        });
+      }
+
+      document.addEventListener('keydown', function (e) {
+        if (redModal.hidden) return;
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeRedModal();
+        }
+      });
+    }
+
+    var subModal = document.getElementById('match-sub-modal');
+    if (subModal) {
+      var subForm = document.getElementById('match-sub-modal-form');
+      var subEventInput = document.getElementById('match-sub-event-key');
+      var subOffNumberInput = document.getElementById('match-sub-off-number');
+      var subOffNameInput = document.getElementById('match-sub-off-name');
+      var subOnNumberInput = document.getElementById('match-sub-on-number');
+      var subOnNameInput = document.getElementById('match-sub-on-name');
+      var subTitle = document.getElementById('match-sub-modal-title');
+      var subStartersByNumber = <%- JSON.stringify(_lineupHomeStartersByNumber) %>;
+      var subSubsByNumber = <%- JSON.stringify(_lineupHomeSubsByNumber) %>;
+      var subStartersByNumberAway = <%- JSON.stringify(_lineupAwayStartersByNumber) %>;
+      var subSubsByNumberAway = <%- JSON.stringify(_lineupAwaySubsByNumber) %>;
+      var subLastFocus = null;
+
+      function applySubLineup(eventKey) {
+        var isAway = eventKey === 'sub_away';
+        subStartersByNumber = isAway ? subStartersByNumberAway : <%- JSON.stringify(_lineupHomeStartersByNumber) %>;
+        subSubsByNumber = isAway ? subSubsByNumberAway : <%- JSON.stringify(_lineupHomeSubsByNumber) %>;
+        if (subOffNumberInput) subOffNumberInput.setAttribute('list', isAway ? 'match-sub-off-list-away' : 'match-sub-off-list-home');
+        if (subOnNumberInput) subOnNumberInput.setAttribute('list', isAway ? 'match-sub-on-list-away' : 'match-sub-on-list-home');
+      }
+
+      function syncSubName(numberInput, nameInput, byNumber) {
+        if (!numberInput || !nameInput) return;
+        var n = String(numberInput.value || '').trim();
+        if (!n || !byNumber[n]) return;
+        if (!String(nameInput.value || '').trim()) nameInput.value = byNumber[n];
+      }
+
+      function openSubModal(eventKey, trigger) {
+        subLastFocus = trigger || null;
+        var key = eventKey || 'sub_home';
+        subModal.setAttribute('data-current-key', key);
+        if (subEventInput) subEventInput.value = key;
+        setEventFormAction(subForm, key);
+        applySubLineup(key);
+        if (subTitle) subTitle.textContent = key === 'sub_away' ? 'Zapsat střídání hostů' : 'Zapsat střídání domácích';
+        if (subOffNumberInput) subOffNumberInput.value = '';
+        if (subOffNameInput) subOffNameInput.value = '';
+        if (subOnNumberInput) subOnNumberInput.value = '';
+        if (subOnNameInput) subOnNameInput.value = '';
+        var sMinute = document.getElementById('match-sub-minute');
+        var sMinuteExtra = document.getElementById('match-sub-minute-extra');
+        if (sMinute) sMinute.value = '';
+        if (sMinuteExtra) sMinuteExtra.value = '';
+        subModal.hidden = false;
+        subModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('match-manage-modal-open');
+        window.setTimeout(function () {
+          if (subOffNumberInput) subOffNumberInput.focus();
+        }, 0);
+      }
+
+      function closeSubModal() {
+        subModal.hidden = true;
+        subModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('match-manage-modal-open');
+        if (subLastFocus && typeof subLastFocus.focus === 'function') subLastFocus.focus();
+      }
+
+      document.querySelectorAll('[data-sub-event-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openSubModal(btn.getAttribute('data-sub-event-open') || 'sub_home', btn);
+        });
+      });
+
+      subModal.querySelectorAll('[data-sub-modal-close]').forEach(function (el) {
+        el.addEventListener('click', closeSubModal);
+      });
+
+      if (subOffNumberInput && subOffNameInput) {
+        subOffNumberInput.addEventListener('input', function () {
+          syncSubName(subOffNumberInput, subOffNameInput, subStartersByNumber);
+        });
+      }
+      if (subOnNumberInput && subOnNameInput) {
+        subOnNumberInput.addEventListener('input', function () {
+          syncSubName(subOnNumberInput, subOnNameInput, subSubsByNumber);
+        });
+      }
+
+      if (subForm) {
+        subForm.addEventListener('submit', function () {
+          var key = subModal.getAttribute('data-current-key') || 'sub_home';
+          if (subEventInput) subEventInput.value = key;
+          setEventFormAction(subForm, key);
+        });
+      }
+
+      document.addEventListener('keydown', function (e) {
+        if (subModal.hidden) return;
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeSubModal();
+        }
+      });
+    }
+
+    var penaltyModal = document.getElementById('match-penalty-modal');
+    if (penaltyModal) {
+      var penaltyForm = document.getElementById('match-penalty-modal-form');
+      var penaltyEventInput = document.getElementById('match-penalty-event-key');
+      var penaltyScorerNumberInput = document.getElementById('match-penalty-scorer-number');
+      var penaltyScorerNameInput = document.getElementById('match-penalty-scorer-name');
+      var penaltyMinuteInput = document.getElementById('match-penalty-minute');
+      var penaltyMinuteExtraInput = document.getElementById('match-penalty-minute-extra');
+      var penaltySubmitBtn = document.getElementById('match-penalty-submit-btn');
+      var penaltyTitle = document.getElementById('match-penalty-modal-title');
+      var penaltyNumberToName = numberToNameHome;
+      var penaltyLastFocus = null;
+
+      var PENALTY_TITLES = {
+        penalty_scored_home: 'Proměněná penalta domácích',
+        penalty_scored_away: 'Proměněná penalta hostů',
+        penalty_missed_home: 'Neproměněná penalta domácích',
+        penalty_missed_away: 'Neproměněná penalta hostů',
+      };
+      var PENALTY_SUBMIT_LABELS = {
+        penalty_scored_home: 'Uložit proměněnou penaltu',
+        penalty_scored_away: 'Uložit proměněnou penaltu',
+        penalty_missed_home: 'Uložit neproměněnou penaltu',
+        penalty_missed_away: 'Uložit neproměněnou penaltu',
+      };
+
+      function applyPenaltyLineup(eventKey) {
+        var isAway = /away$/.test(eventKey);
+        penaltyNumberToName = isAway ? numberToNameAway : numberToNameHome;
+        var listId = isAway ? 'match-penalty-player-list-away' : 'match-penalty-player-list-home';
+        if (penaltyScorerNumberInput) penaltyScorerNumberInput.setAttribute('list', listId);
+      }
+
+      function syncPenaltyName() {
+        if (!penaltyScorerNumberInput || !penaltyScorerNameInput) return;
+        var n = String(penaltyScorerNumberInput.value || '').trim();
+        if (!n || !penaltyNumberToName[n]) return;
+        if (!String(penaltyScorerNameInput.value || '').trim()) penaltyScorerNameInput.value = penaltyNumberToName[n];
+      }
+
+      function openPenaltyModal(eventKey, trigger) {
+        penaltyLastFocus = trigger || null;
+        var key = eventKey || 'penalty_scored_home';
+        penaltyModal.setAttribute('data-current-key', key);
+        if (penaltyEventInput) penaltyEventInput.value = key;
+        setEventFormAction(penaltyForm, key);
+        applyPenaltyLineup(key);
+        if (penaltyTitle) penaltyTitle.textContent = PENALTY_TITLES[key] || 'Zapsat penaltu';
+        if (penaltySubmitBtn) penaltySubmitBtn.textContent = PENALTY_SUBMIT_LABELS[key] || 'Uložit penaltu';
+        if (penaltyScorerNumberInput) penaltyScorerNumberInput.value = '';
+        if (penaltyScorerNameInput) penaltyScorerNameInput.value = '';
+        if (penaltyMinuteInput) penaltyMinuteInput.value = '';
+        if (penaltyMinuteExtraInput) penaltyMinuteExtraInput.value = '';
+        penaltyModal.hidden = false;
+        penaltyModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('match-manage-modal-open');
+        window.setTimeout(function () {
+          if (penaltyMinuteInput) penaltyMinuteInput.focus();
+        }, 0);
+      }
+
+      function closePenaltyModal() {
+        penaltyModal.hidden = true;
+        penaltyModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('match-manage-modal-open');
+        if (penaltyLastFocus && typeof penaltyLastFocus.focus === 'function') penaltyLastFocus.focus();
+      }
+
+      document.querySelectorAll('[data-penalty-event-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openPenaltyModal(btn.getAttribute('data-penalty-event-open') || 'penalty_scored_home', btn);
+        });
+      });
+
+      penaltyModal.querySelectorAll('[data-penalty-modal-close]').forEach(function (el) {
+        el.addEventListener('click', closePenaltyModal);
+      });
+
+      if (penaltyScorerNumberInput) {
+        penaltyScorerNumberInput.addEventListener('input', syncPenaltyName);
+      }
+
+      if (penaltyForm) {
+        penaltyForm.addEventListener('submit', function () {
+          var key = penaltyModal.getAttribute('data-current-key') || 'penalty_scored_home';
+          if (penaltyEventInput) penaltyEventInput.value = key;
+          setEventFormAction(penaltyForm, key);
+        });
+      }
+
+      document.addEventListener('keydown', function (e) {
+        if (penaltyModal.hidden) return;
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closePenaltyModal();
+        }
+      });
+    }
+
+    var disallowedPickModal = document.getElementById('match-disallowed-pick-modal');
+    var disallowedDetailsModal = document.getElementById('match-disallowed-details-modal');
+    if (disallowedPickModal && disallowedDetailsModal) {
+      var disallowedDetailsForm = document.getElementById('match-disallowed-details-form');
+      var disallowedTargetSelect = document.getElementById('match-disallowed-target-select');
+      var disallowedPickNext = document.getElementById('match-disallowed-pick-next');
+      var disallowedEventKeyInput = document.getElementById('match-disallowed-event-key');
+      var disallowedTargetAtInput = document.getElementById('match-disallowed-target-at');
+      var disallowedReasonInput = document.getElementById('match-disallowed-reason');
+      var disallowedVarCheckbox = disallowedDetailsModal.querySelector('input[name="var_used"]');
+      var currentDisallowedKey = 'disallowed_goal_home';
+      var homeGoals = <%- JSON.stringify(_homeGoalEvents) %>;
+      var awayGoals = <%- JSON.stringify(_awayGoalEvents) %>;
+      var allGoals = <%- JSON.stringify(_allGoalEvents) %>;
+
+      function fillDisallowedGoals(list) {
+        if (!disallowedTargetSelect) return;
+        disallowedTargetSelect.innerHTML = '';
+        if (!list.length) {
+          var opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'Není k dispozici žádný gól';
+          disallowedTargetSelect.appendChild(opt);
+          return;
+        }
+        list.forEach(function (goal) {
+          var opt = document.createElement('option');
+          opt.value = goal.at || '';
+          opt.textContent = goal.label || goal.at || 'Gól';
+          disallowedTargetSelect.appendChild(opt);
+        });
+      }
+
+      function openDisallowedPick(eventKey, trigger) {
+        currentDisallowedKey = eventKey || 'disallowed_goal_home';
+        var scopedGoals = currentDisallowedKey === 'disallowed_goal_away' ? awayGoals : homeGoals;
+        fillDisallowedGoals(scopedGoals.length ? scopedGoals : allGoals);
+        disallowedPickModal.hidden = false;
+        disallowedPickModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('match-manage-modal-open');
+        window.setTimeout(function () {
+          if (disallowedTargetSelect) disallowedTargetSelect.focus();
+        }, 0);
+      }
+
+      function closeDisallowedPick() {
+        disallowedPickModal.hidden = true;
+        disallowedPickModal.setAttribute('aria-hidden', 'true');
+      }
+
+      function openDisallowedDetails() {
+        var selectedAt = disallowedTargetSelect ? String(disallowedTargetSelect.value || '').trim() : '';
+        if (!selectedAt) return;
+        if (disallowedEventKeyInput) disallowedEventKeyInput.value = currentDisallowedKey;
+        setEventFormAction(disallowedDetailsForm, currentDisallowedKey);
+        if (disallowedTargetAtInput) disallowedTargetAtInput.value = selectedAt;
+        if (disallowedReasonInput) disallowedReasonInput.value = '';
+        if (disallowedVarCheckbox) disallowedVarCheckbox.checked = false;
+        closeDisallowedPick();
+        disallowedDetailsModal.hidden = false;
+        disallowedDetailsModal.setAttribute('aria-hidden', 'false');
+        window.setTimeout(function () {
+          if (disallowedReasonInput) disallowedReasonInput.focus();
+        }, 0);
+      }
+
+      function closeDisallowedDetails() {
+        disallowedDetailsModal.hidden = true;
+        disallowedDetailsModal.setAttribute('aria-hidden', 'true');
+        if (disallowedPickModal.hidden) {
+          document.body.classList.remove('match-manage-modal-open');
+        }
+      }
+
+      document.querySelectorAll('[data-disallowed-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openDisallowedPick(btn.getAttribute('data-disallowed-open') || 'disallowed_goal_home', btn);
+        });
+      });
+
+      disallowedPickModal.querySelectorAll('[data-disallowed-pick-close]').forEach(function (el) {
+        el.addEventListener('click', function () {
+          closeDisallowedPick();
+          document.body.classList.remove('match-manage-modal-open');
+        });
+      });
+
+      disallowedDetailsModal.querySelectorAll('[data-disallowed-details-close]').forEach(function (el) {
+        el.addEventListener('click', closeDisallowedDetails);
+      });
+
+      if (disallowedPickNext) {
+        disallowedPickNext.addEventListener('click', openDisallowedDetails);
+      }
+    }
+
+    document.querySelectorAll('.match-manage-modal__form').forEach(function (form) {
+      var actionInput = form.querySelector('input[name="action"]');
+      if (!actionInput || actionInput.value !== 'add_match_event') return;
+      form.addEventListener('submit', function () {
+        var keyInput = form.querySelector('input[name="mk"]');
+        if (!keyInput || String(keyInput.value || '').trim()) return;
+        var fallback = form.getAttribute('data-default-event-key');
+        if (fallback) keyInput.value = fallback;
+      });
+    });
+
+    var firstHalfModal = document.getElementById('match-first-half-extra-modal');
+    var liveClock = document.querySelector('.match-board-manage__live-clock[data-match-live-clock]');
+    if (!firstHalfModal || !liveClock) return;
+
+    var extraTitle = document.getElementById('match-first-half-extra-title');
+    var extraActionInput = document.getElementById('match-extra-action');
+    var firstHalfLastFocus = null;
+    var firstHalfMinutesInput = firstHalfModal.querySelector('[data-first-half-extra-minutes]');
+    var firstHalfModeInputs = firstHalfModal.querySelectorAll('[data-first-half-extra-mode]');
+    var startedAt = liveClock.getAttribute('data-match-live-clock');
+    var startMs = Date.parse(startedAt || '');
+    if (!Number.isFinite(startMs)) return;
+
+    var firstHalfSet = liveClock.getAttribute('data-match-live-clock-first-half-set') === '1';
+    var secondHalfSet = liveClock.getAttribute('data-match-live-clock-second-half-set') === '1';
+    var firstHalfShown = false;
+    var secondHalfShown = false;
+    var currentHalfPhase = 1;
+
+    function syncFirstHalfMinutesState() {
+      var selected = firstHalfModal.querySelector('[data-first-half-extra-mode]:checked');
+      var enableMinutes = !selected || selected.value === 'set';
+      if (firstHalfMinutesInput) firstHalfMinutesInput.disabled = !enableMinutes;
+    }
+
+    function openExtraModal(halfPhase, trigger) {
+      if (halfPhase === 1 && (firstHalfSet || firstHalfShown)) return;
+      if (halfPhase === 2 && (secondHalfSet || secondHalfShown)) return;
+      currentHalfPhase = halfPhase === 2 ? 2 : 1;
+      if (currentHalfPhase === 1) firstHalfShown = true;
+      if (currentHalfPhase === 2) secondHalfShown = true;
+      firstHalfLastFocus = trigger || null;
+      if (extraActionInput) extraActionInput.value = currentHalfPhase === 2 ? 'save_second_half_extra' : 'save_first_half_extra';
+      if (extraTitle) extraTitle.textContent = currentHalfPhase === 2 ? 'Nastavení 2. poločasu' : 'Nastavení 1. poločasu';
+      firstHalfModal.hidden = false;
+      firstHalfModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('match-manage-modal-open');
+      syncFirstHalfMinutesState();
+      window.setTimeout(function () {
+        if (firstHalfMinutesInput && !firstHalfMinutesInput.disabled) firstHalfMinutesInput.focus();
+      }, 0);
+    }
+
+    function closeFirstHalfModal() {
+      firstHalfModal.hidden = true;
+      firstHalfModal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('match-manage-modal-open');
+      if (firstHalfLastFocus && typeof firstHalfLastFocus.focus === 'function') firstHalfLastFocus.focus();
+    }
+
+    firstHalfModal.querySelectorAll('[data-first-half-extra-close]').forEach(function (el) {
+      el.addEventListener('click', closeFirstHalfModal);
+    });
+
+    firstHalfModeInputs.forEach(function (input) {
+      input.addEventListener('change', syncFirstHalfMinutesState);
+    });
+
+    var clockEditModal = document.getElementById('match-clock-edit-modal');
+    if (clockEditModal) {
+      var clockEditForm = document.getElementById('match-clock-edit-form');
+      var clockEditMinuteInput = document.getElementById('match-clock-edit-minute');
+      var clockEditPreview = document.getElementById('match-clock-edit-preview');
+      var clockEditLive = document.getElementById('match-clock-edit-live');
+      var clockEditLastFocus = null;
+      var clockEditLiveTicker = null;
+
+      function pad2(n) { return String(n).padStart(2, '0'); }
+
+      function tickClockEditLive() {
+        if (!clockEditLive) return;
+        var elapsed = Date.now() - startMs;
+        var totalSec = Math.max(0, Math.floor(elapsed / 1000));
+        var min = Math.floor(totalSec / 60);
+        var sec = totalSec % 60;
+        clockEditLive.textContent = min + ':' + pad2(sec);
+      }
+
+      function formatClockPreview(mins) {
+        if (mins == null || isNaN(mins) || mins < 0) return '-';
+        return Math.floor(mins) + ':00';
+      }
+
+      function updateClockPreview() {
+        if (!clockEditMinuteInput || !clockEditPreview) return;
+        var v = parseInt(clockEditMinuteInput.value, 10);
+        clockEditPreview.textContent = Number.isFinite(v) && v >= 0 ? formatClockPreview(v) : '-';
+      }
+
+      function openClockEditModal(trigger) {
+        clockEditLastFocus = trigger || null;
+        if (clockEditMinuteInput) {
+          var elapsed = Date.now() - startMs;
+          var currentMin = Math.max(0, Math.floor(elapsed / 60000));
+          clockEditMinuteInput.value = currentMin;
+        }
+        updateClockPreview();
+        tickClockEditLive();
+        clockEditModal.hidden = false;
+        clockEditModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('match-manage-modal-open');
+        clockEditLiveTicker = window.setInterval(tickClockEditLive, 1000);
+        window.setTimeout(function () {
+          if (clockEditMinuteInput) clockEditMinuteInput.focus();
+        }, 0);
+      }
+
+      function closeClockEditModal() {
+        if (clockEditLiveTicker) { window.clearInterval(clockEditLiveTicker); clockEditLiveTicker = null; }
+        clockEditModal.hidden = true;
+        clockEditModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('match-manage-modal-open');
+        if (clockEditLastFocus && typeof clockEditLastFocus.focus === 'function') clockEditLastFocus.focus();
+      }
+
+      document.querySelectorAll('[data-clock-edit-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () { openClockEditModal(btn); });
+      });
+
+      clockEditModal.querySelectorAll('[data-clock-edit-close]').forEach(function (el) {
+        el.addEventListener('click', closeClockEditModal);
+      });
+
+      if (clockEditMinuteInput) {
+        clockEditMinuteInput.addEventListener('input', updateClockPreview);
+      }
+
+      document.addEventListener('keydown', function (e) {
+        if (clockEditModal.hidden) return;
+        if (e.key === 'Escape') { e.preventDefault(); closeClockEditModal(); }
+      });
+    }
+
+    var firstHalfTimer = window.setInterval(function () {
+      var elapsedMs = Date.now() - startMs;
+      if (elapsedMs >= 90 * 60 * 1000 && !secondHalfSet && !secondHalfShown) {
+        openExtraModal(2);
+        return;
+      }
+      if (elapsedMs >= 45 * 60 * 1000 && elapsedMs < 90 * 60 * 1000 && !firstHalfSet && !firstHalfShown) {
+        openExtraModal(1);
+      }
+    }, 1000);
+  })();
+</script>
+<% } %>
+
+<% if (_canPostpone || _canCancel) { %>
+<div
+  id="match-action-modal"
+  class="match-manage-modal"
+  hidden
+  aria-hidden="true"
+  role="presentation"
+>
+  <div class="match-manage-modal__backdrop" data-match-action-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="match-manage-modal__panel card-11"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="match-action-modal-title"
+  >
+    <h2 id="match-action-modal-title" class="match-manage-modal__title text-lg font-semibold text-white"></h2>
+    <form method="post" action="/administrace/zapasy/seznam" class="match-manage-modal__form mt-4 space-y-4">
+      <input type="hidden" name="action" id="match-action-modal-action" value="" />
+      <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+      <input type="hidden" name="page" value="<%= _page %>" />
+      <div>
+        <label for="match-action-modal-reason" class="match-manage-modal__label text-xs text-11muted" id="match-action-modal-reason-label">Důvod</label>
+        <textarea
+          id="match-action-modal-reason"
+          name="reason"
+          rows="4"
+          placeholder="Napište důvod…"
+          class="input-11 mt-1 w-full resize-y rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white placeholder:text-11muted"
+        ></textarea>
+      </div>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5"
+          data-match-action-close
+        >
+          Zavřít
+        </button>
+        <button
+          type="submit"
+          id="match-action-modal-submit"
+          class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg"
+        >
+          Potvrdit
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var modal = document.getElementById('match-action-modal');
+    if (!modal) return;
+
+    var titleEl = document.getElementById('match-action-modal-title');
+    var actionInput = document.getElementById('match-action-modal-action');
+    var reasonLabel = document.getElementById('match-action-modal-reason-label');
+    var reasonInput = document.getElementById('match-action-modal-reason');
+    var submitBtn = document.getElementById('match-action-modal-submit');
+    var panel = modal.querySelector('.match-manage-modal__panel');
+    var lastFocus = null;
+
+    function openModal(btn) {
+      if (!btn) return;
+      lastFocus = btn;
+      actionInput.value = btn.getAttribute('data-match-action-open') || '';
+      titleEl.textContent = btn.getAttribute('data-match-action-title') || '';
+      reasonLabel.textContent = btn.getAttribute('data-match-action-label') || 'Důvod';
+      submitBtn.textContent = btn.getAttribute('data-match-action-submit') || 'Potvrdit';
+      reasonInput.value = '';
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('match-manage-modal-open');
+      window.setTimeout(function () {
+        reasonInput.focus();
+      }, 0);
+    }
+
+    function closeModal() {
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('match-manage-modal-open');
+      if (lastFocus && typeof lastFocus.focus === 'function') {
+        lastFocus.focus();
+      }
+    }
+
+    document.querySelectorAll('[data-match-action-open]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openModal(btn);
+      });
+    });
+
+    modal.querySelectorAll('[data-match-action-close]').forEach(function (el) {
+      el.addEventListener('click', closeModal);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (modal.hidden) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeModal();
+      }
+    });
+
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal.querySelector('.match-manage-modal__backdrop')) {
+        closeModal();
+      }
+    });
+  })();
+</script>
+<% } %>

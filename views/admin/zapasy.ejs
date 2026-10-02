@@ -1,0 +1,162 @@
+<%- include('../partials/admin-layout-start') %>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">Zápasy</h1>
+  <p class="mt-1 text-sm text-11muted">
+    Správa utkání (samostatná funkce, nezávislá na článcích v sekci <a href="/zapasy" class="text-11accent hover:underline" target="_blank" rel="noopener noreferrer">/zapasy</a>).
+    Utkání se stavem „Probíhá“ se zobrazí v <a href="/zapasy/live" class="text-11accent hover:underline" target="_blank" rel="noopener noreferrer">seznamu zápasů</a>.
+  </p>
+</div>
+
+<% if (error) { %><p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p><% } %>
+<% if (success) { %><p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p><% } %>
+
+<section class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white"><%= editingItem ? 'Upravit zápas' : 'Přidat zápas' %></h2>
+  <form class="mt-4 grid gap-3 sm:grid-cols-2" method="post" action="/administrace/zapasy">
+    <input type="hidden" name="action" value="<%= editingItem ? 'update' : 'create' %>" />
+    <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+    <% if (editingItem) { %><input type="hidden" name="id" value="<%= editingItem.id %>" /><% } %>
+
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Soutěž</label>
+      <input name="competition" value="<%= (editingItem && editingItem.competition) || '' %>" placeholder="např. Chance Liga" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="text-xs text-11muted">Domácí tým *</label>
+      <input name="home_team" required value="<%= (editingItem && editingItem.home_team) || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="text-xs text-11muted">Hostující tým *</label>
+      <input name="away_team" required value="<%= (editingItem && editingItem.away_team) || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="text-xs text-11muted">Datum a čas</label>
+      <input name="kickoff_at" type="datetime-local" value="<%= kickoffInputValue || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="text-xs text-11muted">Stav</label>
+      <select name="status" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white">
+        <% (statusOptions || []).forEach(function (s) { %>
+        <option value="<%= s %>" <%= ((editingItem && editingItem.status) || 'Nadcházející') === s ? 'selected' : '' %>><%= s %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div>
+      <label class="text-xs text-11muted">Skóre domácí</label>
+      <input name="home_score" type="number" min="0" max="99" value="<%= editingItem && editingItem.home_score != null ? editingItem.home_score : '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="text-xs text-11muted">Skóre hosté</label>
+      <input name="away_score" type="number" min="0" max="99" value="<%= editingItem && editingItem.away_score != null ? editingItem.away_score : '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Místo / stadion</label>
+      <input name="venue" value="<%= (editingItem && editingItem.venue) || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Vlastní popisek termínu (volitelně)</label>
+      <input name="kickoff_label" value="<%= (editingItem && editingItem.kickoff_label) || '' %>" placeholder="přepíše automatický formát z data" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Odkaz (preview, live, článek…)</label>
+      <input name="preview_url" value="<%= (editingItem && editingItem.preview_url) || '' %>" placeholder="https://..." class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted">Poznámka</label>
+      <input name="note" value="<%= (editingItem && editingItem.note) || '' %>" placeholder="např. přímý přenos na Voyo" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+        <input type="checkbox" name="is_published" value="1" <%= editingItem ? (editingItem.is_published ? 'checked' : '') : 'checked' %> />
+        Zveřejnit na webu
+      </label>
+    </div>
+    <div class="sm:col-span-2 flex flex-wrap gap-2">
+      <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg"><%= editingItem ? 'Uložit změny' : 'Přidat zápas' %></button>
+      <% if (editingItem) { %>
+      <a href="<%= (pagination && pagination.page && pagination.page > 1) ? ('/administrace/zapasy?page=' + pagination.page) : '/administrace/zapasy' %>" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5">Zrušit úpravu</a>
+      <% } %>
+    </div>
+  </form>
+</section>
+
+<section id="zapasy-admin-list" class="mt-8 space-y-3">
+  <h2 class="text-xs font-semibold uppercase tracking-wider text-11muted">Aktuální zápasy</h2>
+  <% if (!(items && items.length)) { %>
+  <p class="text-sm text-11muted">Zatím žádné zápasy.</p>
+  <% } %>
+  <% (items || []).forEach(function (item, index) { %>
+  <article class="card-11 flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+    <span class="text-sm font-semibold text-11accent"><%= index + 1 + ((pagination.page - 1) * pagination.perPage) %></span>
+    <div class="min-w-0 flex-1">
+      <p class="text-sm font-semibold text-white">
+        <%= item.home_team %>
+        <% if (item.home_score != null && item.away_score != null) { %>
+        <span class="text-11accent"><%= item.home_score %> : <%= item.away_score %></span>
+        <% } else { %>
+        <span class="text-11muted">vs</span>
+        <% } %>
+        <%= item.away_team %>
+      </p>
+      <p class="mt-1 text-xs text-11muted">
+        <% if (item.competition) { %><span><%= item.competition %></span><% } %>
+        <% if (item.status) { %><span> · <%= item.status %></span><% } %>
+        <% if (item.kickoff_label || item.kickoff_at) { %><span> · <%= item.kickoff_label || item.kickoff_at %></span><% } %>
+        <% if (item.is_published) { %><span class="text-emerald-300"> · zveřejněno</span><% } else { %><span class="text-amber-300"> · skryto</span><% } %>
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/administrace/zapasy?edit=<%= item.id %><%= (pagination && pagination.page && pagination.page > 1) ? ('&page=' + pagination.page) : '' %>" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10">Upravit</a>
+      <form method="post" action="/administrace/zapasy">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="move_up" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-30" <%= index === 0 && pagination.page === 1 ? 'disabled' : '' %>>↑</button>
+      </form>
+      <form method="post" action="/administrace/zapasy">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="move_down" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-30" <%= index === items.length - 1 && pagination.page === pagination.totalPages ? 'disabled' : '' %>>↓</button>
+      </form>
+      <form method="post" action="/administrace/zapasy" onsubmit="return confirm('Odebrat zápas?');">
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <input type="hidden" name="action" value="delete" />
+        <input type="hidden" name="page" value="<%= (pagination && pagination.page) || 1 %>" />
+        <button type="submit" class="rounded-lg px-2.5 py-2 text-sm text-red-300 hover:bg-red-500/10">Smazat</button>
+      </form>
+    </div>
+  </article>
+  <% }); %>
+</section>
+
+<% if (pagination && pagination.totalPages > 1) { %>
+<nav class="mt-6 flex flex-wrap items-center justify-center gap-2" aria-label="Stránkování zápasů">
+  <% if (pagination.hasPrev) { %>
+  <a href="<%= pagination.prevUrl %>#zapasy-admin-list" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 hover:border-11accent/40 hover:text-white">Předchozí</a>
+  <% } %>
+  <% pagination.pages.forEach(function (p) { %>
+  <% if (p.current) { %>
+  <span class="rounded-lg border border-11accent/40 bg-11accent/10 px-3 py-1.5 text-sm font-semibold text-11accent"><%= p.n %></span>
+  <% } else { %>
+  <a href="<%= p.url %>#zapasy-admin-list" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 hover:border-11accent/40 hover:text-white"><%= p.n %></a>
+  <% } %>
+  <% }); %>
+  <% if (pagination.hasNext) { %>
+  <a href="<%= pagination.nextUrl %>#zapasy-admin-list" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 hover:border-11accent/40 hover:text-white">Další</a>
+  <% } %>
+</nav>
+<% } %>
+
+<script>
+  (function () {
+    var page = <%= (pagination && pagination.page) || 1 %>;
+    if (page > 1 || window.location.hash === '#zapasy-admin-list') {
+      var el = document.getElementById('zapasy-admin-list');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  })();
+</script>
+
+<%- include('../partials/admin-layout-end') %>

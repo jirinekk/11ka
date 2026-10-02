@@ -1,0 +1,136 @@
+<%- include('../partials/admin-layout-start') %>
+<%
+  var form = typeof formValues !== 'undefined' && formValues ? formValues : {};
+  var preview = typeof draftPreview !== 'undefined' ? draftPreview : null;
+  var authorsList = typeof authors !== 'undefined' && authors ? authors : [];
+  var cats = typeof categories !== 'undefined' && categories ? categories : [];
+  var configured = typeof aiConfigured !== 'undefined' ? aiConfigured : false;
+%>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">AI návrh článku</h1>
+  <p class="mt-1 text-sm text-11muted">
+    Vložte vlastní podklad (brief, tiskovku, fakta). AI z něj připraví koncept - pak upravíte a vydáte v editoru.
+  </p>
+  <%- include('../partials/admin-ai-nav', { aiTab: 'navrh' }) %>
+</div>
+
+<% if (typeof error !== 'undefined' && error) { %>
+<p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"><%= error %></p>
+<% } %>
+<% if (typeof success !== 'undefined' && success) { %>
+<p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"><%= success %></p>
+<% } %>
+
+<% if (!configured) { %>
+<p class="mt-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+  AI návrh není nastavený. <%= typeof aiSetupHint !== 'undefined' && aiSetupHint ? aiSetupHint : 'Doplňte konfiguraci v .env.' %>
+</p>
+<% } %>
+
+<section class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white">1. Podklad</h2>
+  <p class="mt-1 text-sm text-11muted">Sem patří jen text, ke kterému máte právo ho použít. Nevkládejte celé cizí články ke kopírování.</p>
+
+  <form method="post" action="/administrace/ai-navrhy" class="mt-5 space-y-4">
+    <input type="hidden" name="action" value="generate" />
+
+    <div>
+      <label class="text-xs text-11muted" for="brief">Podklad / fakta</label>
+      <textarea
+        id="brief"
+        name="brief"
+        required
+        minlength="40"
+        rows="12"
+        placeholder="Např. co se stalo, kdo skóroval, citace, kontext…"
+        class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+      ><%= form.brief || '' %></textarea>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div>
+        <label class="text-xs text-11muted" for="source_note">Zdroj (volitelné)</label>
+        <input
+          id="source_note"
+          name="source_note"
+          type="text"
+          value="<%= form.source_note || '' %>"
+          placeholder="např. tisková zpráva klubu / vlastní reportáž"
+          class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+        />
+      </div>
+      <div>
+        <label class="text-xs text-11muted" for="category">Rubrika</label>
+        <select id="category" name="category" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white">
+          <% cats.forEach(function (c) { %>
+          <option value="<%= c %>" <%= form.category === c ? 'selected' : '' %>><%= c %></option>
+          <% }); %>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label class="text-xs text-11muted" for="author_id">Autor článku</label>
+      <select id="author_id" name="author_id" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white">
+        <% authorsList.forEach(function (u) { %>
+        <option value="<%= u.id %>" <%= String(form.author_id) === String(u.id) ? 'selected' : '' %>>
+          <%= u.display_name || u.email %><%= u.email ? ' (' + u.email + ')' : '' %>
+        </option>
+        <% }); %>
+      </select>
+    </div>
+
+    <button
+      type="submit"
+      class="rounded-xl bg-11accent px-4 py-2.5 text-sm font-semibold text-11bg transition hover:brightness-110 disabled:opacity-50"
+      <%= configured ? '' : 'disabled' %>
+    >
+      Vygenerovat návrh
+    </button>
+  </form>
+</section>
+
+<% if (preview) { %>
+<section class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white">2. Návrh AI</h2>
+  <p class="mt-1 text-sm text-11muted">Zkontrolujte text. Po uložení se otevře běžný editor - tam doplníte fotku a doladíte článek.</p>
+
+  <div class="mt-5 space-y-4">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-11muted">Titulek</p>
+      <p class="mt-1 text-xl font-bold text-white"><%= preview.title %></p>
+    </div>
+    <% if (preview.excerpt) { %>
+    <div>
+      <p class="text-xs uppercase tracking-wide text-11muted">Perex</p>
+      <p class="mt-1 text-sm leading-relaxed text-slate-300"><%= preview.excerpt %></p>
+    </div>
+    <% } %>
+    <% if (preview.sources) { %>
+    <div>
+      <p class="text-xs uppercase tracking-wide text-11muted">Zdroj</p>
+      <p class="mt-1 text-sm text-slate-300"><%= preview.sources %></p>
+    </div>
+    <% } %>
+    <div>
+      <p class="text-xs uppercase tracking-wide text-11muted">Text</p>
+      <div class="mt-2 space-y-3 text-sm leading-relaxed text-slate-200">
+        <% (preview.paragraphs || []).forEach(function (p) { %>
+        <p><%= p %></p>
+        <% }); %>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" action="/administrace/ai-navrhy" class="mt-6 flex flex-wrap gap-3">
+    <input type="hidden" name="action" value="create" />
+    <button type="submit" class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-400">
+      Uložit jako koncept a otevřít editor
+    </button>
+    <a href="/administrace/ai-navrhy?reset=1" class="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-slate-300 hover:text-white">Zahodit návrh</a>
+  </form>
+</section>
+<% } %>
+
+<%- include('../partials/admin-layout-end') %>

@@ -1,0 +1,17 @@
+<% if (pagination && pagination.totalPages > 1) { %>
+<nav class="mt-6 flex flex-wrap items-center justify-center gap-2" aria-label="Stránkování">
+  <% if (pagination.hasPrev) { %>
+  <a href="<%= pagination.prevUrl %><%= listAnchor || '' %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 hover:border-11accent/40 hover:text-white">Předchozí</a>
+  <% } %>
+  <% pagination.pages.forEach(function (p) { %>
+  <% if (p.current) { %>
+  <span class="rounded-lg border border-11accent/40 bg-11accent/10 px-3 py-1.5 text-sm font-semibold text-11accent"><%= p.n %></span>
+  <% } else { %>
+  <a href="<%= p.url %><%= listAnchor || '' %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 hover:border-11accent/40 hover:text-white"><%= p.n %></a>
+  <% } %>
+  <% }); %>
+  <% if (pagination.hasNext) { %>
+  <a href="<%= pagination.nextUrl %><%= listAnchor || '' %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 hover:border-11accent/40 hover:text-white">Další</a>
+  <% } %>
+</nav>
+<% } %>

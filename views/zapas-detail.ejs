@@ -1,0 +1,71 @@
+<%- include('partials/header') %>
+
+<main id="main-content" class="flex-1" tabindex="-1">
+  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+    <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <div class="min-w-0 space-y-6">
+        <header>
+          <a href="/zapasy/live" class="text-sm text-11muted transition hover:text-11accent">← Zpět na seznam zápasů</a>
+          <h1 class="sr-only"><%= pageTitle %></h1>
+        </header>
+        <div class="mx-auto w-full max-w-5xl">
+          <%- include('partials/match-fixture-detail', { fixture: fixture, showBoard: true, showEvents: false }) %>
+        </div>
+
+        <div class="flex flex-wrap gap-2" data-match-detail-tabs>
+          <button type="button" class="tag-pill tag-pill--sm tag-pill--active" data-match-tab="overview">Přehled</button>
+          <button type="button" class="tag-pill tag-pill--sm" data-match-tab="lineup">Sestava</button>
+        </div>
+
+        <div data-match-panel="overview">
+          <%- include('partials/match-fixture-detail', { fixture: fixture, showBoard: false, showEvents: true }) %>
+          <% if (fixture.managedBy && (fixture.status === 'Odehráno' || fixture.status === 'Kontumace')) { %>
+          <p class="match-overview-managed-by">
+            Tento zápas spravoval <%= fixture.managedBy %>
+          </p>
+          <% } %>
+        </div>
+
+        <div data-match-panel="lineup" class="hidden">
+          <%- include('partials/match-fixture-lineup', { fixture: fixture }) %>
+        </div>
+      </div>
+
+      <aside class="space-y-6 lg:sticky lg:top-24">
+        <%- include('partials/sidebar-ssp-ad') %>
+
+        <%- include('partials/sidebar-social') %>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<script>
+  (function () {
+    var root = document.querySelector('[data-match-detail-tabs]');
+    if (!root) return;
+    var tabs = root.querySelectorAll('[data-match-tab]');
+    var panels = document.querySelectorAll('[data-match-panel]');
+    if (!tabs.length || !panels.length) return;
+
+    function setActive(tabName) {
+      tabs.forEach(function (tab) {
+        var active = tab.getAttribute('data-match-tab') === tabName;
+        tab.classList.toggle('tag-pill--active', active);
+      });
+      panels.forEach(function (panel) {
+        var active = panel.getAttribute('data-match-panel') === tabName;
+        panel.classList.toggle('hidden', !active);
+      });
+    }
+
+    root.addEventListener('click', function (event) {
+      var tab = event.target.closest('[data-match-tab]');
+      if (!tab) return;
+      event.preventDefault();
+      setActive(tab.getAttribute('data-match-tab'));
+    });
+  })();
+</script>
+
+<%- include('partials/footer') %>

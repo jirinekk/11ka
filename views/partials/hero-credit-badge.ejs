@@ -1,0 +1,9 @@
+<% var creditText = typeof credit !== 'undefined' ? credit : ''; %>
+<% if (!creditText) { return; } %>
+<span class="btn-11 btn-11--sm hero-credit-badge">
+  <svg class="hero-credit-badge__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+    <path d="M10.9 8.32c-1.79 0-3.17 1.41-3.17 3.13s1.38 3.13 3.17 3.13c1.27 0 2.4-.62 2.96-1.63l-1.32-.69c-.32.62-.92 1.06-1.64 1.06-.98 0-1.67-.73-1.67-1.77s.69-1.77 1.67-1.77c.72 0 1.32.44 1.64 1.06l1.32-.69c-.56-1.01-1.69-1.63-2.96-1.63z"/>
+  </svg>
+  <span class="hero-credit-badge__text"><%= creditText %></span>
+</span>

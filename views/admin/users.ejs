@@ -1,0 +1,156 @@
+<%- include('../partials/admin-layout-start') %>
+<%
+  var labels = typeof roleLabels !== 'undefined' && roleLabels ? roleLabels : {
+    vedeni: 'Vedení',
+    sefredaktor: 'Šéfredaktor',
+    redaktor: 'Redaktor',
+    spravce_akreditace: 'Správce Akreditace',
+  };
+  var roleList = typeof roles !== 'undefined' && roles && roles.length
+    ? roles
+    : ['vedeni', 'sefredaktor', 'redaktor', 'spravce_akreditace'];
+  var roleCounts = {};
+  roleList.forEach(function (r) { roleCounts[r] = 0; });
+  users.forEach(function (u) {
+    var ur = (u.roles && u.roles.length) ? u.roles : (u.role ? [u.role] : []);
+    ur.forEach(function (r) {
+      if (roleCounts[r] != null) roleCounts[r] += 1;
+    });
+  });
+  function userHas(u, r) {
+    if (u.roles && u.roles.length) return u.roles.indexOf(r) !== -1;
+    return u.role === r;
+  }
+%>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">Uživatelé</h1>
+  <p class="mt-1 text-sm text-11muted">Správa účtů a rolí · uživatel může mít více práv najednou · bio schvalujte v sekci <a href="/administrace/bio" class="text-11accent hover:underline">Bio</a></p>
+</div>
+
+<% if (error) { %><p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p><% } %>
+<% if (success) { %><p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p><% } %>
+
+<section class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+  <div class="card-11 p-4">
+    <p class="text-xs uppercase tracking-wide text-11muted">Majitel</p>
+    <p class="mt-1 text-2xl font-bold text-white"><%= roleCounts.majitel || 0 %></p>
+  </div>
+  <div class="card-11 p-4">
+    <p class="text-xs uppercase tracking-wide text-11muted">Vedení</p>
+    <p class="mt-1 text-2xl font-bold text-white"><%= roleCounts.vedeni %></p>
+  </div>
+  <div class="card-11 p-4">
+    <p class="text-xs uppercase tracking-wide text-11muted">Šéfredaktoři</p>
+    <p class="mt-1 text-2xl font-bold text-white"><%= roleCounts.sefredaktor %></p>
+  </div>
+  <div class="card-11 p-4">
+    <p class="text-xs uppercase tracking-wide text-11muted">Redaktoři</p>
+    <p class="mt-1 text-2xl font-bold text-white"><%= roleCounts.redaktor %></p>
+  </div>
+  <div class="card-11 p-4">
+    <p class="text-xs uppercase tracking-wide text-11muted">Správci akreditace</p>
+    <p class="mt-1 text-2xl font-bold text-white"><%= roleCounts.spravce_akreditace %></p>
+  </div>
+</section>
+
+<section class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white">Nový uživatel</h2>
+  <p class="mt-1 text-sm text-11muted">Vytvořte účet a zaškrtněte jednu nebo více rolí. Např. Redaktor + Správce Akreditace. Samostatný Správce Akreditace vidí v adminu jen sekci Akreditace a nezobrazuje se na stránce Redakce.</p>
+  <form class="mt-4 grid gap-3 sm:grid-cols-2" method="post" action="/administrace/uzivatele">
+    <input type="hidden" name="action" value="create" />
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted" for="n-email">E-mail</label>
+      <input id="n-email" name="email" type="email" required class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted" for="n-pass">Počáteční heslo</label>
+      <input id="n-pass" name="password" type="password" required minlength="8" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <p class="text-xs text-11muted">Role</p>
+      <div class="mt-2 flex flex-wrap gap-3">
+        <% roleList.forEach(function (r) { %>
+        <label class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-slate-200">
+          <input type="checkbox" name="roles" value="<%= r %>" class="rounded border-white/20 bg-[#0b1220] text-11accent focus:ring-11accent/40" <%= r === 'redaktor' ? 'checked' : '' %> />
+          <span><%= labels[r] || r %></span>
+        </label>
+        <% }); %>
+      </div>
+    </div>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted" for="n-name">Jméno (volitelné)</label>
+      <input id="n-name" name="display_name" type="text" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+    </div>
+    <div class="sm:col-span-2">
+      <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">Vytvořit</button>
+    </div>
+  </form>
+</section>
+
+<section class="card-11 mt-8 p-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-lg font-semibold text-white">Seznam uživatelů</h2>
+    <p class="text-sm text-11muted">Celkem: <span class="font-semibold text-white"><%= users.length %></span></p>
+  </div>
+  <div class="mt-5 space-y-4">
+    <% users.forEach(function (u) { %>
+    <article class="rounded-xl border border-white/10 bg-[#111827]/55 p-4">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+        <p class="break-all text-sm font-medium text-white"><%= u.email %></p>
+        <div class="flex flex-wrap items-center gap-2">
+          <% var ur = (u.roles && u.roles.length) ? u.roles : (u.role ? [u.role] : []); %>
+          <% ur.forEach(function (r) { %>
+          <span class="rounded-full border border-11accent/40 bg-11accent/10 px-2.5 py-1 text-xs font-semibold text-11accent"><%= labels[r] || r %></span>
+          <% }); %>
+          <% if (u.id === currentUser.id) { %>
+          <span class="rounded-full border border-white/20 px-2.5 py-1 text-xs text-slate-300">Vy</span>
+          <% } %>
+        </div>
+      </div>
+
+      <form method="post" action="/administrace/uzivatele" class="grid gap-3 sm:grid-cols-2">
+        <input type="hidden" name="id" value="<%= u.id %>" />
+        <div class="sm:col-span-2">
+          <label class="text-xs text-11muted">E-mail</label>
+          <input name="email" type="email" value="<%= u.email %>" class="input-11 mt-1 w-full rounded-lg border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div class="sm:col-span-2">
+          <p class="text-xs text-11muted">Role</p>
+          <div class="mt-2 flex flex-wrap gap-3">
+            <% roleList.forEach(function (r) { %>
+            <label class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-slate-200">
+              <input type="checkbox" name="roles" value="<%= r %>" class="rounded border-white/20 bg-[#0b1220] text-11accent focus:ring-11accent/40" <%= userHas(u, r) ? 'checked' : '' %> />
+              <span><%= labels[r] || r %></span>
+            </label>
+            <% }); %>
+          </div>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-xs text-11muted">Jméno</label>
+          <input name="display_name" type="text" value="<%= u.display_name || '' %>" placeholder="Např. Jan Novák" class="input-11 mt-1 w-full rounded-lg border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-xs text-11muted">Nové heslo (volitelné)</label>
+          <input name="password" type="password" placeholder="Nechte prázdné pro beze změny" class="input-11 mt-1 w-full rounded-lg border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        </div>
+        <div class="sm:col-span-2 flex flex-wrap items-center gap-2 pt-1">
+          <button type="submit" name="action" value="update" class="rounded-lg bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/15">Uložit změny</button>
+          <% if (u.id !== currentUser.id) { %>
+          <button
+            type="submit"
+            name="action"
+            value="delete"
+            formnovalidate
+            onclick="return confirm('Opravdu smazat uživatele?');"
+            class="rounded-lg border border-red-500/40 px-3 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
+          >Smazat</button>
+          <% } %>
+        </div>
+      </form>
+    </article>
+    <% }); %>
+  </div>
+</section>
+
+<%- include('../partials/admin-layout-end') %>

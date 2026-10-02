@@ -1,0 +1,205 @@
+<%- include('../partials/admin-layout-start') %>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">Kitswapy</h1>
+  <p class="mt-1 text-sm text-11muted">
+    Max. <%= maxKitswaps %> článků - obrázek se bere z titulní fotky článku.
+  </p>
+  <p class="mt-2 text-xs text-11muted">
+    Volných míst: <strong class="text-slate-300"><%= slotsLeft %></strong> / <%= maxKitswaps %>
+  </p>
+</div>
+
+<% if (error) { %><p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p><% } %>
+<% if (success) { %><p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p><% } %>
+
+<section class="card-11 mt-8 p-6<%= slotsLeft < 1 ? ' opacity-60' : '' %>">
+  <h2 class="font-semibold text-11accent">Přidat do sidebaru</h2>
+  <% if (slotsLeft < 1) { %>
+  <p class="mt-2 text-sm text-11muted">Máte už <%= maxKitswaps %> kitswapů. Nějaký nejdřív odeberte níže.</p>
+  <% } else { %>
+  <div class="mt-4 space-y-4">
+    <div>
+      <label class="text-xs text-11muted" for="kitswap-article-q">Vyhledat článek</label>
+      <input
+        type="text"
+        id="kitswap-article-q"
+        class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted"
+        placeholder="Klíčová slova, např. sparta…"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+      />
+      <p class="mt-2 text-xs text-11muted">
+        Hledá v názvu článku. Více slov = všechna musí v názvu být (např. <span class="text-slate-400">sparta derby</span>).
+      </p>
+    </div>
+    <div
+      id="kitswap-search-results"
+      class="hidden rounded-xl border border-white/10 bg-[#0f1419] divide-y divide-white/5"
+      role="region"
+      aria-live="polite"
+      aria-label="Výsledky vyhledávání"
+    ></div>
+    <p id="kitswap-search-empty" class="hidden text-sm text-11muted">Žádný publikovaný článek neodpovídá hledání.</p>
+  </div>
+  <% } %>
+</section>
+
+<section class="mt-8 space-y-3">
+  <h2 class="text-xs font-semibold uppercase tracking-wider text-11muted">
+    Aktuální kitswapy (<%= (items || []).length %> / <%= maxKitswaps %>)
+  </h2>
+  <% if (!(items && items.length)) { %>
+  <p class="text-sm text-11muted">Zatím žádné. Vyhledejte článek výše a publikujte ho do sidebaru.</p>
+  <% } %>
+  <% (items || []).forEach(function (item, index) { %>
+  <article class="card-11 flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+    <span class="flex h-8 w-8 shrink-0 items-center justify-center text-sm font-semibold text-11accent" aria-hidden="true"><%= index + 1 %></span>
+    <img
+      src="<%= item.image_path %>"
+      alt=""
+      class="h-20 w-16 shrink-0 rounded-lg object-cover"
+      width="64"
+      height="80"
+    />
+    <div class="min-w-0 flex-1">
+      <a
+        href="/clanek/<%= encodeURIComponent(item.article_slug) %>"
+        class="text-sm font-medium text-white hover:text-11accent"
+        target="_blank"
+        rel="noopener"
+      ><%= item.article_title %></a>
+      <% if (item.article_status !== 'published') { %>
+      <p class="mt-1 text-xs text-amber-300">Článek už není publikovaný - na webu se neukáže.</p>
+      <% } %>
+    </div>
+    <div class="flex shrink-0 flex-wrap items-center gap-2">
+      <form method="post" action="/administrace/kitswapy/<%= item.id %>">
+        <input type="hidden" name="action" value="move_up" />
+        <button
+          type="submit"
+          class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-30"
+          aria-label="Posunout nahoru"
+          <%= index === 0 ? 'disabled' : '' %>
+        >↑</button>
+      </form>
+      <form method="post" action="/administrace/kitswapy/<%= item.id %>">
+        <input type="hidden" name="action" value="move_down" />
+        <button
+          type="submit"
+          class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-30"
+          aria-label="Posunout dolů"
+          <%= index === items.length - 1 ? 'disabled' : '' %>
+        >↓</button>
+      </form>
+      <form method="post" action="/administrace/kitswapy/<%= item.id %>" onsubmit="return confirm('Odebrat z sidebaru?');">
+        <input type="hidden" name="action" value="delete" />
+        <button type="submit" class="rounded-lg px-2.5 py-2 text-sm font-medium text-red-300 hover:bg-red-500/10">Odebrat</button>
+      </form>
+    </div>
+  </article>
+  <% }); %>
+</section>
+
+<% if (slotsLeft >= 1) { %>
+<script>
+  (function () {
+    var articles = <%- JSON.stringify((articlesForSearch || []).map(function (a) {
+      return { id: a.id, title: a.title, slug: a.slug };
+    })) %>;
+    var usedIds = new Set(<%- JSON.stringify(usedArticleIds || []) %>);
+    var input = document.getElementById('kitswap-article-q');
+    var results = document.getElementById('kitswap-search-results');
+    var empty = document.getElementById('kitswap-search-empty');
+    if (!input || !results) return;
+
+    var pool = articles.filter(function (a) {
+      return !usedIds.has(a.id);
+    });
+
+    function normalize(s) {
+      return String(s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function matches(title, query) {
+      var tokens = String(query || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      if (!tokens.length) return false;
+      var hay = normalize(title);
+      return tokens.every(function (tok) {
+        return hay.indexOf(normalize(tok)) !== -1;
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderHits(hits) {
+      results.innerHTML = hits
+        .map(function (a) {
+          return (
+            '<div class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">' +
+            '<a href="/clanek/' +
+            encodeURIComponent(a.slug) +
+            '" class="min-w-0 text-sm text-white hover:text-11accent" target="_blank" rel="noopener">' +
+            escapeHtml(a.title) +
+            '</a>' +
+            '<form method="post" action="/administrace/kitswapy" class="shrink-0">' +
+            '<input type="hidden" name="article_id" value="' +
+            a.id +
+            '" />' +
+            '<button type="submit" class="rounded-lg bg-11accent px-3 py-1.5 text-xs font-semibold text-11bg">Publikovat</button>' +
+            '</form></div>'
+          );
+        })
+        .join('');
+    }
+
+    function runSearch() {
+      var q = input.value.trim();
+      if (!q) {
+        results.classList.add('hidden');
+        results.innerHTML = '';
+        empty.classList.add('hidden');
+        return;
+      }
+      var hits = pool.filter(function (a) {
+        return matches(a.title, q);
+      });
+      if (!hits.length) {
+        results.classList.add('hidden');
+        results.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      results.classList.remove('hidden');
+      renderHits(hits.slice(0, 40));
+    }
+
+    var timer;
+    input.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(runSearch, 150);
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        input.value = '';
+        runSearch();
+      }
+    });
+  })();
+</script>
+<% } %>
+
+<%- include('../partials/admin-layout-end') %>

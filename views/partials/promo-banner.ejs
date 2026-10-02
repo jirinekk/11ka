@@ -1,0 +1,19 @@
+<% var banner = typeof promoBanner !== 'undefined' && promoBanner ? promoBanner : null; %>
+<% if (banner && banner.image_path && banner.link_url) { %>
+<aside class="promo-banner card-11 overflow-hidden p-0" aria-label="Reklama">
+  <a
+    href="<%= banner.link_url %>"
+    target="_blank"
+    rel="sponsored noopener noreferrer"
+    class="promo-banner__link block"
+  >
+    <img
+      src="<%= banner.image_path %>"
+      alt="<%= banner.alt || 'Reklama' %>"
+      class="promo-banner__image h-auto w-full object-cover"
+      loading="lazy"
+      decoding="async"
+    />
+  </a>
+</aside>
+<% } %>

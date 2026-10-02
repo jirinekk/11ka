@@ -1,0 +1,80 @@
+<% var _kitswaps = (typeof kitswaps !== 'undefined' && kitswaps && kitswaps.length) ? kitswaps : []; %>
+<% if (_kitswaps.length) { %>
+<div
+  class="card-11 p-4 perf-cv sidebar-kitswaps"
+  data-kitswap-carousel
+  data-count="<%= _kitswaps.length %>"
+>
+  <div class="kitswap-carousel__head">
+    <h2 class="kitswap-carousel__heading">Tip redakce</h2>
+    <% if (_kitswaps.length > 1) { %>
+    <span class="kitswap-carousel__counter" data-kitswap-counter aria-live="polite">1 / <%= _kitswaps.length %></span>
+    <% } %>
+  </div>
+  <div
+    class="kitswap-carousel"
+    role="region"
+    aria-roledescription="carousel"
+    aria-label="Tip redakce"
+  >
+    <div class="kitswap-carousel__frame">
+      <div class="kitswap-carousel__viewport">
+        <% _kitswaps.forEach(function (item, idx) { %>
+        <a
+          href="<%= item.href %>"
+          class="kitswap-carousel__slide<%= idx === 0 ? ' kitswap-carousel__slide--active' : '' %>"
+          data-kitswap-slide="<%= idx %>"
+          aria-label="<%= item.articleTitle %>"
+          <%= idx === 0 ? 'aria-current="true"' : '' %>
+        >
+          <img
+            src="<%= item.image %>"
+            alt=""
+            class="kitswap-carousel__image"
+            loading="<%= idx === 0 ? 'eager' : 'lazy' %>"
+            decoding="async"
+          />
+          <div class="kitswap-carousel__overlay">
+            <% if (item.label) { %>
+            <p class="kitswap-carousel__label"><%= item.label %></p>
+            <% } %>
+            <p class="kitswap-carousel__title"><%= item.articleTitle %></p>
+            <span class="kitswap-carousel__cta">
+              Číst článek
+              <svg class="kitswap-carousel__cta-icon" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </span>
+          </div>
+        </a>
+        <% }); %>
+        <% if (_kitswaps.length > 1) { %>
+        <div class="kitswap-carousel__progress" aria-hidden="true">
+          <span class="kitswap-carousel__progress-bar" data-kitswap-progress></span>
+        </div>
+        <% } %>
+      </div>
+    </div>
+    <% if (_kitswaps.length > 1) { %>
+    <div class="kitswap-carousel__footer">
+      <button type="button" class="kitswap-carousel__btn" data-kitswap-prev aria-label="Předchozí">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <div class="kitswap-carousel__dots" role="tablist" aria-label="Výběr článku">
+        <% _kitswaps.forEach(function (item, idx) { %>
+        <button
+          type="button"
+          class="kitswap-carousel__dot<%= idx === 0 ? ' kitswap-carousel__dot--active' : '' %>"
+          data-kitswap-dot="<%= idx %>"
+          role="tab"
+          aria-label="Slide <%= idx + 1 %> z <%= _kitswaps.length %>"
+          aria-selected="<%= idx === 0 ? 'true' : 'false' %>"
+        ></button>
+        <% }); %>
+      </div>
+      <button type="button" class="kitswap-carousel__btn" data-kitswap-next aria-label="Další">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+    <% } %>
+  </div>
+</div>
+<% } %>

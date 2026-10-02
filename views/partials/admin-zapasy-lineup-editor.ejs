@@ -1,0 +1,547 @@
+<%
+  var _page = (pagination && pagination.page) || 1;
+  var _lineup = (editingFixture && editingFixture.lineup) || {};
+  var _homeTeam = (editingFixture && editingFixture.homeTeam) || 'Domácí';
+  var _awayTeam = (editingFixture && editingFixture.awayTeam) || 'Hosté';
+  var _positionSections = ['Brankáři', 'Obránci', 'Záložníci', 'Útočníci', 'Trenér'];
+  var _lineupGroups = ['Základní sestava', 'Náhradníci', 'Hrát nebudou'];
+  if (!_lineup.home && !_lineup.away) {
+    _lineup = {
+      home: _lineupGroups.map(function (group) {
+        return {
+          group: group,
+          positions: _positionSections.map(function (section) {
+            return { section: section, players: [] };
+          }),
+        };
+      }),
+      away: _lineupGroups.map(function (group) {
+        return {
+          group: group,
+          positions: _positionSections.map(function (section) {
+            return { section: section, players: [] };
+          }),
+        };
+      }),
+    };
+  }
+%>
+
+<section class="card-11 mt-6 p-5" id="match-lineup-editor">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-base font-semibold text-white">Nastavit sestavu na zápas</h2>
+    <button type="button" class="rounded-xl border border-white/15 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/5" data-lineup-toggle>
+      Otevřít / zavřít
+    </button>
+  </div>
+
+  <form method="post" action="/administrace/zapasy/seznam" class="mt-4 hidden space-y-4" data-lineup-form>
+    <input type="hidden" name="action" value="save_lineup" />
+    <input type="hidden" name="id" value="<%= editingFixture.id %>" />
+    <input type="hidden" name="page" value="<%= _page %>" />
+    <input type="hidden" name="lineup_json" value="" data-lineup-json />
+
+    <div class="flex flex-wrap gap-3">
+      <div class="zapasy-lineup-group-picker">
+        <label class="zapasy-lineup-group-picker__label" for="match-lineup-side-select">Tým</label>
+        <div class="zapasy-lineup-group-picker__control">
+          <select
+            id="match-lineup-side-select"
+            class="zapasy-lineup-group-picker__select"
+            data-lineup-side-select
+          >
+            <option value="home"><%= _homeTeam %></option>
+            <option value="away"><%= _awayTeam %></option>
+          </select>
+        </div>
+      </div>
+      <div class="zapasy-lineup-group-picker">
+        <label class="zapasy-lineup-group-picker__label" for="match-lineup-group-select">Sekce sestavy</label>
+        <div class="zapasy-lineup-group-picker__control">
+          <select
+            id="match-lineup-group-select"
+            class="zapasy-lineup-group-picker__select"
+            data-lineup-group-select
+          >
+            <% _lineupGroups.forEach(function (groupName, idx) { %>
+            <option value="<%= idx %>"><%= groupName %></option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div data-lineup-root></div>
+
+    <div class="flex justify-end">
+      <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">Uložit sestavu</button>
+    </div>
+  </form>
+</section>
+
+<script>
+  (function () {
+    var root = document.getElementById('match-lineup-editor');
+    if (!root) return;
+
+    var toggle = root.querySelector('[data-lineup-toggle]');
+    var form = root.querySelector('[data-lineup-form]');
+    var lineupRoot = root.querySelector('[data-lineup-root]');
+    var lineupInput = root.querySelector('[data-lineup-json]');
+    var groupSelect = root.querySelector('[data-lineup-group-select]');
+    var sideSelect = root.querySelector('[data-lineup-side-select]');
+    var initialLineup = <%- JSON.stringify(_lineup) %>;
+    var lineupGroups = ['Základní sestava', 'Náhradníci', 'Hrát nebudou'];
+    var positionSections = ['Brankáři', 'Obránci', 'Záložníci', 'Útočníci', 'Trenér'];
+    var lineupSides = ['home', 'away'];
+
+    function flagFromCode(code) {
+      var c = String(code || '').trim().toUpperCase();
+      if (!/^[A-Z]{2}$/.test(c)) return '';
+      return c.replace(/./g, function (ch) {
+        return String.fromCodePoint(127397 + ch.charCodeAt(0));
+      });
+    }
+
+    function escHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function emptyPlayer(sectionName, groupName) {
+      return {
+        number: '',
+        name: '',
+        nationality: '',
+        age: '',
+        injured: false,
+        reason: groupName === 'Hrát nebudou' ? '' : null,
+        isCoach: sectionName === 'Trenér',
+      };
+    }
+
+    function normalizePositions(positions, groupName) {
+      var map = {};
+      (positions || []).forEach(function (block) {
+        if (block && block.section) map[block.section] = block.players || [];
+      });
+      return positionSections.map(function (sectionName) {
+        return {
+          section: sectionName,
+          players: (map[sectionName] || []).map(function (player) {
+            return {
+              number: player && player.number != null ? String(player.number) : '',
+              name: player && player.name ? String(player.name) : '',
+              nationality: player && player.nationality ? String(player.nationality) : '',
+              age: player && player.age != null && player.age !== '' ? String(player.age) : '',
+              injured: !!(player && player.injured),
+              reason:
+                groupName === 'Hrát nebudou'
+                  ? (player && player.reason ? String(player.reason) : '')
+                  : null,
+              isCoach: sectionName === 'Trenér',
+            };
+          }),
+        };
+      });
+    }
+
+    function isLegacyLineup(lineup) {
+      return Array.isArray(lineup) && (lineup || []).some(function (block) {
+        return block && (lineupGroups.indexOf(block.section) !== -1 || lineupGroups.indexOf(block.group) !== -1);
+      });
+    }
+
+    function migrateLegacyLineup(lineup) {
+      var map = {};
+      (lineup || []).forEach(function (block) {
+        if (block && block.section) map[block.section] = block.players || [];
+        if (block && block.group) map[block.group] = block.positions || [];
+      });
+      return lineupGroups.map(function (groupName) {
+        var legacyBlock = (lineup || []).find(function (b) { return b && b.group === groupName; });
+        if (legacyBlock && legacyBlock.positions) {
+          return { group: groupName, positions: normalizePositions(legacyBlock.positions, groupName) };
+        }
+        var legacyPlayers = map[groupName] || [];
+        var positions = positionSections.map(function (sectionName) {
+          return { section: sectionName, players: [] };
+        });
+        if (legacyPlayers.length && !Array.isArray(legacyPlayers[0])) {
+          var bucket = positions.find(function (pos) { return pos.section === 'Záložníci'; });
+          if (bucket) {
+            bucket.players = legacyPlayers.map(function (player) {
+              return {
+                number: player && player.number != null ? String(player.number) : '',
+                name: player && player.name ? String(player.name) : '',
+                nationality: player && player.nationality ? String(player.nationality) : '',
+                age: player && player.age != null && player.age !== '' ? String(player.age) : '',
+                injured: !!(player && player.injured),
+                reason: groupName === 'Hrát nebudou' ? (player && player.reason ? String(player.reason) : '') : null,
+                isCoach: false,
+              };
+            });
+          }
+        }
+        return { group: groupName, positions: positions };
+      });
+    }
+
+    function normalizeSideState(sideLineup) {
+      if (isLegacyLineup(sideLineup)) return migrateLegacyLineup(sideLineup);
+      var map = {};
+      (sideLineup || []).forEach(function (block) {
+        if (block && block.group) map[block.group] = block.positions || [];
+      });
+      return lineupGroups.map(function (groupName) {
+        return {
+          group: groupName,
+          positions: normalizePositions(map[groupName], groupName),
+        };
+      });
+    }
+
+    function normalizeState(lineup) {
+      if (lineup && lineup.home && lineup.away) {
+        return {
+          home: normalizeSideState(lineup.home),
+          away: normalizeSideState(lineup.away),
+        };
+      }
+      if (isLegacyLineup(lineup)) {
+        return {
+          home: migrateLegacyLineup(lineup),
+          away: normalizeSideState([]),
+        };
+      }
+      return {
+        home: normalizeSideState([]),
+        away: normalizeSideState([]),
+      };
+    }
+
+    function ensureDefaultRowsForSide(state) {
+      state.forEach(function (groupBlock) {
+        groupBlock.positions.forEach(function (block) {
+          if (!block.players.length) {
+            block.players.push(emptyPlayer(block.section, groupBlock.group));
+          }
+        });
+      });
+      return state;
+    }
+
+    function ensureDefaultRows(state) {
+      state.home = ensureDefaultRowsForSide(state.home);
+      state.away = ensureDefaultRowsForSide(state.away);
+      return state;
+    }
+
+    var lineupState = ensureDefaultRows(normalizeState(initialLineup));
+    var activeSide = 'home';
+    var activeGroupIdx = 0;
+
+    function getActiveSide() {
+      if (!sideSelect) return activeSide;
+      var side = sideSelect.value;
+      return side === 'away' ? 'away' : 'home';
+    }
+
+    function getActiveSideState() {
+      return lineupState[getActiveSide()] || [];
+    }
+
+    function getActiveGroupIdx() {
+      if (!groupSelect) return activeGroupIdx;
+      var idx = parseInt(groupSelect.value, 10);
+      return Number.isFinite(idx) ? idx : activeGroupIdx;
+    }
+
+    function allowNumber(groupBlock, block) {
+      return (groupBlock.group === 'Základní sestava' || groupBlock.group === 'Náhradníci') && block.section !== 'Trenér';
+    }
+
+    function getPositionBlock(groupEl, sectionEl) {
+      if (!groupEl || !sectionEl) return null;
+      var groupIdx = parseInt(groupEl.getAttribute('data-lineup-group-idx'), 10);
+      var sectionIdx = parseInt(sectionEl.getAttribute('data-lineup-section-idx'), 10);
+      if (!Number.isFinite(groupIdx) || !Number.isFinite(sectionIdx)) return null;
+      var sideState = getActiveSideState();
+      var groupBlock = sideState[groupIdx];
+      if (!groupBlock) return null;
+      return groupBlock.positions[sectionIdx] || null;
+    }
+
+    function collectFromDom(sideOverride) {
+      var side = sideOverride || getActiveSide();
+      var sideState = lineupState[side];
+      var groupIdx = getActiveGroupIdx();
+      var groupBlock = sideState[groupIdx];
+      var groupEl = lineupRoot.querySelector('[data-lineup-group-idx="' + groupIdx + '"]');
+      if (!groupBlock || !groupEl) return;
+      var withReason = groupBlock.group === 'Hrát nebudou';
+      groupBlock.positions.forEach(function (block, sectionIdx) {
+        var sectionEl = groupEl.querySelector('[data-lineup-section-idx="' + sectionIdx + '"]');
+        if (!sectionEl) return;
+        var showNumber = allowNumber(groupBlock, block);
+        var rows = sectionEl.querySelectorAll('[data-lineup-row]');
+        block.players = Array.prototype.map.call(rows, function (row) {
+          return {
+            number: showNumber ? ((row.querySelector('[data-field="number"]') || {}).value || '') : '',
+            name: (row.querySelector('[data-field="name"]') || {}).value || '',
+            nationality: (row.querySelector('[data-field="nationality"]') || {}).value || '',
+            age: (row.querySelector('[data-field="age"]') || {}).value || '',
+            injured: withReason ? !!((row.querySelector('[data-field="injured"]') || {}).checked) : false,
+            reason:
+              withReason
+                ? (row.querySelector('[data-field="reason"]') || {}).value || ''
+                : null,
+            isCoach: block.section === 'Trenér',
+          };
+        });
+      });
+    }
+
+    function serializeSide(sideState) {
+      return sideState.map(function (groupBlock) {
+        return {
+          group: groupBlock.group,
+          positions: groupBlock.positions.map(function (block) {
+            return {
+              section: block.section,
+              players: block.players
+                .filter(function (player) { return String(player.name || '').trim(); })
+                .map(function (player) {
+                  var showNumber = allowNumber(groupBlock, block);
+                  var withReason = groupBlock.group === 'Hrát nebudou';
+                  var item = {
+                    number: showNumber ? (String(player.number || '').trim() || null) : null,
+                    name: String(player.name || '').trim(),
+                    nationality: String(player.nationality || '').trim().toUpperCase() || null,
+                    age: player.age === '' ? null : parseInt(player.age, 10),
+                    injured: withReason ? !!player.injured : false,
+                  };
+                  if (withReason) {
+                    item.reason = String(player.reason || '').trim() || null;
+                  }
+                  return item;
+                }),
+            };
+          }),
+        };
+      });
+    }
+
+    function serializeLineup() {
+      return {
+        home: serializeSide(lineupState.home),
+        away: serializeSide(lineupState.away),
+      };
+    }
+
+    function syncInput() {
+      collectFromDom();
+      lineupInput.value = JSON.stringify(serializeLineup());
+    }
+
+    function renderRow(groupBlock, block, player, rowIdx) {
+      var isCoach = block.section === 'Trenér';
+      var withReason = groupBlock.group === 'Hrát nebudou';
+      var showNumber = allowNumber(groupBlock, block);
+      var row = document.createElement('tr');
+      row.setAttribute('data-lineup-row', String(rowIdx));
+
+      row.innerHTML =
+        (showNumber
+          ? '<td class="zapasy-team-roster__cell zapasy-team-roster__cell--num">' +
+              '<input type="text" inputmode="numeric" data-field="number" value="' + escHtml(player.number) + '" class="zapasy-team-roster__input" aria-label="Číslo dresu" />' +
+            '</td>'
+          : '') +
+        '<td class="zapasy-team-roster__cell zapasy-team-roster__cell--name">' +
+          '<div class="zapasy-team-roster__name-wrap">' +
+            '<span class="zapasy-team-roster__flag" data-flag-for="' + rowIdx + '">' + flagFromCode(player.nationality) + '</span>' +
+            '<input type="text" data-field="name" value="' + escHtml(player.name) + '" placeholder="' + (isCoach ? 'Jméno trenéra' : 'Jméno hráče') + '" class="zapasy-team-roster__input zapasy-team-roster__input--name" aria-label="Jméno" />' +
+            (withReason && player.injured ? '<span class="zapasy-team-roster__injured" title="Zraněný">✚</span>' : '<span class="zapasy-team-roster__injured" title="Zraněný" hidden>✚</span>') +
+          '</div>' +
+        '</td>' +
+        '<td class="zapasy-team-roster__cell">' +
+          '<input type="text" data-field="nationality" value="' + escHtml(player.nationality) + '" placeholder="CZ" maxlength="3" class="zapasy-team-roster__input zapasy-team-roster__input--nat" aria-label="Národnost" />' +
+        '</td>' +
+        '<td class="zapasy-team-roster__cell">' +
+          '<input type="text" inputmode="numeric" data-field="age" value="' + escHtml(player.age) + '" class="zapasy-team-roster__input zapasy-team-roster__input--age" aria-label="Věk" />' +
+        '</td>' +
+        (withReason
+          ? '<td class="zapasy-team-roster__cell"><input type="text" data-field="reason" value="' + escHtml(player.reason) + '" placeholder="Důvod proč nebude hrát" class="zapasy-team-roster__input" aria-label="Důvod" /></td>'
+          : '') +
+        '<td class="zapasy-team-roster__cell zapasy-team-roster__cell--actions">' +
+          (withReason
+            ? '<label class="zapasy-team-roster__injured-toggle" title="Zraněný">' +
+                '<input type="checkbox" data-field="injured"' + (player.injured ? ' checked' : '') + ' />' +
+                '<span>✚</span>' +
+              '</label>'
+            : '') +
+          '<button type="button" class="zapasy-team-roster__remove" data-remove-row aria-label="Odebrat řádek">×</button>' +
+        '</td>';
+
+      var natInput = row.querySelector('[data-field="nationality"]');
+      var injuredInput = row.querySelector('[data-field="injured"]');
+      var injuredBadge = row.querySelector('.zapasy-team-roster__injured');
+      if (natInput) {
+        natInput.addEventListener('input', function () {
+          var flag = row.querySelector('[data-flag-for="' + rowIdx + '"]');
+          if (flag) flag.textContent = flagFromCode(natInput.value);
+          syncInput();
+        });
+      }
+      if (injuredInput && injuredBadge) {
+        injuredInput.addEventListener('change', function () {
+          injuredBadge.hidden = !injuredInput.checked;
+          syncInput();
+        });
+      }
+      row.querySelectorAll('input:not([type="checkbox"])').forEach(function (input) {
+        input.addEventListener('input', syncInput);
+        input.addEventListener('change', syncInput);
+      });
+      if (injuredInput) injuredInput.addEventListener('change', syncInput);
+
+      return row;
+    }
+
+    function renderPositionSection(groupBlock, block, sectionIdx) {
+      var section = document.createElement('section');
+      section.className = 'zapasy-team-roster__section';
+      section.setAttribute('data-lineup-section-idx', String(sectionIdx));
+      section.setAttribute('data-lineup-section', block.section);
+
+      var isCoach = block.section === 'Trenér';
+      var withReason = groupBlock.group === 'Hrát nebudou';
+      var showNumber = allowNumber(groupBlock, block);
+      section.innerHTML =
+        '<div class="zapasy-team-roster__head">' +
+          '<h4 class="zapasy-team-roster__title">' + block.section + '</h4>' +
+          '<button type="button" class="zapasy-team-roster__add" data-add-player>Přidat' + (isCoach ? ' trenéra' : ' hráče') + '</button>' +
+        '</div>' +
+        '<div class="zapasy-team-roster__table-wrap">' +
+          '<table class="zapasy-team-roster__table">' +
+            '<thead><tr>' +
+              (showNumber ? '<th>Číslo</th>' : '') +
+              '<th>Jméno</th>' +
+              '<th>Nár.</th>' +
+              '<th>Věk</th>' +
+              (withReason ? '<th>Důvod</th>' : '') +
+              '<th></th>' +
+            '</tr></thead>' +
+            '<tbody data-lineup-body></tbody>' +
+          '</table>' +
+        '</div>';
+
+      var tbody = section.querySelector('[data-lineup-body]');
+      block.players.forEach(function (player, idx) {
+        tbody.appendChild(renderRow(groupBlock, block, player, idx));
+      });
+
+      return section;
+    }
+
+    function renderGroup(groupBlock, groupIdx) {
+      var group = document.createElement('div');
+      group.className = 'zapasy-lineup-editor__group';
+      group.setAttribute('data-lineup-group-idx', String(groupIdx));
+
+      var roster = document.createElement('div');
+      roster.className = 'zapasy-team-roster space-y-5';
+      groupBlock.positions.forEach(function (block, sectionIdx) {
+        roster.appendChild(renderPositionSection(groupBlock, block, sectionIdx));
+      });
+      group.appendChild(roster);
+
+      return group;
+    }
+
+    function renderLineup() {
+      activeSide = getActiveSide();
+      activeGroupIdx = getActiveGroupIdx();
+      lineupRoot.innerHTML = '';
+      var sideState = lineupState[activeSide];
+      var groupBlock = sideState[activeGroupIdx];
+      if (groupBlock) {
+        lineupRoot.appendChild(renderGroup(groupBlock, activeGroupIdx));
+      }
+    }
+
+    lineupRoot.addEventListener('click', function (event) {
+      var addBtn = event.target.closest('[data-add-player]');
+      if (addBtn) {
+        event.preventDefault();
+        var groupEl = addBtn.closest('[data-lineup-group-idx]');
+        var sectionEl = addBtn.closest('[data-lineup-section-idx]');
+        var block = getPositionBlock(groupEl, sectionEl);
+        if (!block || !groupEl) return;
+        var groupIdx = parseInt(groupEl.getAttribute('data-lineup-group-idx'), 10);
+        var sideState = lineupState[getActiveSide()];
+        var groupBlock = sideState[groupIdx];
+        if (!groupBlock) return;
+        collectFromDom();
+        block.players.push(emptyPlayer(block.section, groupBlock.group));
+        renderLineup();
+        syncInput();
+        return;
+      }
+
+      var removeBtn = event.target.closest('[data-remove-row]');
+      if (removeBtn) {
+        event.preventDefault();
+        var row = removeBtn.closest('[data-lineup-row]');
+        var groupEl = removeBtn.closest('[data-lineup-group-idx]');
+        var sectionEl = removeBtn.closest('[data-lineup-section-idx]');
+        var block = getPositionBlock(groupEl, sectionEl);
+        if (!block || !row || !groupEl) return;
+        var groupIdx = parseInt(groupEl.getAttribute('data-lineup-group-idx'), 10);
+        var sideState = lineupState[getActiveSide()];
+        var groupBlock = sideState[groupIdx];
+        if (!groupBlock) return;
+        collectFromDom();
+        var rowIdx = parseInt(row.getAttribute('data-lineup-row'), 10);
+        var isCoach = block.section === 'Trenér';
+        if (block.players.length <= 1) {
+          block.players[0] = emptyPlayer(block.section, groupBlock.group);
+        } else if (Number.isFinite(rowIdx)) {
+          block.players.splice(rowIdx, 1);
+        }
+        renderLineup();
+        syncInput();
+      }
+    });
+
+    toggle.addEventListener('click', function () {
+      form.classList.toggle('hidden');
+    });
+
+    if (sideSelect) {
+      sideSelect.addEventListener('change', function () {
+        collectFromDom(activeSide);
+        activeSide = getActiveSide();
+        renderLineup();
+        syncInput();
+      });
+    }
+
+    if (groupSelect) {
+      groupSelect.addEventListener('change', function () {
+        collectFromDom();
+        activeGroupIdx = getActiveGroupIdx();
+        renderLineup();
+      });
+    }
+
+    form.addEventListener('submit', function () {
+      syncInput();
+    });
+
+    renderLineup();
+    syncInput();
+  })();
+</script>

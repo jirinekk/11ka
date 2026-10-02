@@ -1,0 +1,56 @@
+<%- include('partials/header') %>
+
+<main id="main-content" class="flex-1" tabindex="-1">
+  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+    <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <article class="min-w-0 space-y-6">
+        <header class="card-11 p-6">
+          <h1 class="text-2xl font-bold leading-tight text-white sm:text-3xl">Redakce</h1>
+          <p class="mt-2 text-sm text-11muted">Tým 11ka.</p>
+        </header>
+
+        <% function roleLabel(r) { return r === 'sefredaktor' ? 'Šéfredaktor' : r === 'redaktor' ? 'Redaktor' : r === 'vedeni' ? 'Vedení' : r; } %>
+
+        <% (groups || []).forEach(function (g) { %>
+        <% if (g.members && g.members.length) { %>
+        <section class="card-11 p-6 perf-cv">
+          <h2 class="text-lg font-bold text-11accent"><%= g.title %></h2>
+          <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <% g.members.forEach(function (m) { %>
+            <div class="rounded-2xl border border-white/10 bg-black/10 p-4">
+              <div class="flex items-center gap-3">
+                <img
+                  src="<%= m.avatar || '/logo.png' %>"
+                  alt="<%= m.name %>"
+                  loading="lazy"
+                  fetchpriority="low"
+                  decoding="async"
+                  class="h-12 w-12 shrink-0 rounded-full ring-2 ring-white/10 <%= m.avatar ? 'object-cover' : 'bg-11bg object-contain p-1' %>"
+                  width="48"
+                  height="48"
+                />
+                <div class="min-w-0">
+                  <a href="/redaktor/<%= encodeURIComponent(m.id) %>" class="block truncate text-sm font-semibold text-white hover:text-11accent"><%= m.name %></a>
+                  <p class="mt-0.5 text-xs text-11muted"><%= roleLabel(m.role) %></p>
+                </div>
+              </div>
+            </div>
+            <% }); %>
+          </div>
+        </section>
+        <% } %>
+        <% }); %>
+
+        <% if (!groups || !groups.some(function (g) { return g.members && g.members.length; })) { %>
+        <section class="card-11 p-6 text-center">
+          <p class="text-sm font-medium text-slate-200">Zatím tu není uvedený žádný člen redakce.</p>
+          <p class="mt-1 text-xs text-11muted">Doplňte uživatelům jméno a avatar v účtu / administraci.</p>
+        </section>
+        <% } %>
+      </article>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>
+

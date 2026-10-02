@@ -1,0 +1,22 @@
+<% (items || []).forEach(function (item, idx) { %>
+<article class="card-11 flex flex-col overflow-hidden p-0 transition hover:border-white/15">
+  <a href="<%= item.href %>" class="block overflow-hidden">
+    <img
+      src="<%= item.image %>"
+      alt="<%= item.title %>"
+      loading="<%= idx <= 2 ? 'eager' : 'lazy' %>"
+      fetchpriority="<%= idx === 0 ? 'high' : 'auto' %>"
+      decoding="<%= idx <= 2 ? 'sync' : 'async' %>"
+      class="aspect-video w-full object-cover transition duration-300 hover:scale-[1.03]"
+      data-object-position="<%= item.heroPosition || '50% 50%' %>"
+    />
+  </a>
+  <div class="flex flex-1 flex-col p-4">
+    <h3 class="text-base font-semibold leading-snug text-white">
+      <a href="<%= item.href %>" class="hover:text-11accent"><%= item.title %></a>
+    </h3>
+    <p class="mt-2 line-clamp-3 flex-1 text-sm text-11muted"><%= item.excerpt %></p>
+    <time class="mt-3 text-xs text-slate-500" datetime="<%= item.isoTime || '' %>"><%= item.timeAgo %></time>
+  </div>
+</article>
+<% }); %>

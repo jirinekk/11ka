@@ -1,0 +1,92 @@
+<% if (lineup) { %>
+<div class="min-w-0 rounded-xl border border-white/10 bg-black/10 p-4">
+  <h3 class="border-b border-white/10 pb-2 text-sm font-semibold text-white"><%= teamName %></h3>
+  <% if (lineup.formationLabel) { %>
+  <div class="lineup-pitch-formation-bar mt-3">
+    <% if (teamFlag) { %>
+    <span class="lineup-pitch-flag" aria-hidden="true"><%= teamFlag %></span>
+    <% } %>
+    <span class="lineup-pitch-formation-text"><%= lineup.formationLabel %></span>
+  </div>
+  <% } %>
+  <% if (lineup.pitchPlayers && lineup.pitchPlayers.length) { %>
+  <div
+    class="lineup-pitch lineup-pitch--<%= side %> mt-4"
+    role="img"
+    aria-label="Základní sestava <%= teamName %>, formace <%= lineup.formationLabel || 'nezjištěna' %>"
+    style="<% if (typeof kitColor !== 'undefined' && kitColor) { %>--kit-fill:<%= kitColor %>;<% } %><% if (typeof kitStroke !== 'undefined' && kitStroke) { %>--kit-stroke:<%= kitStroke %>;<% } %>"
+  >
+    <div class="lineup-pitch__markings" aria-hidden="true"></div>
+    <div class="lineup-pitch__inner">
+      <% lineup.pitchPlayers.forEach(function (p) { %>
+      <% var nameParts = (p.name || '').trim().split(/\s+/); var shortLabel = nameParts.length > 1 ? nameParts[nameParts.length - 1] : (p.name || ''); %>
+      <div
+        class="lineup-pitch-player"
+        style="left: <%= p.pitchLeft %>%; top: <%= p.pitchTop %>%;"
+        title="<%= p.name %><% if (p.position) { %> - <%= p.position %><% } %>"
+      >
+        <span class="lineup-pitch-player__jersey">
+          <svg class="lineup-pitch-player__shirt" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path
+              fill="var(--kit-fill, #0a0a0a)"
+              stroke="var(--kit-stroke, rgba(255,255,255,0.16))"
+              stroke-width="1"
+              d="M18 8 L24 12 L30 8 L38 12 L44 18 L40.5 22.5 L36 18.5 V42 H12 V18.5 L7.5 22.5 L4 18 L10 12 Z"
+            />
+            <path
+              fill="none"
+              stroke="rgba(255,255,255,0.10)"
+              stroke-width="1"
+              d="M18 8 L24 12 L30 8"
+            />
+          </svg>
+          <span class="lineup-pitch-player__shirt-num"><%= p.jersey || '–' %></span>
+        </span>
+        <span class="lineup-pitch-player__name">
+          <%= shortLabel %>
+        </span>
+      </div>
+      <% }); %>
+    </div>
+  </div>
+  <% } else if (lineup.starters && lineup.starters.length) { %>
+  <ul class="mt-3 space-y-0">
+    <% lineup.starters.forEach(function (p) { %>
+    <li class="flex items-center gap-2 border-b border-white/5 py-2 text-sm last:border-0">
+      <% if (p.jersey) { %><span class="w-7 shrink-0 text-right tabular-nums text-11muted"><%= p.jersey %></span><% } else { %><span class="w-7 shrink-0"></span><% } %>
+      <span class="min-w-0 flex-1 truncate text-slate-200">
+        <%= p.name %>
+        <% if (p.events) { %>
+          <% if (p.events.goals) { %><span class="ml-1 inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-400/25">⚽<%= p.events.goals %></span><% } %>
+          <% if (p.events.yellow) { %><span class="ml-1 inline-flex items-center rounded-full bg-yellow-500/15 px-2 py-0.5 text-[11px] font-bold text-yellow-200 ring-1 ring-yellow-400/25">ŽK<%= p.events.yellow %></span><% } %>
+          <% if (p.events.red) { %><span class="ml-1 inline-flex items-center rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-bold text-red-200 ring-1 ring-red-400/25">ČK<%= p.events.red %></span><% } %>
+          <% if (p.events.subIn || p.events.subOut) { %><span class="ml-1 inline-flex items-center rounded-full bg-slate-500/15 px-2 py-0.5 text-[11px] font-bold text-slate-200 ring-1 ring-white/10">↔<%= (p.events.subIn || 0) %>/<%= (p.events.subOut || 0) %></span><% } %>
+        <% } %>
+      </span>
+      <% if (p.position) { %><span class="shrink-0 text-xs text-11muted"><%= p.position %></span><% } %>
+    </li>
+    <% }); %>
+  </ul>
+  <% } %>
+  <% if (lineup.bench && lineup.bench.length) { %>
+  <p class="mt-4 text-xs font-medium uppercase tracking-wide text-11muted">Lavička</p>
+  <ul class="mt-2 flex flex-wrap gap-2">
+    <% lineup.bench.forEach(function (p) { %>
+    <li
+      class="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-xs text-slate-200"
+      title="<%= p.name %><% if (p.position) { %> - <%= p.position %><% } %>"
+    >
+      <% if (p.jersey) { %><span class="tabular-nums text-11muted"><%= p.jersey %></span><% } %>
+      <span class="max-w-[10rem] truncate"><%= p.name %></span>
+      <% if (p.events) { %>
+        <% if (p.events.goals) { %><span class="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-400/25">⚽<%= p.events.goals %></span><% } %>
+        <% if (p.events.yellow) { %><span class="inline-flex items-center rounded-full bg-yellow-500/15 px-2 py-0.5 text-[11px] font-bold text-yellow-200 ring-1 ring-yellow-400/25">ŽK<%= p.events.yellow %></span><% } %>
+        <% if (p.events.red) { %><span class="inline-flex items-center rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-bold text-red-200 ring-1 ring-red-400/25">ČK<%= p.events.red %></span><% } %>
+        <% if (p.events.subIn || p.events.subOut) { %><span class="inline-flex items-center rounded-full bg-slate-500/15 px-2 py-0.5 text-[11px] font-bold text-slate-200 ring-1 ring-white/10">↔<%= (p.events.subIn || 0) %>/<%= (p.events.subOut || 0) %></span><% } %>
+      <% } %>
+    </li>
+    <% }); %>
+  </ul>
+  <% } %>
+</div>
+<% } %>

@@ -1,0 +1,58 @@
+<%- include('../partials/admin-layout-start') %>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl"><%= reel ? 'Upravit reels video' : 'Nové reels video' %></h1>
+  <p class="mt-1 text-sm text-11muted">Formulář pro video v rubrice Gólovky.</p>
+</div>
+
+<% if (error) { %>
+<div class="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"><%= error %></div>
+<% } %>
+<% if (success) { %>
+<div class="mt-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"><%= success %></div>
+<% } %>
+
+<% var src = (typeof form !== 'undefined' && form) ? form : (reel || {}); %>
+<form method="post" enctype="multipart/form-data" action="<%= reel ? ('/administrace/reels/' + reel.id + '/edit') : '/administrace/reels/nove' %>" class="mt-6 grid gap-4 rounded-xl border border-white/10 bg-[#111827]/60 p-4 md:grid-cols-2 md:p-5">
+  <div class="md:col-span-2">
+    <label for="headline" class="text-sm font-bold text-white">Nadpis</label>
+    <input id="headline" name="headline" required maxlength="100" value="<%= src.headline || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm font-semibold text-white" />
+    <p id="headline-counter" class="mt-1 text-xs text-11muted">0 / 100</p>
+  </div>
+  <div class="md:col-span-2">
+    <label for="title" class="text-xs text-11muted">Celý popis videa</label>
+    <textarea id="title" name="title" required rows="3" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"><%= src.title || '' %></textarea>
+  </div>
+  <div class="md:col-span-2">
+    <label for="video_file" class="text-xs text-11muted">Video soubor ze zařízení</label>
+    <input id="video_file" name="video_file" type="file" <%= reel ? '' : 'required' %> class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-200" />
+    <p class="mt-1 text-xs text-11muted">Doporučený formát: MP4 (H.264), vertikální poměr 9:16, ideálně 1080x1920.</p>
+    <% if (src.file_path) { %>
+    <p class="mt-1 text-xs text-11muted">Aktuální soubor: <%= src.file_path %>. Pokud nenahrajete nový, zůstane tento.</p>
+    <% } %>
+  </div>
+  <input type="hidden" name="is_active" value="<%= (src.is_active === 0 || src.is_active === '0') ? '' : 'on' %>" />
+  <input type="hidden" name="source_type" value="upload" />
+  <div class="md:col-span-2 flex flex-wrap items-center gap-3">
+    <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg transition hover:brightness-110">Vydat</button>
+  </div>
+</form>
+
+<script>
+  (function () {
+    var headlineInput = document.getElementById('headline');
+    var counter = document.getElementById('headline-counter');
+    if (!headlineInput || !counter) return;
+
+    function refreshHeadlineCounter() {
+      var max = Number(headlineInput.getAttribute('maxlength') || 100);
+      var length = String(headlineInput.value || '').length;
+      counter.textContent = length + ' / ' + max;
+    }
+
+    headlineInput.addEventListener('input', refreshHeadlineCounter);
+    refreshHeadlineCounter();
+  })();
+</script>
+
+<%- include('../partials/admin-layout-end') %>

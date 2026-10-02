@@ -1,0 +1,111 @@
+<%- include('../partials/admin-layout-start') %>
+<%
+  var dashRoles = (typeof currentUser !== 'undefined' && currentUser && currentUser.roles && currentUser.roles.length)
+    ? currentUser.roles
+    : ((typeof roles !== 'undefined' && roles && roles.length) ? roles : [(typeof currentUser !== 'undefined' && currentUser && currentUser.role) ? currentUser.role : (typeof role !== 'undefined' ? role : '')]);
+  var roleLabelMap = typeof roleLabels !== 'undefined' && roleLabels ? roleLabels : {
+    vedeni: 'Vedení',
+    sefredaktor: 'Šéfredaktor',
+    redaktor: 'Redaktor',
+    spravce_akreditace: 'Správce Akreditace',
+  };
+  var dashRoleText = typeof formatRoles === 'function'
+    ? formatRoles(currentUser)
+    : dashRoles.map(function (r) { return roleLabelMap[r] || r; }).filter(Boolean).join(', ');
+  var showVedeni = typeof hasRole === 'function' ? hasRole(currentUser, 'vedeni') : dashRoles.indexOf('vedeni') !== -1;
+  var showSef = typeof hasAnyRole === 'function' ? hasAnyRole(currentUser, 'vedeni', 'sefredaktor') : (dashRoles.indexOf('vedeni') !== -1 || dashRoles.indexOf('sefredaktor') !== -1);
+  var showRedaktor = typeof isRedaktorWorkflow === 'function' ? isRedaktorWorkflow(currentUser) : dashRoles.indexOf('redaktor') !== -1 && !showSef;
+  var showAkreditace = typeof hasAnyRole === 'function' ? hasAnyRole(currentUser, 'vedeni', 'spravce_akreditace') : (dashRoles.indexOf('vedeni') !== -1 || dashRoles.indexOf('spravce_akreditace') !== -1);
+  var showAiDrafts = typeof canAccessAiDrafts === 'function' ? canAccessAiDrafts(currentUser) : false;
+  var akreditaceOnly = typeof isAkreditaceOnly === 'function' ? isAkreditaceOnly(currentUser) : (dashRoles.length === 1 && dashRoles[0] === 'spravce_akreditace');
+%>
+
+<div class="border-b border-white/10 pb-8">
+  <h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Přehled</h1>
+  <p class="mt-2 max-w-2xl text-sm text-11muted">
+    Přihlášen jako <strong class="text-slate-300"><%= currentUser.email %></strong>
+    · role <strong class="text-11accent"><%= dashRoleText || '-' %></strong>
+  </p>
+</div>
+
+<section class="mt-10" aria-labelledby="admin-quick-heading">
+  <h2 id="admin-quick-heading" class="text-xs font-semibold uppercase tracking-wider text-11muted">Rychlé akce</h2>
+  <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <% if (showVedeni) { %>
+    <a href="/administrace/uzivatele" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Uživatelé</h3>
+      <p class="mt-1 text-sm text-11muted">Účty a role</p>
+    </a>
+    <a href="/administrace/statistiky" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Statistiky</h3>
+      <p class="mt-1 text-sm text-11muted">Čtenost článků</p>
+    </a>
+    <a href="/administrace/reklamy" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Reklamy</h3>
+      <p class="mt-1 text-sm text-11muted">Bannery na webu</p>
+    </a>
+    <a href="/administrace/pomaha" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">11ka Pomáhá</h3>
+      <p class="mt-1 text-sm text-11muted">Správa akcí a podpory</p>
+    </a>
+    <a href="/administrace/bio" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Bio</h3>
+      <p class="mt-1 text-sm text-11muted">Schvalování textů autorů</p>
+    </a>
+    <% } %>
+    <% if (showSef) { %>
+    <a href="/administrace/kitswapy" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Kitswapy</h3>
+      <p class="mt-1 text-sm text-11muted">Články v sidebaru</p>
+    </a>
+    <a href="/administrace/zadosti" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Žádosti o vydání</h3>
+      <p class="mt-1 text-sm text-11muted">Schvalování redaktorů</p>
+    </a>
+    <a href="/administrace/clanky" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Všechny články</h3>
+      <p class="mt-1 text-sm text-11muted">Přehled a úpravy</p>
+    </a>
+    <a href="/administrace/zapasy" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Zápasy</h3>
+      <p class="mt-1 text-sm text-11muted">Správa utkání</p>
+    </a>
+    <a href="/administrace/penalty" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Penalty</h3>
+      <p class="mt-1 text-sm text-11muted">Výběr brankářů v minihře</p>
+    </a>
+    <% } %>
+    <% if (showRedaktor) { %>
+    <a href="/administrace/moje-clanky" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Moje články</h3>
+      <p class="mt-1 text-sm text-11muted">Koncepty a stav</p>
+    </a>
+    <% } %>
+    <% if (!akreditaceOnly) { %>
+    <a href="/administrace/clanek/novy" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Nový článek</h3>
+      <p class="mt-1 text-sm text-11muted">Editor</p>
+    </a>
+    <% } %>
+    <% if (showAkreditace) { %>
+    <a href="/administrace/akreditace" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Akreditace</h3>
+      <p class="mt-1 text-sm text-11muted">Žádosti z webu</p>
+    </a>
+    <% } %>
+    <% if (showAiDrafts) { %>
+    <a href="/administrace/ai-clanky" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">AI články</h3>
+      <p class="mt-1 text-sm text-11muted">RSS, přepis a vydání</p>
+    </a>
+    <% } %>
+    <% if (!showVedeni) { %>
+    <a href="/ucet" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Účet</h3>
+      <p class="mt-1 text-sm text-11muted">Heslo a fotka</p>
+    </a>
+    <% } %>
+  </div>
+</section>
+
+<%- include('../partials/admin-layout-end') %>

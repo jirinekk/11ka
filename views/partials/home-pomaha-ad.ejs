@@ -1,0 +1,6 @@
+<% var _ad = (typeof ad !== 'undefined' && ad) ? ad : null; %>
+<% if (_ad && _ad.active && (_ad.content_html && String(_ad.content_html).trim())) { %>
+<section class="card-11 p-0 overflow-hidden home-pomaha-ad" aria-label="11ka Pomáhá - reklamní prostor">
+  <div class="p-4 sm:p-5"><%- _ad.content_html %></div>
+</section>
+<% } %>

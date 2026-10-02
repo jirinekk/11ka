@@ -1,0 +1,46 @@
+<% var fixtures = (typeof sidebarLiveFixtures !== 'undefined' && sidebarLiveFixtures) ? sidebarLiveFixtures : []; %>
+<% var shown = fixtures.slice(0, 5); %>
+<div class="card-11 p-4 sidebar-live-matches">
+  <div class="mb-3 flex items-center justify-between gap-2">
+    <h2 class="text-lg font-bold text-11accent">Seznam zápasů</h2>
+    <% if (fixtures.length) { %>
+    <span class="sidebar-live-matches__badge" aria-label="<%= fixtures.length %> probíhajících utkání">
+      <span class="sidebar-live-matches__dot" aria-hidden="true"></span>
+      <%= fixtures.length %>
+    </span>
+    <% } %>
+  </div>
+
+  <% if (shown.length) { %>
+  <ul class="sidebar-live-matches__list">
+    <% shown.forEach(function (fixture) { %>
+    <li class="sidebar-live-matches__item">
+      <% if (fixture.competition) { %>
+      <p class="sidebar-live-matches__competition"><%= fixture.competition %></p>
+      <% } %>
+      <div class="sidebar-live-matches__teams">
+        <div class="sidebar-live-matches__team">
+          <span class="sidebar-live-matches__team-name"><%= fixture.homeTeam %></span>
+          <% if (fixture.scoreText) { %>
+          <span class="sidebar-live-matches__score"><%= fixture.homeScore %></span>
+          <% } %>
+        </div>
+        <div class="sidebar-live-matches__team">
+          <span class="sidebar-live-matches__team-name"><%= fixture.awayTeam %></span>
+          <% if (fixture.scoreText) { %>
+          <span class="sidebar-live-matches__score"><%= fixture.awayScore %></span>
+          <% } %>
+        </div>
+      </div>
+    </li>
+    <% }); %>
+  </ul>
+  <% if (fixtures.length > shown.length) { %>
+  <p class="mt-2 text-xs text-11muted">+ <%= fixtures.length - shown.length %> další</p>
+  <% } %>
+  <% } %>
+
+  <a href="/zapasy/live" class="sidebar-live-matches__link">
+    Zobrazit seznam zápasů
+  </a>
+</div>
