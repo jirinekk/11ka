@@ -1,9 +1,10 @@
 <%- include('head') %>
-<body class="min-h-screen bg-11bg font-sans text-slate-200 antialiased flex flex-col">
+<body class="site-v2 min-h-screen bg-11bg font-sans text-slate-200 antialiased flex flex-col">
   <% var showBar = typeof showSearchLogin === 'undefined' || showSearchLogin; %>
   <% var showNav = typeof showNav === 'undefined' ? true : !!showNav; %>
   <% var _activeNav = (typeof activeNav !== 'undefined') ? activeNav : 'home'; %>
-  <% var _mainNav = (typeof getMainNav === 'function') ? getMainNav(_activeNav) : []; %>
+  <% var _activeSubnav = (typeof activeSubnav !== 'undefined') ? activeSubnav : ''; %>
+  <% var _mainNav = (typeof getMainNav === 'function') ? getMainNav(_activeNav, _activeSubnav) : []; %>
   <header class="header11 sticky top-0 z-50<%= showNav ? '' : ' header11--minimal' %>" data-header11>
     <div class="header11__bar">
       <div class="header11__inner mx-auto max-w-7xl px-4 lg:px-6">
@@ -11,26 +12,40 @@
           <img src="/logo.png" alt="11ka" class="h-8 w-auto md:h-9" width="120" height="36" />
         </a>
 
-        <% if (showNav || showBar) { %>
-        <div class="header11__cluster">
-          <% if (showNav) { %>
-          <nav class="header11__nav hidden md:flex" aria-label="Hlavní navigace">
-            <div class="header11__track" data-nav-track>
-              <span class="header11__glider" data-nav-glider aria-hidden="true"></span>
-              <% _mainNav.forEach(function (item) { %>
+        <% if (showNav) { %>
+        <nav class="header11__nav hidden md:flex" aria-label="Hlavní navigace">
+          <div class="header11__track" data-nav-track>
+            <span class="header11__glider" data-nav-glider aria-hidden="true"></span>
+            <% _mainNav.forEach(function (item) { %>
+            <% var _children = item.children || []; %>
+            <div class="header11__item<%= item.active ? ' header11__item--active' : '' %>" data-nav-item<%= _children.length ? ' data-nav-dd' : '' %>>
               <a
                 href="<%= item.href %>"
                 class="header11__link <%= item.active ? 'header11__link--active' : '' %>"
                 data-nav-link
                 title="<%= item.label %>"
-                <%= item.active ? 'aria-current="page"' : '' %>
+                <%= _children.length ? 'aria-haspopup="true" aria-expanded="false"' : '' %>
+                <%= item.active && !_activeSubnav ? 'aria-current="page"' : '' %>
               ><%- item.labelHtml || item.label %></a>
-              <% }); %>
+              <% if (_children.length) { %>
+              <div class="header11__dropdown" data-nav-dropdown>
+                <% _children.forEach(function (child) { %>
+                <a
+                  href="<%= child.href %>"
+                  class="header11__dropdown-link<%= child.active ? ' header11__dropdown-link--active' : '' %>"
+                  <%= child.active ? 'aria-current="page"' : '' %>
+                ><%= child.label %></a>
+                <% }); %>
+              </div>
+              <% } %>
             </div>
-          </nav>
-          <% } %>
+            <% }); %>
+          </div>
+        </nav>
+        <% } %>
 
-          <% if (showBar) { %>
+        <% if (showBar) { %>
+        <div class="header11__end">
           <div class="header11__actions-desktop">
             <form action="/hledat" method="get" class="header11__search header11__search--desktop" aria-label="Vyhledávání">
               <svg class="header11__search-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3" stroke-linecap="round"/></svg>
@@ -50,14 +65,10 @@
             </div>
             <% } else { %>
             <a href="/prihlaseni" class="header11__login">Přihlásit se</a>
+            <a href="/registrace" class="header11__register">Registrace</a>
             <% } %>
           </div>
-          <% } %>
-        </div>
-        <% } %>
-
-        <% if (showBar) { %>
-        <div class="header11__actions-mobile md:hidden">
+          <div class="header11__actions-mobile md:hidden">
             <button
               type="button"
               class="header11__icon-btn"
@@ -80,6 +91,7 @@
               <span class="header11__burger" aria-hidden="true"><span></span><span></span></span>
             </button>
             <% } %>
+          </div>
         </div>
         <% } %>
       </div>
@@ -121,24 +133,53 @@
       </div>
       <nav class="header11__menu-nav" aria-label="Mobilní navigace">
         <% _mainNav.forEach(function (item) { %>
+        <% var _children = item.children || []; %>
+        <% if (_children.length) { %>
+        <div class="header11__menu-group<%= item.active ? ' is-open is-active' : '' %>" data-nav-accordion>
+          <button
+            type="button"
+            class="header11__menu-link header11__menu-toggle<%= item.active ? ' header11__menu-link--active' : '' %>"
+            aria-expanded="<%= item.active ? 'true' : 'false' %>"
+          >
+            <span><%= item.label %></span>
+            <svg class="header11__menu-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="header11__menu-sub" <%= item.active ? '' : 'hidden' %>>
+            <% _children.forEach(function (child) { %>
+            <a
+              href="<%= child.href %>"
+              class="header11__menu-sublink<%= child.active ? ' header11__menu-sublink--active' : '' %>"
+              <%= child.active ? 'aria-current="page"' : '' %>
+            ><%= child.label %></a>
+            <% }); %>
+          </div>
+        </div>
+        <% } else { %>
         <a
           href="<%= item.href %>"
           class="header11__menu-link <%= item.active ? 'header11__menu-link--active' : '' %>"
           <%= item.active ? 'aria-current="page"' : '' %>
         ><%= item.label %></a>
+        <% } %>
         <% }); %>
       </nav>
       <div class="header11__menu-foot">
         <% if (typeof currentUser !== 'undefined' && currentUser) { %>
         <% var _menuUser = (currentUser.display_name && String(currentUser.display_name).trim()) ? currentUser.display_name : currentUser.email; %>
         <p class="mb-1 truncate text-xs text-11muted"><%= _menuUser %></p>
+        <% if (typeof isStaffUser === 'function' ? isStaffUser(currentUser) : true) { %>
         <a href="/administrace" class="header11__login header11__login--block">Administrace</a>
+        <% } %>
+        <% if (currentUser.slug) { %>
+        <a href="/uzivatel/<%= encodeURIComponent(currentUser.slug) %>" class="header11__menu-sub">Můj profil</a>
+        <% } %>
         <a href="/ucet" class="header11__menu-sub">Můj účet</a>
         <form action="/odhlaseni" method="post">
           <button type="submit" class="header11__menu-sub w-full text-left">Odhlásit</button>
         </form>
         <% } else { %>
         <a href="/prihlaseni" class="header11__login header11__login--block">Přihlásit se</a>
+        <a href="/registrace" class="header11__menu-sub">Registrace</a>
         <% } %>
       </div>
     </div>

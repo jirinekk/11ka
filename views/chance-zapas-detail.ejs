@@ -1,0 +1,252 @@
+<%- include('partials/header') %>
+<%
+  var m = typeof match !== 'undefined' && match ? match : {};
+  var homeLineup = m.lineups && m.lineups.home;
+  var awayLineup = m.lineups && m.lineups.away;
+  var hasStarters = (homeLineup && homeLineup.starters && homeLineup.starters.length) || (awayLineup && awayLineup.starters && awayLineup.starters.length);
+  var hasCoaches = (homeLineup && homeLineup.coach) || (awayLineup && awayLineup.coach);
+  var hasScorers = (m.scorers && m.scorers.home && m.scorers.home.length) || (m.scorers && m.scorers.away && m.scorers.away.length);
+  var hasStats = m.stats && m.stats.some(function (s) {
+    return String(s.home || '') !== '' && !/^0+(\.0+)?%?$/.test(String(s.home).replace(/\s/g,''));
+  });
+  var events = (m.events || []).filter(function (e) { return e.kind === 'goal' || e.kind === 'yellow' || e.kind === 'red' || e.kind === 'sub'; });
+  function kickoffLabel(iso) {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' });
+    } catch (_) { return ''; }
+  }
+  function statNum(v) {
+    var n = parseFloat(String(v || '').replace('%', '').replace(',', '.').replace(/\s/g, ''));
+    return Number.isFinite(n) ? n : 0;
+  }
+  function isPct(v) { return /%/.test(String(v || '')); }
+  var scoreLine = m.scoreLine || String(m.score || '0:0').replace(':', ' - ');
+  var tabs = [
+    { id: 'prehled', label: 'Přehled' },
+    { id: 'sestavy', label: 'Sestavy' },
+    { id: 'tabulka', label: 'Tabulka' },
+    { id: 'statistiky', label: 'Statistiky' },
+  ];
+%>
+
+<main id="main-content" class="flex-1" tabindex="-1">
+  <div class="mc-page mx-auto max-w-[1400px] px-4 py-6 lg:px-6 lg:py-8">
+    <div class="mc-layout">
+      <div class="mc-layout__main min-w-0" data-mc-hub data-mc-hash>
+        <section class="mc-hero">
+          <div class="mc-hero__top">
+            <a href="/zapasy/live" class="mc-hero__back">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Zápasy
+            </a>
+            <p class="mc-hero__comp"><%= m.league %><% if (m.round) { %> · <%= m.round %><% } %></p>
+            <span class="mc-hero__spacer" aria-hidden="true"></span>
+          </div>
+          <p class="mc-hero__meta">
+            <%= kickoffLabel(m.kickoff || m.date) %>
+            <% if (m.venue) { %> · <%= m.venue %><% if (m.city) { %>, <%= m.city %><% } %><% } %>
+          </p>
+
+          <div class="mc-hero__duel">
+            <% var homeTag = m.homeHref ? 'a' : 'div'; %>
+            <<%= homeTag %><% if (m.homeHref) { %> href="<%= m.homeHref %>"<% } %> class="mc-hero__club mc-hero__club--home">
+              <span class="mc-hero__name"><%= m.home %></span>
+              <% if (m.homeLogo) { %><img class="mc-hero__crest" src="<%= m.homeLogo %>" alt="" /><% } %>
+            </<%= homeTag %>>
+            <div class="mc-hero__mid">
+              <p class="mc-hero__score"><%= scoreLine %></p>
+              <p class="mc-hero__status<%= m.isLive ? ' is-live' : '' %>"><%= m.statusLabel === 'Konec' ? 'Full time' : (m.statusLabel || '') %></p>
+            </div>
+            <% var awayTag = m.awayHref ? 'a' : 'div'; %>
+            <<%= awayTag %><% if (m.awayHref) { %> href="<%= m.awayHref %>"<% } %> class="mc-hero__club mc-hero__club--away">
+              <% if (m.awayLogo) { %><img class="mc-hero__crest" src="<%= m.awayLogo %>" alt="" /><% } %>
+              <span class="mc-hero__name"><%= m.away %></span>
+            </<%= awayTag %>>
+          </div>
+
+          <% if (hasScorers) { %>
+          <div class="mc-hero__goals">
+            <div class="mc-hero__goals-side">
+              <% (m.scorers.home || []).forEach(function (g) { %>
+              <p><%= g.player %> <%= g.minute %><%= /['′’]$/.test(String(g.minute || '')) ? '' : "'" %></p>
+              <% }); %>
+            </div>
+            <span class="mc-hero__goals-ball" aria-hidden="true"></span>
+            <div class="mc-hero__goals-side mc-hero__goals-side--away">
+              <% (m.scorers.away || []).forEach(function (g) { %>
+              <p><%= g.player %> <%= g.minute %><%= /['′’]$/.test(String(g.minute || '')) ? '' : "'" %></p>
+              <% }); %>
+            </div>
+          </div>
+          <% } %>
+
+          <div class="mc-tabs" role="tablist" aria-label="Přehled zápasu">
+            <% tabs.forEach(function (tab, i) { %>
+            <button
+              type="button"
+              class="mc-tabs__tab<%= i === 0 ? ' is-active' : '' %>"
+              role="tab"
+              aria-selected="<%= i === 0 ? 'true' : 'false' %>"
+              data-cl-tab="<%= tab.id %>"
+            ><%= tab.label %></button>
+            <% }); %>
+          </div>
+        </section>
+
+        <div class="mc-tabs__pane is-active mt-4" data-cl-pane="prehled" role="tabpanel">
+          <% if (hasStats) { %>
+          <section class="mc-facts">
+            <h2 class="mc-facts__title">Top statistiky</h2>
+            <ul class="mc-facts__stats">
+              <% m.stats.slice(0, 6).forEach(function (s) { %>
+              <% var hv = statNum(s.home); var av = statNum(s.away); var pct = isPct(s.home) || isPct(s.away) || /držen|possession|míče/i.test(s.label); %>
+              <% var sum = hv + av; var hw = pct ? hv : (sum ? (hv / sum) * 100 : 50); var aw = pct ? av : (sum ? (av / sum) * 100 : 50); %>
+              <li class="<%= pct ? 'is-bar' : 'is-num' %>">
+                <div class="mc-facts__row">
+                  <span class="<%= hv >= av ? 'is-lead' : '' %>"><%= s.home %></span>
+                  <span class="mc-facts__label"><%= s.label %></span>
+                  <span class="<%= av > hv ? 'is-lead' : '' %>"><%= s.away %></span>
+                </div>
+                <div class="mc-facts__bar" aria-hidden="true"><i style="width: <%= Math.max(0, Math.min(100, hw)) %>%"></i><b style="width: <%= Math.max(0, Math.min(100, aw)) %>%"></b></div>
+              </li>
+              <% }); %>
+            </ul>
+          </section>
+          <% } %>
+
+          <% if (events.length) { %>
+          <section class="mc-facts mt-4">
+            <h2 class="mc-facts__title">Události</h2>
+            <ol class="mc-timeline">
+              <% events.forEach(function (e) { %>
+              <li class="mc-timeline__item mc-timeline__item--<%= e.side %>">
+                <span class="mc-timeline__min"><%= e.minute %><%= /['′’]$/.test(String(e.minute || '')) ? '' : "'" %></span>
+                <span class="mc-timeline__kind"><%= e.label %></span>
+                <span class="mc-timeline__player"><%= e.player %></span>
+              </li>
+              <% }); %>
+            </ol>
+          </section>
+          <% } %>
+
+          <% if (typeof matchArticles !== 'undefined' && matchArticles && matchArticles.length) { %>
+          <section class="related-stories related-stories--match mt-8" aria-labelledby="match-articles-heading">
+            <h2 id="match-articles-heading" class="related-stories__title">Články k zápasu</h2>
+            <div class="related-stories__grid">
+              <% matchArticles.forEach(function (item) { %>
+              <a href="<%= item.href %>" class="related-card">
+                <img src="<%= item.image %>" alt="" loading="lazy" decoding="async" style="object-position: <%= item.heroPosition || '50% 50%' %>;" />
+                <div class="related-card__shade" aria-hidden="true"></div>
+                <div class="related-card__body">
+                  <% if (item.tag || item.category) { %>
+                  <span class="related-card__cat"><%= item.tag || item.category %></span>
+                  <% } %>
+                  <h3 class="related-card__title font-article-title"><%= item.title %></h3>
+                </div>
+              </a>
+              <% }); %>
+            </div>
+          </section>
+          <% } %>
+        </div>
+
+        <div class="mc-tabs__pane mt-4" data-cl-pane="sestavy" role="tabpanel" hidden>
+          <section class="mc-facts">
+            <h2 class="mc-facts__title">Sestavy<% if (homeLineup && homeLineup.formation || awayLineup && awayLineup.formation) { %> <span class="mc-panel__sub"><%= (homeLineup && homeLineup.formation) || '' %><% if (homeLineup && homeLineup.formation && awayLineup && awayLineup.formation) { %> · <% } %><%= (awayLineup && awayLineup.formation) || '' %></span><% } %></h2>
+            <% if (hasStarters || hasCoaches) { %>
+            <div class="mc-lineups">
+              <% [homeLineup, awayLineup].forEach(function (lu) { if (!lu) return; %>
+              <div>
+                <h3 class="mc-scorers__side"><%= lu.name %></h3>
+                <% if (lu.starters && lu.starters.length) { %>
+                <ol class="mc-xi">
+                  <% lu.starters.forEach(function (p) { %>
+                  <li><% if (p.number) { %><span class="mc-xi__num"><%= p.number %></span><% } %> <%= p.name %><% if (p.role) { %> <span class="mc-xi__role"><%= p.role %></span><% } %></li>
+                  <% }); %>
+                </ol>
+                <% } else { %>
+                <p class="mc-empty">Základní sestava zatím chybí.</p>
+                <% } %>
+                <% if (lu.bench && lu.bench.length) { %>
+                <p class="mc-xi__label">Náhradníci</p>
+                <p class="mc-xi__bench"><%= lu.bench.map(function (p) { return (p.number ? p.number + ' ' : '') + p.name; }).join(', ') %></p>
+                <% } %>
+                <% if (lu.coach) { %>
+                <p class="mc-xi__coach">Trenér: <%= lu.coach %></p>
+                <% } %>
+              </div>
+              <% }); %>
+            </div>
+            <% } else { %>
+            <p class="mc-empty">Sestavy zatím nejsou k dispozici.</p>
+            <% } %>
+          </section>
+        </div>
+
+        <div class="mc-tabs__pane mt-4" data-cl-pane="tabulka" role="tabpanel" hidden>
+          <%- include('partials/chance-liga-table', {
+            standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [],
+            highlightCodes: [m.homeCode, m.awayCode].filter(Boolean)
+          }) %>
+        </div>
+
+        <div class="mc-tabs__pane mt-4" data-cl-pane="statistiky" role="tabpanel" hidden>
+          <% if (hasStats) { %>
+          <section class="mc-facts">
+            <h2 class="mc-facts__title">Statistiky</h2>
+            <ul class="mc-facts__stats">
+              <% m.stats.forEach(function (s) { %>
+              <% var hv = statNum(s.home); var av = statNum(s.away); var pct = isPct(s.home) || isPct(s.away); %>
+              <li class="<%= pct ? 'is-bar' : 'is-num' %>">
+                <div class="mc-facts__row">
+                  <span class="<%= hv >= av ? 'is-lead' : '' %>"><%= s.home %></span>
+                  <span class="mc-facts__label"><%= s.label %></span>
+                  <span class="<%= av > hv ? 'is-lead' : '' %>"><%= s.away %></span>
+                </div>
+                <% var sum = hv + av; var hw = pct ? hv : (sum ? (hv / sum) * 100 : 50); var aw = pct ? av : (sum ? (av / sum) * 100 : 50); %>
+                <div class="mc-facts__bar" aria-hidden="true"><i style="width: <%= Math.max(0, Math.min(100, hw)) %>%"></i><b style="width: <%= Math.max(0, Math.min(100, aw)) %>%"></b></div>
+              </li>
+              <% }); %>
+            </ul>
+          </section>
+          <% } else { %>
+          <p class="mc-empty">Statistiky se objeví po začátku zápasu.</p>
+          <% } %>
+        </div>
+      </div>
+
+      <aside class="mc-layout__rail space-y-6">
+        <% if (m.venue || m.city || m.attendance) { %>
+        <section class="fm-card">
+          <h2 class="fm-card__title">Stadion</h2>
+          <p class="mc-sideinfo__name"><%= m.venue || 'Stadion' %></p>
+          <% if (m.city) { %><p class="mc-sideinfo__muted"><%= m.city %></p><% } %>
+          <% if (m.attendance) { %><p class="mc-sideinfo__muted">Návštěva <%= m.attendance %></p><% } %>
+        </section>
+        <% } %>
+        <% if (m.referee) { %>
+        <section class="fm-card">
+          <h2 class="fm-card__title">Rozhodčí</h2>
+          <p class="mc-sideinfo__name"><%= m.referee %></p>
+        </section>
+        <% } %>
+        <%- include('partials/chance-liga-table', { standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [], compactTable: true, tableRail: true, highlightCodes: [m.homeCode, m.awayCode].filter(Boolean) }) %>
+        <% if (typeof roundMates !== 'undefined' && roundMates && roundMates.length) { %>
+        <section class="fm-card">
+          <h2 class="fm-card__title"><%= m.round || 'Kolo' %></h2>
+          <div class="fm-league__list fm-league__list--tight">
+            <% roundMates.forEach(function (row) { %>
+            <%- include('partials/fotmob-match-row', { match: row }) %>
+            <% }); %>
+          </div>
+        </section>
+        <% } %>
+        <%- include('partials/sidebar-ssp-ad') %>
+        <%- include('partials/sidebar-social') %>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

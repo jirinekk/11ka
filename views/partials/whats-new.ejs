@@ -1,0 +1,31 @@
+<% var wn = typeof whatsNew !== 'undefined' && whatsNew ? whatsNew : null; %>
+<% if (wn) { %>
+<div
+  id="whats-new"
+  class="whats-new"
+  role="dialog"
+  aria-modal="true"
+  aria-hidden="true"
+  aria-labelledby="whats-new-title"
+  data-whats-new
+  data-whats-new-version="<%= wn.version %>"
+>
+  <button type="button" class="whats-new__backdrop" aria-hidden="true" tabindex="-1" data-whats-new-close></button>
+  <div class="whats-new__card">
+    <button type="button" class="whats-new__close" aria-label="Zavřít" data-whats-new-close data-whats-new-focus>
+      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.22 4.22a.75.75 0 011.06 0L10 8.94l4.72-4.72a.75.75 0 111.06 1.06L11.06 10l4.72 4.72a.75.75 0 11-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 11-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 010-1.06z" clip-rule="evenodd"/></svg>
+    </button>
+    <p class="whats-new__kicker"><%= wn.kicker %></p>
+    <h2 id="whats-new-title" class="whats-new__title"><%= wn.title %></h2>
+    <p class="whats-new__intro"><%= wn.intro %></p>
+    <ul class="whats-new__list">
+      <% (wn.items || []).forEach(function (item) { %>
+      <li><%= item %></li>
+      <% }); %>
+    </ul>
+    <button type="button" class="btn-11 btn-11--primary btn-11--block whats-new__cta" data-whats-new-close>
+      <%= wn.cta %>
+    </button>
+  </div>
+</div>
+<% } %>

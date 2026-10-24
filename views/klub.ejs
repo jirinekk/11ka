@@ -1,0 +1,86 @@
+<%- include('partials/header') %>
+<%
+  var club = typeof club !== 'undefined' && club ? club : {};
+  var row = typeof clubRow !== 'undefined' ? clubRow : null;
+  var hubView = typeof clubHubView !== 'undefined' && clubHubView ? clubHubView : 'soupiska';
+  var hubTabs = [
+    { id: 'soupiska', label: 'Soupiska' },
+    { id: 'program', label: 'Program' },
+    { id: 'vysledky', label: 'Výsledky' },
+    { id: 'tabulka', label: 'Tabulka' },
+  ];
+%>
+
+<main id="main-content" class="flex-1" tabindex="-1">
+  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+    <a href="/zapasy/live#kluby" class="text-sm text-11muted transition hover:text-11accent">← Zpět na zápasy</a>
+
+    <header class="cl-club-hero">
+      <% if (club.logo) { %>
+      <img class="cl-club-hero__crest" src="<%= club.logo %>" alt="" width="72" height="72" />
+      <% } %>
+      <div class="cl-club-hero__body">
+        <p class="cl-club-hero__kicker">Chance Liga</p>
+        <h1 class="cl-club-hero__name"><%= club.name %></h1>
+        <% if (row) { %>
+        <p class="cl-club-hero__meta">
+          <strong><%= row.rank %>.</strong> místo
+          · <%= row.played %> zápasů
+          · <%= row.pts %> b
+          · skóre <%= row.goalsLabel %>
+          · rozdíl <%= row.gdLabel %>
+        </p>
+        <% } %>
+      </div>
+    </header>
+
+    <section class="cl-hub mt-8" data-cl-hub data-cl-hash aria-label="<%= club.short %>">
+      <div class="cl-matches__tabs" role="tablist" aria-label="Profil klubu">
+        <% hubTabs.forEach(function (tab) { %>
+        <button
+          type="button"
+          class="cl-matches__tab<%= tab.id === hubView ? ' is-active' : '' %>"
+          role="tab"
+          aria-selected="<%= tab.id === hubView ? 'true' : 'false' %>"
+          data-cl-tab="<%= tab.id %>"
+        ><%= tab.label %></button>
+        <% }); %>
+      </div>
+
+      <div class="cl-matches__pane<%= hubView === 'soupiska' ? ' is-active' : '' %> mt-5" data-cl-pane="soupiska" role="tabpanel" <%= hubView === 'soupiska' ? '' : 'hidden' %>>
+        <%- include('partials/chance-liga-squad', { squad: typeof clubSquad !== 'undefined' ? clubSquad : { groups: [], coach: null } }) %>
+      </div>
+      <div class="cl-matches__pane<%= hubView === 'program' ? ' is-active' : '' %> mt-5" data-cl-pane="program" role="tabpanel" <%= hubView === 'program' ? '' : 'hidden' %>>
+        <%- include('partials/chance-liga-board', { chanceMatchLeagues: typeof clubProgramLeagues !== 'undefined' ? clubProgramLeagues : [], chanceLigaShowAll: false, chanceLigaTitle: 'Program' }) %>
+      </div>
+      <div class="cl-matches__pane<%= hubView === 'vysledky' ? ' is-active' : '' %> mt-5" data-cl-pane="vysledky" role="tabpanel" <%= hubView === 'vysledky' ? '' : 'hidden' %>>
+        <%- include('partials/chance-liga-board', { chanceMatchLeagues: typeof clubResultLeagues !== 'undefined' ? clubResultLeagues : [], chanceLigaShowAll: false, chanceLigaTitle: 'Výsledky' }) %>
+      </div>
+      <div class="cl-matches__pane<%= hubView === 'tabulka' ? ' is-active' : '' %> mt-5" data-cl-pane="tabulka" role="tabpanel" <%= hubView === 'tabulka' ? '' : 'hidden' %>>
+        <%- include('partials/chance-liga-table', { standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [], highlightCode: club.code }) %>
+      </div>
+    </section>
+
+    <% if (typeof clubArticles !== 'undefined' && clubArticles && clubArticles.length) { %>
+    <section class="related-stories related-stories--after-article mt-10" aria-labelledby="club-articles-heading">
+      <h2 id="club-articles-heading" class="related-stories__title">Články o klubu</h2>
+      <div class="related-stories__grid">
+        <% clubArticles.forEach(function (item) { %>
+        <a href="<%= item.href %>" class="related-card">
+          <img src="<%= item.image %>" alt="" loading="lazy" decoding="async" style="object-position: <%= item.heroPosition || '50% 50%' %>;" />
+          <div class="related-card__shade" aria-hidden="true"></div>
+          <div class="related-card__body">
+            <% if (item.tag || item.category) { %>
+            <span class="related-card__cat"><%= item.tag || item.category %></span>
+            <% } %>
+            <h3 class="related-card__title font-article-title"><%= item.title %></h3>
+          </div>
+        </a>
+        <% }); %>
+      </div>
+    </section>
+    <% } %>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

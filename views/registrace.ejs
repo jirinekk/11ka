@@ -1,0 +1,38 @@
+<%- include('partials/header', { title: title, activeNav: 'home', showSearchLogin: false, showNav: false, structuredData: [] }) %>
+
+<main class="flex flex-1 items-center justify-center px-4 py-16">
+  <div class="card-11 w-full max-w-md p-8">
+    <h1 class="text-xl font-bold text-white">Registrace</h1>
+    <p class="mt-1 text-sm text-11muted">Veřejný profil, komentáře a oblíbené kluby Chance Ligy.</p>
+    <% if (error) { %>
+    <p class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p>
+    <% } %>
+    <form class="mt-6 space-y-4" method="post" action="/registrace">
+      <input type="hidden" name="next" value="<%= typeof nextUrl !== 'undefined' ? nextUrl : '' %>" />
+      <div>
+        <label class="mb-1 block text-xs font-medium text-11muted" for="display_name">Zobrazované jméno</label>
+        <input id="display_name" name="display_name" type="text" required minlength="2" maxlength="40" value="<%= form && form.display_name ? form.display_name : '' %>" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-medium text-11muted" for="email">E-mail</label>
+        <input id="email" name="email" type="email" autocomplete="email" required value="<%= form && form.email ? form.email : '' %>" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-medium text-11muted" for="password">Heslo (min. 8 znaků)</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-medium text-11muted" for="password_confirm">Potvrzení hesla</label>
+        <input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" required minlength="8" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+      </div>
+      <button type="submit" class="btn-11 btn-11--primary btn-11--block">Vytvořit účet</button>
+    </form>
+    <p class="mt-6 text-center text-sm text-11muted">
+      Už účet máte?
+      <a href="/prihlaseni<%= typeof nextUrl !== 'undefined' && nextUrl ? ('?next=' + encodeURIComponent(nextUrl)) : '' %>" class="text-11accent hover:underline">Přihlásit se</a>
+    </p>
+    <p class="mt-3 text-center text-xs text-11muted"><a href="/" class="text-11accent hover:underline">Zpět na web</a></p>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

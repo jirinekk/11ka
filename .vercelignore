@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.git
+storage
+public/uploads
+*.sqlite
+*.sqlite3
+*.db
+logs
+tmp
+.npm
+.claude
+.DS_Store
+node_modules

@@ -1,111 +1,104 @@
 <%- include('partials/header') %>
+<%
+  var days = typeof matchDays !== 'undefined' && matchDays ? matchDays : [];
+  var ligaFilter = typeof ligaFilter !== 'undefined' ? ligaFilter : '';
+  var liveOnly = typeof liveOnly !== 'undefined' && liveOnly;
+  var ligaHrefs = typeof ligaHrefs !== 'undefined' && ligaHrefs ? ligaHrefs : {};
+  var clubs = typeof chanceClubs !== 'undefined' && chanceClubs ? chanceClubs : [];
+  var focusDay = typeof focusDay !== 'undefined' ? focusDay : '';
+  var liveCount = typeof liveCount !== 'undefined' ? liveCount : 0;
+%>
 
 <main id="main-content" class="flex-1" tabindex="-1">
-  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
-    <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-      <div class="min-w-0 space-y-6">
-        <header>
-          <h1 class="font-display text-2xl font-bold leading-tight text-white sm:text-3xl">
-            <%= pageTitle %>
-          </h1>
-        </header>
+  <div class="fm-page mx-auto max-w-[1400px] px-4 py-6 lg:px-6 lg:py-8">
+    <h1 class="sr-only"><%= pageTitle %></h1>
 
-        <section aria-label="Seznam zápasů">
-          <% if (fixtures && fixtures.length) { %>
-          <%- include('partials/match-fixture-cards', { fixtures: fixtures }) %>
-
-          <% if (typeof pagination !== 'undefined' && pagination && pagination.totalPages > 1) { %>
-          <nav class="mt-8 flex flex-wrap items-center justify-center gap-2" aria-label="Stránkování">
-            <% if (pagination.hasPrev) { %>
-            <a
-              href="<%= pagination.prevUrl %>"
-              class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
-              rel="prev"
-            >Předchozí</a>
-            <% } else { %>
-            <span
-              class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50"
-              aria-disabled="true"
-            >Předchozí</span>
-            <% } %>
-
-            <div class="flex flex-wrap items-center justify-center gap-1">
-              <% pagination.pages.forEach(function (p) { %>
-                <% if (p.current) { %>
-                <span
-                  class="min-w-[40px] rounded-lg bg-11accent px-3 py-2 text-center text-sm text-11bg transition"
-                  aria-current="page"
-                ><%= p.n %></span>
-                <% } else { %>
-                <a
-                  href="<%= p.url %>"
-                  class="min-w-[40px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
-                ><%= p.n %></a>
-                <% } %>
-              <% }); %>
-            </div>
-
-            <% if (pagination.hasNext) { %>
-            <a
-              href="<%= pagination.nextUrl %>"
-              class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
-              rel="next"
-            >Další</a>
-            <% } else { %>
-            <span
-              class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 opacity-50"
-              aria-disabled="true"
-            >Další</span>
-            <% } %>
+    <div class="fm-shell">
+      <aside class="fm-rail fm-rail--left">
+        <section class="fm-card">
+          <h2 class="fm-card__title">Soutěže</h2>
+          <nav class="fm-leagues" aria-label="Soutěže">
+            <a class="fm-leagues__item<%= !ligaFilter ? ' is-active' : '' %>" href="<%= ligaHrefs.all || '/zapasy/live' %>">Všechny zápasy</a>
+            <a class="fm-leagues__item<%= ligaFilter === 'chance-liga' ? ' is-active' : '' %>" href="<%= ligaHrefs['chance-liga'] || '/zapasy/live?liga=chance-liga' %>">Chance Liga</a>
+            <a class="fm-leagues__item<%= ligaFilter === 'chance-narodni' ? ' is-active' : '' %>" href="<%= ligaHrefs['chance-narodni'] || '/zapasy/live?liga=chance-narodni' %>">Chance Národní liga</a>
+            <a class="fm-leagues__item<%= ligaFilter === 'ceska-reprezentace' ? ' is-active' : '' %>" href="<%= ligaHrefs['ceska-reprezentace'] || '/zapasy/live?liga=ceska-reprezentace' %>">Česká reprezentace</a>
           </nav>
-          <% } %>
-          <% } else { %>
-          <div class="card-11 p-6 text-center">
-            <p class="text-sm font-medium text-slate-200">Momentálně není nastavený žádný zápas.</p>
-            <p class="mt-4">
-              <a href="/" class="btn-11 btn-11--sm btn-11--accent-outline">Zpět domů</a>
-            </p>
-          </div>
-          <% } %>
         </section>
+        <% if (clubs.length) { %>
+        <section class="fm-card">
+          <h2 class="fm-card__title">Kluby</h2>
+          <nav class="fm-leagues" aria-label="Kluby Chance Ligy">
+            <% clubs.forEach(function (club) { %>
+            <a class="fm-leagues__item fm-leagues__item--club" href="<%= club.href %>">
+              <% if (club.logo) { %><img src="<%= club.logo %>" alt="" width="18" height="18" /><% } %>
+              <%= club.short %>
+            </a>
+            <% }); %>
+          </nav>
+        </section>
+        <% } %>
+      </aside>
+
+      <div class="fm-main">
+        <div class="fm-toolbar fm-card">
+          <div class="fm-daynav">
+            <button type="button" class="fm-daynav__btn" data-fm-prev aria-label="Předchozí den">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <nav class="fm-daychips" data-fm-days aria-label="Program podle dne">
+              <% days.forEach(function (day) { %>
+              <a
+                class="fm-chip<%= focusDay === day.day ? ' is-active' : '' %>"
+                href="#den-<%= day.day %>"
+                data-fm-day="<%= day.day %>"
+              ><%= day.dayLabel %></a>
+              <% }); %>
+            </nav>
+            <button type="button" class="fm-daynav__btn" data-fm-next aria-label="Další den">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+          <div class="fm-filters">
+            <a class="fm-chip<%= liveOnly ? ' is-active' : '' %>" href="<%= typeof liveHref !== 'undefined' ? liveHref : '/zapasy/live' %>">Živě<% if (liveCount) { %> · <%= liveCount %><% } %></a>
+          </div>
+        </div>
+
+        <div class="fm-feed">
+          <% if (!days.length) { %>
+          <div class="fm-empty">Pro tento výběr zatím nejsou žádné zápasy.</div>
+          <% } else { %>
+          <% days.forEach(function (day) { %>
+          <section class="fm-day" id="den-<%= day.day %>">
+            <h2 class="fm-day__title"><%= day.dayLabel %></h2>
+            <%- include('partials/fotmob-match-list', { matchLeagues: day.leagues || [] }) %>
+          </section>
+          <% }); %>
+          <% } %>
+        </div>
       </div>
 
-      <aside class="space-y-6 lg:sticky lg:top-24">
+      <aside class="fm-rail fm-rail--right">
         <%- include('partials/sidebar-ssp-ad') %>
-
+        <%- include('partials/chance-liga-table', { standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [], compactTable: true, tableRail: true, tableHref: '/zapasy/live' }) %>
+        <div class="news-rail">
+          <%- include('partials/sidebar-most-read', { items: typeof sidebarMostRead !== 'undefined' ? sidebarMostRead : [], mostReadLimit: 4 }) %>
+        </div>
         <div class="card-11 p-4">
           <h2 class="mb-2 text-lg font-bold text-11accent">Newsletter</h2>
           <p class="text-sm text-11muted"><%= newsletter.description %></p>
           <% if (typeof newsletterStatus !== 'undefined' && newsletterStatus === 'ok') { %>
-          <p class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
-            Jste přihlášeni k odběru novinek.
-          </p>
+          <p class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">Jste přihlášeni k odběru novinek.</p>
           <% } else if (typeof newsletterStatus !== 'undefined' && newsletterStatus === 'dupe') { %>
-          <p class="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            Tento e-mail už v odběru je.
-          </p>
+          <p class="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">Tento e-mail už v odběru je.</p>
           <% } else if (typeof newsletterStatus !== 'undefined' && newsletterStatus === 'bad') { %>
-          <p class="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-            Zadejte platný e-mail.
-          </p>
+          <p class="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">Zadejte platný e-mail.</p>
           <% } %>
           <form class="mt-4 space-y-2" action="/newsletter" method="post">
             <label class="sr-only" for="newsletter-email-live">E-mail</label>
-            <input
-              id="newsletter-email-live"
-              name="email"
-              type="email"
-              required
-              autocomplete="email"
-              placeholder="váš@email.cz"
-              class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
-            />
-            <button type="submit" class="btn-11 btn-11--primary btn-11--block">
-              Přihlásit se
-            </button>
+            <input id="newsletter-email-live" name="email" type="email" required autocomplete="email" placeholder="váš@email.cz" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+            <button type="submit" class="btn-11 btn-11--primary btn-11--block">Přihlásit se</button>
           </form>
         </div>
-
         <%- include('partials/sidebar-social') %>
       </aside>
     </div>

@@ -1,10 +1,10 @@
 /* 11ka - design tokens & components (extends Tailwind CDN) */
 
 :root {
-  --11-bg: #0b111b;
-  --11-card: #151c2c;
+  --11-bg: #0a0e14;
+  --11-card: #14191f;
   --11-accent: #16dffb;
-  --11-muted: #94a3b8;
+  --11-muted: #8b95a5;
   --font-body: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-article-title: '11ka Article', Inter, system-ui, sans-serif;
@@ -2187,11 +2187,13 @@ body[data-admin="1"] a.rounded-xl.px-4:not(.btn-11):active {
 }
 
 .header11__cluster .nav-user-dd,
+.header11__end .nav-user-dd,
 .header11__actions-mobile .nav-user-dd {
   flex-shrink: 0;
 }
 
-.header11__cluster .nav-user-dd > summary {
+.header11__cluster .nav-user-dd > summary,
+.header11__end .nav-user-dd > summary {
   min-height: 2.5rem;
   border: none;
   border-radius: var(--glass-radius-pill);
@@ -2205,7 +2207,8 @@ body[data-admin="1"] a.rounded-xl.px-4:not(.btn-11):active {
 }
 
 @media (hover: hover) {
-  .header11__cluster .nav-user-dd > summary:hover {
+  .header11__cluster .nav-user-dd > summary:hover,
+  .header11__end .nav-user-dd > summary:hover {
     box-shadow: var(--glass-sheen), 0 0 16px -6px rgba(22, 223, 251, 0.3);
   }
 }

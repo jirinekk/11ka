@@ -1,9 +1,16 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcrypt');
+const { reservedOwnerEmails, serializeRoles } = require('../lib/roles');
 
-const storageDir = path.join(__dirname, '..', 'storage');
+// Vercel’s function filesystem is read-only except /tmp (and even /tmp is ephemeral).
+const storageDir =
+  process.env.STORAGE_DIR ||
+  (process.env.VERCEL
+    ? path.join(os.tmpdir(), '11ka-storage')
+    : path.join(__dirname, '..', 'storage'));
 const dbPath = path.join(storageDir, '11ka.sqlite');
 const schemaPath = path.join(__dirname, 'schema.sql');
 
@@ -518,7 +525,14 @@ function initDb() {
   migrateUsersRoleCheck();
   migrateUsersRolesColumn();
   migrateUsersMajitelRole();
-  seedAdminIfEmpty();
+  initCommunityFeatures();
+  seedStaffFromFile();
+  try {
+    require('../services/rubrics').ensureTables();
+  } catch (e) {
+    console.error('[11ka] rubrics tables failed:', e && e.message);
+  }
+  ensureAdminFromEnv();
   grantMajitelToOwners();
   seedDefaultAdsIfEmpty();
   ensureExtraAdSlots();
@@ -738,11 +752,192 @@ function migrateUsersMajitelRole() {
   }
 }
 
+function tableHasColumn(table, column) {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+    return cols.some((c) => c && c.name === column);
+  } catch {
+    return false;
+  }
+}
+
+function addColumnIfMissing(table, column, ddl) {
+  if (tableHasColumn(table, column)) return;
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  } catch {
+    /* column already exists */
+  }
+}
+
+function uniqueUserSlugValue(base, excludeId) {
+  const { uniqueSlug } = require('../lib/slug');
+  return uniqueSlug(base || 'uzivatel', (candidate) => {
+    const row = db
+      .prepare(`SELECT id FROM users WHERE slug = ? COLLATE NOCASE`)
+      .get(candidate);
+    if (!row) return false;
+    if (excludeId != null && row.id === excludeId) return false;
+    return true;
+  });
+}
+
+function backfillUserSlugs() {
+  if (!tableHasColumn('users', 'slug')) return;
+  const rows = db
+    .prepare(`SELECT id, display_name, email, slug FROM users`)
+    .all();
+  const update = db.prepare(`UPDATE users SET slug = ? WHERE id = ?`);
+  for (const row of rows) {
+    if (row.slug && String(row.slug).trim()) continue;
+    const emailLocal = String(row.email || '').split('@')[0] || 'uzivatel';
+    const base = row.display_name || emailLocal;
+    update.run(uniqueUserSlugValue(base, row.id), row.id);
+  }
+}
+
+function migrateUsersCtenarRole() {
+  try {
+    const row = db
+      .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'`)
+      .get();
+    if (row && row.sql && row.sql.includes("'ctenar'")) return;
+
+    const cols = db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name);
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      BEGIN;
+      CREATE TABLE users_ctenar (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('majitel', 'vedeni', 'sefredaktor', 'redaktor', 'spravce_akreditace', 'ctenar')),
+        roles TEXT,
+        display_name TEXT,
+        avatar_path TEXT,
+        author_bio TEXT,
+        author_bio_pending TEXT,
+        slug TEXT UNIQUE COLLATE NOCASE,
+        public_bio TEXT,
+        favorite_team_code TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    const dest = [
+      'id',
+      'email',
+      'password_hash',
+      'role',
+      'roles',
+      'display_name',
+      'avatar_path',
+      'author_bio',
+      'author_bio_pending',
+      'slug',
+      'public_bio',
+      'favorite_team_code',
+      'created_at',
+      'updated_at',
+    ].filter((c) => cols.includes(c));
+    db.exec(
+      `INSERT INTO users_ctenar (${dest.join(', ')}) SELECT ${dest.join(', ')} FROM users;
+       DROP TABLE users;
+       ALTER TABLE users_ctenar RENAME TO users;
+       COMMIT;`
+    );
+    db.pragma('foreign_keys = ON');
+    console.log('[11ka] users.role CHECK migrated (ctenar)');
+  } catch (e) {
+    try {
+      db.exec('ROLLBACK;');
+    } catch {
+      /* ignore */
+    }
+    try {
+      db.pragma('foreign_keys = ON');
+    } catch {
+      /* ignore */
+    }
+    console.error('[11ka] users ctenar migration failed:', e && e.message);
+  }
+}
+
+function initCommunityFeatures() {
+  addColumnIfMissing('users', 'slug', 'slug TEXT');
+  addColumnIfMissing('users', 'public_bio', 'public_bio TEXT');
+  addColumnIfMissing('users', 'favorite_team_code', 'favorite_team_code TEXT');
+  migrateUsersCtenarRole();
+  addColumnIfMissing('users', 'slug', 'slug TEXT');
+  addColumnIfMissing('users', 'public_bio', 'public_bio TEXT');
+  addColumnIfMissing('users', 'favorite_team_code', 'favorite_team_code TEXT');
+  backfillUserSlugs();
+
+  addColumnIfMissing('comments', 'user_id', 'user_id INTEGER');
+  addColumnIfMissing('articles', 'rubric_slug', 'rubric_slug TEXT');
+  addColumnIfMissing('articles', 'related_article_ids', 'related_article_ids TEXT');
+  addColumnIfMissing('articles', 'match_key', 'match_key TEXT');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS article_ratings (
+      article_id INTEGER NOT NULL REFERENCES articles (id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      stars INTEGER NOT NULL CHECK (stars IN (1, 2, 3)),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (article_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_article_ratings_article ON article_ratings (article_id);
+    CREATE INDEX IF NOT EXISTS idx_article_ratings_user ON article_ratings (user_id);
+    CREATE TABLE IF NOT EXISTS user_team_stars (
+      user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      team_code TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, team_code)
+    );
+    CREATE TABLE IF NOT EXISTS article_teams (
+      article_id INTEGER NOT NULL REFERENCES articles (id) ON DELETE CASCADE,
+      team_code TEXT NOT NULL,
+      PRIMARY KEY (article_id, team_code)
+    );
+  `);
+
+  try {
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_slug ON users (slug);`);
+  } catch {
+    /* ignore */
+  }
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_articles_rubric ON articles (rubric_slug);`);
+  } catch {
+    /* ignore */
+  }
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_articles_match_key ON articles (match_key);`);
+  } catch {
+    /* ignore */
+  }
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_comments_user ON comments (user_id);`);
+  } catch {
+    /* ignore */
+  }
+}
+
+function seedStaffFromFile() {
+  try {
+    const usersService = require('../services/users');
+    if (typeof usersService.seedStaffUsers === 'function') {
+      usersService.seedStaffUsers();
+    }
+  } catch (e) {
+    console.error('[11ka] staff seed failed:', e && e.message);
+  }
+}
+
 function grantMajitelToOwners() {
   try {
-    const emails = ['admin@11ka.local', 'jgalba@11ka.cz', 'jbrabec@11ka.cz', process.env.ADMIN_EMAIL]
-      .map((e) => String(e || '').trim().toLowerCase())
-      .filter(Boolean);
+    const emails = reservedOwnerEmails();
     const users = db.prepare(`SELECT id, email, role, roles FROM users`).all();
     const update = db.prepare(`UPDATE users SET role = ?, roles = ? WHERE id = ?`);
     for (const user of users) {
@@ -780,34 +975,80 @@ function getDb() {
   return db;
 }
 
-function seedAdminIfEmpty() {
-  const row = getDb().prepare('SELECT COUNT(*) AS c FROM users').get();
-  if (row.c > 0) return;
-
-  const email = process.env.ADMIN_EMAIL || 'admin@11ka.local';
-  const password = process.env.ADMIN_PASSWORD || 'changeme';
-  const hash = bcrypt.hashSync(password, 12);
-  const now = new Date().toISOString();
-
+function usersHasRolesColumn() {
   const cols = getDb().prepare(`PRAGMA table_info(users)`).all();
-  const hasRoles = cols.some((c) => c && c.name === 'roles');
+  return cols.some((c) => c && c.name === 'roles');
+}
+
+function insertMajitelUser(email, passwordHash, now) {
+  const hasRoles = usersHasRolesColumn();
   if (hasRoles) {
     getDb()
       .prepare(
         `INSERT INTO users (email, password_hash, role, roles, display_name, created_at, updated_at)
          VALUES (?, ?, 'majitel', ?, ?, ?, ?)`
       )
-      .run(email, hash, JSON.stringify(['majitel', 'vedeni']), 'Administrátor', now, now);
+      .run(email, passwordHash, serializeRoles(['majitel', 'vedeni']), 'Administrátor', now, now);
   } else {
     getDb()
       .prepare(
         `INSERT INTO users (email, password_hash, role, display_name, created_at, updated_at)
          VALUES (?, ?, 'majitel', ?, ?, ?)`
       )
-      .run(email, hash, 'Administrátor', now, now);
+      .run(email, passwordHash, 'Administrátor', now, now);
+  }
+}
+
+function updateMajitelUser(id, passwordHash, now) {
+  const hasRoles = usersHasRolesColumn();
+  if (hasRoles) {
+    getDb()
+      .prepare(
+        `UPDATE users SET password_hash = ?, role = 'majitel', roles = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(passwordHash, serializeRoles(['majitel', 'vedeni']), now, id);
+  } else {
+    getDb()
+      .prepare(`UPDATE users SET password_hash = ?, role = 'majitel', updated_at = ? WHERE id = ?`)
+      .run(passwordHash, now, id);
+  }
+}
+
+function findUserByEmail(email) {
+  return getDb()
+    .prepare(`SELECT id, email, password_hash, role, roles, display_name FROM users WHERE email = ? COLLATE NOCASE`)
+    .get(email);
+}
+
+function ensureAdminFromEnv() {
+  const email = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+  const hasEnv = Boolean(email && password);
+
+  if (!hasEnv) {
+    const staffCount = getDb().prepare('SELECT COUNT(*) AS c FROM users').get();
+    if ((process.env.VERCEL || process.env.NODE_ENV === 'production') && !(staffCount && staffCount.c)) {
+      console.error(
+        '[11ka] ADMIN_EMAIL / ADMIN_PASSWORD nejsou nastavené a seed redakce je prázdný. Nastavte je ve Vercel → Settings → Environment Variables, nebo doplňte data/seed-users.json.'
+      );
+    }
+    return;
   }
 
-  console.warn('[11ka] Created default Majitel user:', email, '(set ADMIN_EMAIL / ADMIN_PASSWORD in .env)');
+  const existing = findUserByEmail(email);
+  if (existing) {
+    return;
+  }
+
+  const galbaAliases = ['admin@11ka.local', 'jgalba@11ka.cz'];
+  if (galbaAliases.includes(email)) {
+    const alias = galbaAliases.find((candidate) => candidate !== email && findUserByEmail(candidate));
+    if (alias) return;
+  }
+
+  const now = new Date().toISOString();
+  insertMajitelUser(email, bcrypt.hashSync(password, 12), now);
+  console.warn('[11ka] Ensured Majitel user from ADMIN_EMAIL:', email);
 }
 
 function seedDefaultAdsIfEmpty() {

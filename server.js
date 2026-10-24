@@ -1,8 +1,12 @@
 const path = require('path');
+const launchedPort = process.env.PORT;
+const launchedServerPort = process.env.SERVER_PORT;
 require('dotenv').config({
   path: path.join(__dirname, '.env'),
   override: true,
 });
+if (launchedPort) process.env.PORT = launchedPort;
+if (launchedServerPort) process.env.SERVER_PORT = launchedServerPort;
 
 const { isSmtpConfigured } = require('./services/mail');
 if (!isSmtpConfigured()) {
@@ -20,6 +24,7 @@ if (!isSmtpConfigured()) {
 const fs = require('fs');
 const express = require('express');
 const { getMainNav } = require('./config/main-nav');
+const whatsNew = require('./config/whats-new');
 const { getGooglePreferredSourceCta } = require('./config/google-preferred-source');
 const matchFixturesService = require('./services/match-fixtures');
 const { formatPragueDateTime } = require('./lib/prague-datetime');
@@ -27,7 +32,7 @@ const compression = require('compression');
 const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
 
-const { initDb } = require('./db');
+const { initDb, storageDir } = require('./db');
 const articlesService = require('./services/articles');
 const usersService = require('./services/users');
 const siteRouter = require('./routes/site');
@@ -36,16 +41,20 @@ const ucetRouter = require('./routes/ucet');
 const apiOembed = require('./routes/api-oembed');
 const apiMostRead = require('./routes/api-most-read');
 const apiPenalty = require('./routes/api-penalty');
+const apiArticleTts = require('./routes/api-article-tts');
 const newsletterPublicRouter = require('./routes/newsletter-public');
 const { router: adminRouter, ensureUploadDirs } = require('./routes/admin');
 const { attachUser } = require('./middleware/auth');
+const authCookie = require('./lib/auth-cookie');
 const {
   hasRole,
   hasAnyRole,
+  isStaffUser,
   isAkreditaceOnly,
   isRedaktorWorkflow,
   formatRoles,
   ROLE_LABELS,
+  STAFF_ROLES,
 } = require('./lib/roles');
 const { canAccessAiDrafts } = require('./config/ai-drafts');
 
@@ -54,7 +63,8 @@ app.set('trust proxy', process.env.TRUST_PROXY || 1);
 app.disable('x-powered-by');
 
 // Pterodactyl obvykle nastavuje SERVER_PORT; lokálně se často používá PORT
-const HOST = '0.0.0.0';
+// Bind :: so Safari localhost (::1) and 127.0.0.1 both work (dual-stack).
+const HOST = process.env.HOST || '::';
 const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;
 
 function getAssetVersion() {
@@ -62,6 +72,7 @@ function getAssetVersion() {
         path.join(__dirname, 'public', 'css', 'fonts.css'),
         path.join(__dirname, 'public', 'css', 'tailwind.generated.css'),
         path.join(__dirname, 'public', 'css', 'overrides.css'),
+        path.join(__dirname, 'public', 'css', 'redesign.css'),
         path.join(__dirname, 'public', 'images', 'penalty-keeper.webp'),
         path.join(__dirname, 'public', 'images', 'penalty-keeper-dive-left.webp'),
         path.join(__dirname, 'public', 'images', 'penalty-keeper-dive-right.webp'),
@@ -75,6 +86,10 @@ function getAssetVersion() {
         path.join(__dirname, 'public', 'js', 'ssp-zone-init.js'),
         path.join(__dirname, 'public', 'js', 'apply-dynamic-styles.js'),
         path.join(__dirname, 'public', 'js', 'inject-ld.js'),
+        path.join(__dirname, 'public', 'js', 'matches-carousel.js'),
+        path.join(__dirname, 'public', 'js', 'sidebar-hiring-promo.js'),
+        path.join(__dirname, 'public', 'js', 'article-audio.js'),
+        path.join(__dirname, 'public', 'js', 'whats-new.js'),
     ];
     let newestMs = 0;
     for (const filePath of candidates) {
@@ -109,13 +124,31 @@ function resolveAssetVersion() {
 // DB + uploads bootstrap
 initDb();
 articlesService.seedDemoIfEmpty();
+try {
+  require('./services/article-ratings').seedDemoIfEmpty();
+} catch (e) {
+  console.error('[11ka] article ratings seed failed:', e && e.message);
+}
+try {
+  require('./services/accreditation').seedIfEmpty();
+} catch (e) {
+  console.error('[11ka] accreditation seed failed:', e && e.message);
+}
 ensureUploadDirs();
 
-// Session storage
-const storageDir = path.join(__dirname, 'storage');
+// Session storage (same dir as SQLite; on Vercel this is /tmp)
 if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
 
 const sessionSecret = process.env.SESSION_SECRET || 'dev-change-me';
+const isEphemeralFs = Boolean(process.env.VERCEL);
+if (
+  (isEphemeralFs || process.env.NODE_ENV === 'production') &&
+  (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'dev-change-me')
+) {
+  console.error(
+    '[11ka] SESSION_SECRET není nastavený. Přihlášení na Vercelu bude nestabilní napříč instancemi. Nastavte SESSION_SECRET ve Vercel → Settings → Environment Variables.'
+  );
+}
 
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -129,30 +162,33 @@ app.use(
 app.use(express.urlencoded({ extended: true, limit: '1gb' }));
 app.use(express.json({ limit: '64kb' }));
 
-app.use(
-    session({
-        store: new SQLiteStore({
-            db: 'sessions.sqlite',
-            dir: storageDir,
-        }),
-        secret: sessionSecret,
-        resave: false,
-        saveUninitialized: false,
-        proxy: true,
-        cookie: {
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-            httpOnly: true,
-            sameSite: 'lax',
-            secure: process.env.NODE_ENV === 'production',
-        },
-    })
-);
-
+const sessionConfig = {
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    proxy: true,
+    cookie: {
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' || isEphemeralFs,
+    },
+};
+if (!isEphemeralFs) {
+    sessionConfig.store = new SQLiteStore({
+        db: 'sessions.sqlite',
+        dir: storageDir,
+    });
+}
+app.use(session(sessionConfig));
+app.use(authCookie.restoreToSession);
 app.use(attachUser(usersService));
 app.use((req, res, next) => {
     res.locals.currentUser = req.user || null;
     res.locals.hasRole = hasRole;
     res.locals.hasAnyRole = hasAnyRole;
+    res.locals.isStaffUser = isStaffUser;
+    res.locals.staffRoles = STAFF_ROLES;
     res.locals.isAkreditaceOnly = isAkreditaceOnly;
     res.locals.isRedaktorWorkflow = isRedaktorWorkflow;
     res.locals.formatRoles = formatRoles;
@@ -176,6 +212,7 @@ app.use((req, res, next) => {
         article_sidebar_300: process.env.GOOGLE_ADS_SLOT_ARTICLE_SIDEBAR_300 || null,
     };
     res.locals.assetVersion = resolveAssetVersion();
+    res.locals.whatsNew = whatsNew;
     res.locals.getMainNav = getMainNav;
     res.locals.formatPragueDateTime = formatPragueDateTime;
     try {
@@ -210,6 +247,7 @@ app.use(
 app.use('/api', apiOembed);
 app.use('/api', apiMostRead);
 app.use('/api', apiPenalty);
+app.use('/api', apiArticleTts);
 
 // Public + CMS routes
 app.use(newsletterPublicRouter);
@@ -265,6 +303,10 @@ process.on('unhandledRejection', (err) => {
   console.error('[11ka] unhandledRejection', err);
 });
 
-app.listen(PORT, HOST, () => {
-    console.log(`11ka listening at http://localhost:${PORT}`);
-});
+module.exports = app;
+
+if (require.main === module) {
+    app.listen({ port: Number(PORT), host: HOST, ipv6Only: false }, () => {
+        console.log(`11ka listening at http://localhost:${PORT}`);
+    });
+}

@@ -1,0 +1,78 @@
+<%
+  var rows = typeof standings !== 'undefined' && standings ? standings : [];
+  var compact = typeof compactTable !== 'undefined' && compactTable;
+  var highlights = {};
+  if (typeof highlightCode !== 'undefined' && highlightCode) highlights[String(highlightCode)] = true;
+  if (typeof highlightCodes !== 'undefined' && highlightCodes && highlightCodes.length) {
+    highlightCodes.forEach(function (code) {
+      if (code) highlights[String(code)] = true;
+    });
+  }
+  var tableHref = typeof tableHref !== 'undefined' && tableHref ? tableHref : '/zapasy/live#tabulka';
+  var tableClass = 'cl-table';
+  if (compact) tableClass += ' cl-table--compact';
+  if (typeof tableRail !== 'undefined' && tableRail) tableClass += ' cl-table--rail';
+%>
+<% if (rows.length) { %>
+<section class="<%= tableClass %>" aria-label="Tabulka Chance Ligy">
+  <div class="home-section-head cl-table__head">
+    <h2 class="cl-matches__title"><%= compact ? 'Tabulka' : 'Tabulka Chance Ligy' %></h2>
+    <% if (compact) { %>
+    <a href="<%= tableHref %>" class="btn-11 btn-11--sm btn-11--accent-outline shrink-0">Celá tabulka</a>
+    <% } %>
+  </div>
+  <div class="cl-table__wrap">
+    <table class="cl-table__grid">
+      <thead>
+        <tr>
+          <th class="cl-table__rank" title="Pořadí">#</th>
+          <th class="cl-table__team">Tým</th>
+          <th title="Zápasy">Z</th>
+          <% if (!compact) { %>
+          <th title="Výhry">V</th>
+          <th title="Remízy">R</th>
+          <th title="Prohry">P</th>
+          <% } %>
+          <th title="Góly">Góly</th>
+          <th title="Rozdíl gólů">+/-</th>
+          <th title="Body">B</th>
+          <% if (!compact) { %>
+          <th class="cl-table__form" title="Posledních 5 zápasů">Forma</th>
+          <% } %>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function (row) { %>
+        <tr class="<%= highlights[row.code] ? 'is-active' : '' %>">
+          <td class="cl-table__rank"><%= row.rank %></td>
+          <td class="cl-table__team">
+            <a href="<%= row.href %>">
+              <% if (row.logo) { %>
+              <img src="<%= row.logo %>" alt="" width="22" height="22" />
+              <% } %>
+              <span><%= compact ? (row.short || row.name) : row.name %></span>
+            </a>
+          </td>
+          <td><%= row.played %></td>
+          <% if (!compact) { %>
+          <td><%= row.won %></td>
+          <td><%= row.drawn %></td>
+          <td><%= row.lost %></td>
+          <% } %>
+          <td class="cl-table__goals"><%= row.goalsLabel %></td>
+          <td class="cl-table__gd"><%= row.gdLabel %></td>
+          <td class="cl-table__pts"><%= row.pts %></td>
+          <% if (!compact) { %>
+          <td class="cl-table__form">
+            <% (row.form || []).forEach(function (f) { %>
+            <span class="cl-form cl-form--<%= f === 'W' ? 'w' : f === 'D' ? 'd' : 'l' %>"><%= f === 'W' ? 'V' : f === 'D' ? 'R' : 'P' %></span>
+            <% }); %>
+          </td>
+          <% } %>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<% } %>

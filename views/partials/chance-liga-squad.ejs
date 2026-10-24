@@ -1,0 +1,45 @@
+<%
+  var squad = typeof squad !== 'undefined' && squad ? squad : { groups: [], coach: null };
+  var groups = squad.groups || [];
+  var coach = squad.coach || null;
+%>
+<section class="cl-squad" aria-label="Soupiska">
+  <% if (coach && coach.name) { %>
+  <p class="cl-squad__coach">Trenér: <strong><%= coach.name %></strong><% if (coach.age) { %> <span>· <%= coach.age %> let</span><% } %></p>
+  <% } %>
+  <% if (!groups.length) { %>
+  <p class="cl-matches__empty">Soupiska se právě načítá.</p>
+  <% } %>
+  <% groups.forEach(function (group) { %>
+  <div class="cl-squad__group">
+    <h3 class="cl-squad__title"><%= group.title %></h3>
+    <div class="cl-squad__wrap">
+      <table class="cl-squad__grid">
+        <thead>
+          <tr>
+            <th class="cl-squad__no">#</th>
+            <th>Jméno</th>
+            <th>Věk</th>
+            <th title="Zápasy">Z</th>
+            <th title="Góly">G</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% (group.players || []).forEach(function (p) { %>
+          <tr class="<%= p.out ? 'is-out' : '' %>">
+            <td class="cl-squad__no"><%= p.jersey || '—' %></td>
+            <td>
+              <%= p.name %>
+              <% if (p.out) { %><span class="cl-squad__out">mimo soupisku</span><% } %>
+            </td>
+            <td><%= p.age || '—' %></td>
+            <td><%= p.played || '0' %></td>
+            <td><%= p.goals || '0' %></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% }); %>
+</section>

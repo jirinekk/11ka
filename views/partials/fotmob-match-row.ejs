@@ -1,0 +1,25 @@
+<%
+  var m = typeof match !== 'undefined' && match ? match : {};
+  var href = m.detailHref || '';
+  var homeName = m.homeLabel || m.home || '';
+  var awayName = m.awayLabel || m.away || '';
+  var badge = m.badge || m.time || '';
+  var score = m.scoreLine || (m.isLive || m.isDone ? (m.score || '0 - 0').replace(':', ' - ') : '–');
+  var Tag = href ? 'a' : 'div';
+%>
+<<%= Tag %> class="fm-row<%= m.isLive ? ' is-live' : '' %>"<% if (href) { %> href="<%= href %>"<% } %>>
+  <span class="fm-row__badge<%= m.isLive ? ' is-live' : '' %>"><%= badge %></span>
+  <span class="fm-row__home">
+    <span class="fm-row__name"><%= homeName %></span>
+    <% if (m.homeLogo) { %>
+    <img class="fm-row__crest" src="<%= m.homeLogo %>" alt="" width="22" height="22" />
+    <% } %>
+  </span>
+  <span class="fm-row__score"><%= score %></span>
+  <span class="fm-row__away">
+    <% if (m.awayLogo) { %>
+    <img class="fm-row__crest" src="<%= m.awayLogo %>" alt="" width="22" height="22" />
+    <% } %>
+    <span class="fm-row__name"><%= awayName %></span>
+  </span>
+</<%= Tag %>>

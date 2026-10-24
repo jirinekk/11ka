@@ -1,7 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const articlesService = require('../services/articles');
-const commentsService = require('../services/comments');
+const articleRatingsService = require('../services/article-ratings');
 const adsService = require('../services/ads');
 const kitswapsService = require('../services/kitswaps');
 const mostReadService = require('../services/most-read');
@@ -12,14 +12,98 @@ const { parseBlocksInput, renderBlocksToHtml } = require('../lib/article-blocks'
 const { prepareLineupForView } = require('../lib/lineup');
 const { sendAccreditationRequest } = require('../services/mail');
 const accreditationService = require('../services/accreditation');
-const { resolveTagOptions, getTagsForNav } = require('../config/main-nav');
+const {
+  resolveTagOptions,
+  getTagsForNav,
+  REGION_PARENTS,
+  getTypeSubcat,
+  getListingScope,
+  resolveArticleSection,
+} = require('../config/main-nav');
+const { getRubric, listRubrics } = require('../config/rubrics');
+const rubricsService = require('../services/rubrics');
+const newsletterService = require('../services/newsletter');
+const { safeNextPath } = require('../lib/safe-path');
 const { buildHomeLeaderboardPlacements, getHomeLeaderboardPlacementsBySlug } = require('../config/ssp-zones');
 const { getSidebarInstagramForView } = require('../services/sidebar-instagram-feed');
 const pomahaEventsService = require('../services/pomaha-events');
 const matchFixturesService = require('../services/match-fixtures');
 const matchTeamsService = require('../services/match-teams');
+const liveScoresService = require('../services/live-scores');
+const livesportChance = require('../services/livesport-chance');
+const chanceLigaLogos = require('../services/chance-liga-logos');
 const penaltyGameService = require('../services/penalty-game');
 const penaltyLeaderboardService = require('../services/penalty-leaderboard');
+const articleTts = require('../services/article-tts');
+
+function foldTeamName(name) {
+  return String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function logoForTeam(lookup, name) {
+  if (!name) return '';
+  if (lookup[name]) return lookup[name];
+  const needle = foldTeamName(name);
+  if (!needle) return '';
+  const entries = Object.entries(lookup || {});
+  const exact = entries.find(([key]) => foldTeamName(key) === needle);
+  if (exact && exact[1]) return exact[1];
+  const partial = entries.find(([key]) => {
+    const k = foldTeamName(key);
+    return k && (needle.includes(k) || k.includes(needle));
+  });
+  return partial && partial[1] ? partial[1] : '';
+}
+
+function asChanceLeague(id, label, matches) {
+  if (!matches || !matches.length) return [];
+  return [{ id, label, matches }];
+}
+
+async function loadChanceStandings() {
+  try {
+    return await livesportChance.getStandings();
+  } catch {
+    return [];
+  }
+}
+
+async function loadChanceResults(limit = 32) {
+  try {
+    const matches = await livesportChance.listResults(limit);
+    return asChanceLeague('chance-liga-results', 'Chance Liga', matches);
+  } catch {
+    return [];
+  }
+}
+
+async function loadChanceMatchLeagues(limit = 36) {
+  try {
+    const leagues = await liveScoresService.listChanceLigaSchedule({ limit });
+    const lookup = matchTeamsService.buildLogoLookup();
+    return (leagues || [])
+      .map((league) => ({
+        ...league,
+        matches: (league.matches || []).map((m) => {
+          const officialHome = league.id === 'chance-liga' ? chanceLigaLogos.logoForName(m.home) : '';
+          const officialAway = league.id === 'chance-liga' ? chanceLigaLogos.logoForName(m.away) : '';
+          return chanceLigaLogos.withLogos({
+            ...m,
+            homeLogo: officialHome || m.homeLogo || logoForTeam(lookup, m.home),
+            awayLogo: officialAway || m.awayLogo || logoForTeam(lookup, m.away),
+          });
+        }),
+      }))
+      .filter((league) => league.matches && league.matches.length);
+  } catch {
+    return [];
+  }
+}
 
 const router = express.Router();
 
@@ -61,6 +145,7 @@ function mapArticleCard(a, imageFallback = DEFAULT_CARD_IMAGE) {
     heroPosition: heroCardPositionFor(a),
     title: a.title,
     excerpt: a.excerpt || '',
+    category: a.category ? String(a.category).trim() : '',
     tag: a.tag ? String(a.tag).trim() : '',
     isoTime: a.published_at || a.created_at || '',
     timeAgo: relativeTime(a.published_at || a.created_at),
@@ -68,33 +153,12 @@ function mapArticleCard(a, imageFallback = DEFAULT_CARD_IMAGE) {
   };
 }
 
-const HOME_CATEGORY_SECTIONS = [
-  {
-    title: 'Český Fotbal',
-    href: '/cesky-fotbal',
-    category: ['Český Fotbal', 'Česká Fotbal', 'Česká liga'],
-  },
-  {
-    title: 'Ženský Fotbal',
-    href: '/zensky-fotbal',
-    category: 'Ženský Fotbal',
-  },
-  {
-    title: 'Analýzy',
-    href: '/analyzy',
-    category: 'Analýzy',
-  },
-  {
-    title: 'Světový Fotbal',
-    href: '/svetovy-fotbal',
-    category: ['Světový Fotbal', 'Evropa'],
-  },
-  {
-    title: 'Rozhovory',
-    href: '/rozhovory',
-    category: 'Rozhovory',
-  },
-];
+const HOME_CATEGORY_SECTIONS = REGION_PARENTS.map((parent) => ({
+  title: parent.label,
+  href: parent.href,
+  category: parent.categories,
+  regionTags: parent.regionTags,
+}));
 
 const HOME_SECTIONS_CACHE_TTL_MS = 30 * 1000;
 let homeSectionsCache = { at: 0, sections: null };
@@ -112,6 +176,7 @@ function buildHomeSections() {
       .listLatestForListing({
         scope: 'category',
         category: section.category,
+        regionTags: section.regionTags,
         limit: 3,
       })
       .map((a) => mapArticleCard(a)),
@@ -147,11 +212,14 @@ function mapHeroSlides(articles) {
 function buildListingPageData(req, opts = {}) {
   const scope = opts.scope || 'category';
   const category = opts.category;
+  const typeCategory = opts.typeCategory;
+  const regionTags = opts.regionTags;
   const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 80) : '';
   const tagFromQuery = typeof req.query.tag === 'string' ? req.query.tag.trim().slice(0, 60) : '';
   const tag = scope === 'tag' ? String(opts.fixedTag || tagFromQuery || '').trim() : tagFromQuery;
   const perPage = LISTING_PER_PAGE;
   const listingQuery = scope === 'category' ? q : scope === 'all' ? q : '';
+  const listingExtra = { typeCategory, regionTags, rubricSlug: opts.rubricSlug };
 
   if (scope === 'search') {
     if (!q) {
@@ -189,10 +257,12 @@ function buildListingPageData(req, opts = {}) {
     category,
     tag,
     query: listingQuery,
+    ...listingExtra,
   });
   const page = parsePositiveInt(req.query.page, 1);
   const appliesHero = !listingQuery;
-  const useHero = page === 1 && appliesHero && totalItems >= HERO_COUNT;
+  const minHero = scope === 'rubric' ? 1 : HERO_COUNT;
+  const useHero = page === 1 && appliesHero && totalItems >= minHero;
   const pagination = buildPagination({
     pathname: req.path,
     query: req.query,
@@ -209,6 +279,7 @@ function buildListingPageData(req, opts = {}) {
       category,
       tag,
       query: listingQuery,
+      ...listingExtra,
       limit: HERO_COUNT,
     });
     heroSlides = mapHeroSlides(heroArticles);
@@ -219,6 +290,7 @@ function buildListingPageData(req, opts = {}) {
     category,
     tag,
     query: listingQuery,
+    ...listingExtra,
     limit: perPage,
     offset: gridOffset,
   });
@@ -229,6 +301,29 @@ function buildListingPageData(req, opts = {}) {
     articles: dbArticles.map((a) => mapArticleCard(a)),
     heroSlides,
     pagination,
+  };
+}
+
+const rubricNotifyLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+function buildRubricPage(req, rubric) {
+  if (!rubric) return null;
+  const email = req.user && req.user.email ? req.user.email : '';
+  return {
+    slug: rubric.slug,
+    label: rubric.label,
+    description: rubric.description || '',
+    owner_name: rubric.owner_name || '',
+    owner_href: rubricsService.ownerHref(rubric),
+    owner_avatar: rubric.owner_avatar || '',
+    owner_initials: rubricsService.ownerInitials(rubric.owner_name),
+    notify_enabled: !!rubric.notify_enabled,
+    subscribed: email ? rubricsService.isSubscribed(rubric.id, email) : false,
   };
 }
 
@@ -312,6 +407,7 @@ router.use(async (req, res, next) => {
     const { getSidebarInstagram } = require('../config/sidebar-instagram');
     res.locals.sidebarInstagram = getSidebarInstagram();
   }
+  res.locals.chanceStandings = await loadChanceStandings();
   next();
 });
 
@@ -376,12 +472,19 @@ router.get('/robots.txt', (req, res) => {
 router.get('/sitemap.xml', (req, res) => {
   const staticPaths = [
     '/',
-    '/zapasy',
     '/zapasy/live',
-    '/rozhovory',
-    '/analyzy',
     '/cesky-fotbal',
+    '/cesky-fotbal/zapasy',
+    '/cesky-fotbal/analyzy',
+    '/cesky-fotbal/rozhovory',
+    '/zensky-fotbal',
+    '/zensky-fotbal/zapasy',
+    '/zensky-fotbal/analyzy',
+    '/zensky-fotbal/rozhovory',
     '/svetovy-fotbal',
+    '/svetovy-fotbal/zapasy',
+    '/svetovy-fotbal/analyzy',
+    '/svetovy-fotbal/rozhovory',
     '/vsechny-clanky',
     '/kontakt',
     '/spoluprace',
@@ -501,6 +604,8 @@ router.get('/', async (req, res) => {
   const heroSlides = mapHeroSlides(published);
   const hero = heroSlides[0] || homeFallback.hero;
   const homeSections = buildHomeSections();
+  const chanceMatchLeagues = await loadChanceMatchLeagues(16);
+  const chanceStandings = await loadChanceStandings();
   const sidebarMostReadDb = mostReadService.getMostReadCards({
     layout: 'sidebar',
     limit: 4,
@@ -508,6 +613,7 @@ router.get('/', async (req, res) => {
   const sidebarMostRead = sidebarMostReadDb.length
     ? sidebarMostReadDb
     : homeFallback.mostRead.slice(0, 4);
+  const sidebarFavorites = articleRatingsService.listFavorites();
   const kitswaps = kitswapsService.listActiveForHome();
   const pomahaHomeAd = adMap.home_pomaha_11ka || null;
 
@@ -520,7 +626,10 @@ router.get('/', async (req, res) => {
     activeNav: 'home',
     hero,
     heroSlides,
+    chanceMatchLeagues,
+    chanceStandings,
     sidebarMostRead,
+    sidebarFavorites,
     homeSections,
     pomahaHomeAd,
     homeLeaderboardPlacements: buildHomeLeaderboardPlacements(),
@@ -602,15 +711,23 @@ function buildPagination({ pathname, query, page, perPage, totalItems }) {
 }
 
 async function renderCategoryPage(req, res, opts) {
-  const { category, activeNav, pageTitle, pageSubtitle, emptyTitle, emptySubtitle, searchQuery } = opts;
+  const { category, activeNav, activeSubnav, pageTitle, pageSubtitle, emptyTitle, emptySubtitle, searchQuery } = opts;
   const tagPillsMode =
     opts.tagPillsMode != null
       ? opts.tagPillsMode
       : 'full';
 
   const adMap = adsService.getActiveMap();
-  let tagOptions = resolveTagOptions(activeNav, articlesService.listDistinctTags(200));
-  const listing = buildListingPageData(req, { scope: 'category', category });
+  let tagOptions = opts.tagOptions != null
+    ? opts.tagOptions
+    : resolveTagOptions(activeNav, articlesService.listDistinctTags(200));
+  const listing = buildListingPageData(req, {
+    scope: opts.scope || 'category',
+    category,
+    typeCategory: opts.typeCategory,
+    regionTags: opts.regionTags,
+    rubricSlug: opts.rubricSlug,
+  });
   if (listing.tag && !tagOptions.includes(listing.tag)) tagOptions = [listing.tag, ...tagOptions];
 
   const nl = req.query.newsletter;
@@ -620,6 +737,7 @@ async function renderCategoryPage(req, res, opts) {
   res.render('category', {
     title: `${pageTitle} - 11ka`,
     activeNav,
+    activeSubnav: activeSubnav || '',
     pageTitle,
     pageSubtitle,
     emptyTitle,
@@ -634,6 +752,9 @@ async function renderCategoryPage(req, res, opts) {
     newsletter: homeFallback.newsletter,
     adMap,
     newsletterStatus,
+    rubricPage: opts.rubricPage || null,
+    rubricCards: opts.rubricCards || null,
+    rubricNotifyStatus: opts.rubricNotifyStatus || null,
     ...seoForPage({
       title: `${pageTitle} - 11ka.cz`,
       description: `${pageTitle} na 11ka.cz - nejnovější články, analýzy a přehledy.`,
@@ -650,20 +771,89 @@ async function renderCategoryPage(req, res, opts) {
   });
 }
 
-const ZENSKY_FOTBAL_SECTION = { label: 'Ženský Fotbal', href: '/zensky-fotbal', nav: 'zensky-fotbal' };
-const CESKA_FOTBAL_SECTION = { label: 'Český Fotbal', href: '/cesky-fotbal', nav: 'cesky-fotbal' };
-const SVETOVY_FOTBAL_SECTION = { label: 'Světový Fotbal', href: '/svetovy-fotbal', nav: 'svetovy-fotbal' };
-const SECTION_META = {
-  'Zápasy': { label: 'Zápasy', href: '/zapasy', nav: 'zapasy' },
-  'Rozhovory': { label: 'Rozhovory', href: '/rozhovory', nav: 'rozhovory' },
-  'Analýzy': { label: 'Analýzy', href: '/analyzy', nav: 'analyzy' },
-  'Český Fotbal': CESKA_FOTBAL_SECTION,
-  'Česká Fotbal': CESKA_FOTBAL_SECTION,
-  'Česká liga': CESKA_FOTBAL_SECTION,
-  'Ženský Fotbal': ZENSKY_FOTBAL_SECTION,
-  'Světový Fotbal': SVETOVY_FOTBAL_SECTION,
-  'Evropa': SVETOVY_FOTBAL_SECTION,
-};
+const SECTION_META = Object.fromEntries(
+  REGION_PARENTS.flatMap((parent) =>
+    parent.categories.map((category) => [
+      category,
+      { label: parent.label, href: parent.href, nav: parent.id },
+    ])
+  )
+);
+
+function fixtureToListRow(fixture) {
+  const isLive = !!fixture.isLive;
+  const isDone = fixture.status === 'Odehráno' || fixture.status === 'Kontumace';
+  return {
+    home: fixture.homeTeam,
+    away: fixture.awayTeam,
+    homeLabel: fixture.homeTeam,
+    awayLabel: fixture.awayTeam,
+    homeLogo: fixture.homeLogo || '',
+    awayLogo: fixture.awayLogo || '',
+    isLive,
+    isDone,
+    dayKey: fixture.dayKey || livesportChance.pragueDayKey(fixture.kickoffAt || fixture.kickoff_at || fixture.date),
+    scoreLine: fixture.showScore ? `${fixture.homeScore} - ${fixture.awayScore}` : '–',
+    badge: isLive ? 'LIVE' : isDone ? 'FT' : fixture.kickoffTime || '',
+    detailHref: fixture.detailUrl,
+    homeHref: '',
+    awayHref: '',
+  };
+}
+
+function normalizeAgendaMatch(m) {
+  const done = !!m.isDone;
+  const live = !!m.isLive;
+  const raw = String(m.scoreLine || m.score || '').replace(/\s+/g, '');
+  const parts = raw.match(/^(\d+)[:\-](\d+)$/);
+  return {
+    ...m,
+    dayKey: m.dayKey || livesportChance.pragueDayKey(m.date || m.kickoff),
+    homeLabel: m.homeLabel || m.home,
+    awayLabel: m.awayLabel || m.away,
+    scoreLine: live || done ? (parts ? `${parts[1]} - ${parts[2]}` : m.scoreLine || m.score || '0 - 0') : m.scoreLine || '–',
+    badge: live ? 'LIVE' : done ? 'FT' : m.badge || m.time || '',
+  };
+}
+
+function groupAgendaDays(leagues, fromDay) {
+  const map = new Map();
+  (leagues || []).forEach((league) => {
+    (league.matches || []).forEach((m) => {
+      const key = m.dayKey || '';
+      if (!key) return;
+      if (fromDay && key < fromDay) return;
+      if (!map.has(key)) {
+        map.set(key, {
+          day: key,
+          dayLabel: livesportChance.formatDayNavLabel(key),
+          leagues: [],
+        });
+      }
+      const bucket = map.get(key);
+      let group = bucket.leagues.find((item) => item.id === league.id);
+      if (!group) {
+        group = { id: league.id, label: league.label, matches: [] };
+        bucket.leagues.push(group);
+      }
+      group.matches.push(m);
+    });
+  });
+  let days = Array.from(map.values()).sort((a, b) => a.day.localeCompare(b.day));
+  if (!days.length && fromDay) days = groupAgendaDays(leagues, '');
+  return days;
+}
+
+function matchesHubQs(base, extra) {
+  const params = new URLSearchParams();
+  const merged = { ...base, ...extra };
+  Object.keys(merged).forEach((key) => {
+    const val = merged[key];
+    if (val) params.set(key, val);
+  });
+  const qs = params.toString();
+  return qs ? `/zapasy/live?${qs}` : '/zapasy/live';
+}
 
 router.get('/zapasy/live', async (req, res) => {
   const adMap = adsService.getActiveMap();
@@ -671,47 +861,201 @@ router.get('/zapasy/live', async (req, res) => {
   const newsletterStatus =
     nl === 'ok' || nl === 'dupe' || nl === 'bad' ? nl : null;
 
-  const perPage = 10;
-  const rawPage = parseInt(req.query.page, 10);
-  const requestedPage = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
-  const totalItems = matchFixturesService.countForWeb();
-  const pagination = buildPagination({
-    pathname: '/zapasy/live',
-    query: req.query,
-    page: requestedPage,
-    perPage,
-    totalItems,
-  });
-  const offset = (pagination.page - 1) * perPage;
-  const logoLookup = matchTeamsService.buildLogoLookup();
-  const fixtures = matchFixturesService
-    .listForWebPaged(perPage, offset)
-    .map((row) => {
-      const fixture = matchFixturesService.formatForWeb(row);
-      fixture.homeLogo = logoLookup[fixture.homeTeam] || '';
-      fixture.awayLogo = logoLookup[fixture.awayTeam] || '';
-      return fixture;
-    });
+  const liveOnly = String(req.query.live || '') === '1';
+  const ligaFilter = String(req.query.liga || '').trim();
+  const focusDay = String(req.query.den || '').trim().slice(0, 10);
+  let agenda = { today: '', liveCount: 0, matches: [] };
+  try {
+    agenda = await livesportChance.getMatchesAgenda();
+  } catch {
+    agenda = { today: '', liveCount: 0, matches: [] };
+  }
+
+  const today = agenda.today || livesportChance.pragueDayKey(new Date().toISOString());
+  const chanceStandings = await loadChanceStandings();
+  let narodni = [];
+  try {
+    narodni = await livesportChance.listNarodniLiga();
+  } catch {
+    narodni = [];
+  }
+
+  let repre = [];
+  try {
+    repre = await livesportChance.listCzechNational();
+  } catch {
+    repre = [];
+  }
+
+  let leagues = [
+    { id: 'chance-liga', label: 'Chance Liga', matches: agenda.matches || [] },
+    { id: 'chance-narodni', label: 'Chance Národní liga', matches: narodni },
+    { id: 'ceska-reprezentace', label: 'Česká reprezentace', matches: repre },
+  ];
+  if (liveOnly) {
+    leagues = leagues.map((league) => ({
+      ...league,
+      matches: (league.matches || []).filter((m) => m.isLive),
+    }));
+  }
+  if (ligaFilter) {
+    leagues = leagues.filter((league) => league.id === ligaFilter);
+  }
+
+  const matchDays = groupAgendaDays(leagues, today).slice(0, 12);
+  const liveCount = matchDays.reduce(
+    (sum, day) =>
+      sum +
+      day.leagues.reduce((n, league) => n + (league.matches || []).filter((m) => m.isLive).length, 0),
+    0
+  );
+  const qsBase = { liga: ligaFilter || '', live: liveOnly ? '1' : '' };
+  const sidebarMostRead = mostReadService.getMostReadCards({ layout: 'sidebar', limit: 4 });
 
   res.render('zapasy-live', {
     title: 'Seznam zápasů - 11ka',
     activeNav: 'zapasy',
-    pageTitle: 'Seznam zápasů',
-    fixtures,
-    pagination: pagination.totalPages > 1 ? pagination : null,
+    pageTitle: 'Zápasy',
+    matchDays,
+    focusDay: /^\d{4}-\d{2}-\d{2}$/.test(focusDay) ? focusDay : (matchDays[0] && matchDays[0].day) || today,
+    liveCount,
+    ligaFilter,
+    liveOnly,
+    liveHref: matchesHubQs({ liga: ligaFilter }, { live: liveOnly ? '' : '1' }),
+    ligaHrefs: {
+      all: matchesHubQs({ live: liveOnly ? '1' : '' }, { liga: '' }),
+      'chance-liga': matchesHubQs(qsBase, { liga: 'chance-liga' }),
+      'chance-narodni': matchesHubQs(qsBase, { liga: 'chance-narodni' }),
+      'ceska-reprezentace': matchesHubQs(qsBase, { liga: 'ceska-reprezentace' }),
+    },
+    chanceStandings,
+    chanceClubs: chanceLigaLogos.listClubs(),
+    sidebarMostRead,
     newsletter: homeFallback.newsletter,
     newsletterStatus,
     adMap,
     ...seoForPage({
-      title: 'Seznam zápasů - 11ka.cz',
-      description: 'Seznam fotbalových zápasů a živé skóre na 11ka.cz.',
+      title: 'Zápasy - 11ka.cz',
+      description: 'Program, výsledky a tabulka Chance Ligy na 11ka.cz.',
       path: '/zapasy/live',
       structuredData: [
         {
           '@context': 'https://schema.org',
           '@type': 'CollectionPage',
-          name: 'Seznam zápasů',
+          name: 'Zápasy',
           url: absoluteUrl('/zapasy/live'),
+        },
+      ],
+    }),
+  });
+});
+
+router.get('/klub/:slug', async (req, res) => {
+  const slug = String(req.params.slug || '').trim();
+  let profile = null;
+  try {
+    profile = await livesportChance.getClubProfile(slug);
+  } catch {
+    profile = null;
+  }
+  if (!profile || !profile.club) {
+    return res.status(404).render('404', { title: 'Klub nenalezen - 11ka', activeNav: 'zapasy' });
+  }
+  const club = profile.club;
+  const clubArticles = articlesService
+    .listPublishedByTeamCode(club.code, 6)
+    .map((row) => mapArticleCard(row));
+  const hubRaw = String(req.query.view || '').trim().toLowerCase();
+  const clubHubView = ['soupiska', 'program', 'vysledky', 'tabulka'].includes(hubRaw)
+    ? hubRaw
+    : 'soupiska';
+
+  res.render('klub', {
+    title: `${club.name} - Chance Liga - 11ka`,
+    activeNav: 'zapasy',
+    club,
+    clubRow: profile.row,
+    clubSquad: profile.squad,
+    chanceStandings: profile.standings || [],
+    clubProgramLeagues: asChanceLeague('club-program', 'Program', profile.program),
+    clubResultLeagues: asChanceLeague('club-results', 'Výsledky', profile.results),
+    clubArticles,
+    clubHubView,
+    ...seoForPage({
+      title: `${club.name} - Chance Liga - 11ka`,
+      description: `Profil ${club.name}: soupiska, program, výsledky a tabulka Chance Ligy na 11ka.cz.`,
+      path: club.href,
+      structuredData: [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'SportsTeam',
+          name: club.name,
+          url: absoluteUrl(club.href),
+          sport: 'Soccer',
+        },
+      ],
+    }),
+  });
+});
+
+router.get('/tym/:slug', (req, res) => {
+  res.redirect(301, `/klub/${encodeURIComponent(String(req.params.slug || '').trim())}`);
+});
+
+router.get('/zapasy/chance/:slug', async (req, res) => {
+  const slug = String(req.params.slug || '').trim();
+  let match = null;
+  try {
+    match = await livesportChance.getMatchDetail(slug);
+  } catch {
+    match = null;
+  }
+  if (!match) {
+    return res.status(404).render('404', { title: 'Zápas nenalezen - 11ka', activeNav: 'zapasy' });
+  }
+  match = chanceLigaLogos.withLogos(match);
+  const matchArticles = articlesService
+    .listPublishedByMatchKey(`chance:${slug}`, 8)
+    .map((row) => mapArticleCard(row));
+  const chanceStandings = await loadChanceStandings();
+  let roundMates = [];
+  try {
+    roundMates = await livesportChance.listSameRound(match.round, match.id);
+  } catch {
+    roundMates = [];
+  }
+
+  const adMap = adsService.getActiveMap();
+  const nl = req.query.newsletter;
+  const newsletterStatus = nl === 'ok' || nl === 'dupe' || nl === 'bad' ? nl : null;
+  const pageTitle = `${match.home} vs ${match.away}`;
+  const seoTitle = `${pageTitle} - Chance Liga - 11ka`;
+
+  res.render('chance-zapas-detail', {
+    title: seoTitle,
+    activeNav: 'zapasy',
+    pageTitle,
+    match,
+    matchArticles,
+    chanceStandings,
+    roundMates,
+    newsletter: homeFallback.newsletter,
+    newsletterStatus,
+    adMap,
+    ...seoForPage({
+      title: seoTitle,
+      description: `Zápas ${match.home} vs ${match.away} (Chance Liga) na 11ka.cz — skóre, střelci a sestavy.`,
+      path: match.href || `/zapasy/chance/${slug}`,
+      ogType: 'website',
+      structuredData: [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'SportsEvent',
+          name: pageTitle,
+          url: absoluteUrl(match.href || `/zapasy/chance/${slug}`),
+          startDate: match.date || undefined,
+          homeTeam: { '@type': 'SportsTeam', name: match.home },
+          awayTeam: { '@type': 'SportsTeam', name: match.away },
         },
       ],
     }),
@@ -769,59 +1113,126 @@ router.get('/zapasy/:id', async (req, res) => {
   });
 });
 
-router.get('/zapasy', async (req, res) => {
+function renderRegionCategory(req, res, parent, subcat) {
+  const listing = getListingScope(parent, subcat);
+  const pageTitle = subcat ? `${parent.label} · ${subcat.label}` : parent.label;
   return renderCategoryPage(req, res, {
-    category: 'Zápasy',
-    activeNav: 'zapasy',
-    pageTitle: 'Zápasy',
+    category: listing.category,
+    typeCategory: listing.typeCategory,
+    regionTags: listing.regionTags,
+    activeNav: parent.id,
+    activeSubnav: subcat ? subcat.id : '',
+    pageTitle,
   });
+}
+
+router.get('/zapasy', (req, res) => {
+  res.redirect(301, '/zapasy/live');
 });
 
-router.get('/zensky-fotbal', async (req, res) => {
-  return renderCategoryPage(req, res, {
-    category: 'Ženský Fotbal',
-    activeNav: 'zensky-fotbal',
-    pageTitle: 'Ženský Fotbal',
-  });
+router.get('/rozhovory', (req, res) => {
+  res.redirect(301, '/cesky-fotbal/rozhovory');
 });
 
-router.get('/rozhovory', async (req, res) => {
-  return renderCategoryPage(req, res, {
-    category: 'Rozhovory',
-    activeNav: 'rozhovory',
-    pageTitle: 'Rozhovory',
-  });
-});
-
-router.get('/analyzy', async (req, res) => {
-  return renderCategoryPage(req, res, {
-    category: 'Analýzy',
-    activeNav: 'analyzy',
-    pageTitle: 'Analýzy',
-  });
+router.get('/analyzy', (req, res) => {
+  res.redirect(301, '/cesky-fotbal/analyzy');
 });
 
 router.get('/ceska-liga', (req, res) => {
   res.redirect(301, '/cesky-fotbal');
 });
 
-router.get('/cesky-fotbal', async (req, res) => {
-  return renderCategoryPage(req, res, {
-    category: ['Český Fotbal', 'Česká Fotbal', 'Česká liga'],
-    activeNav: 'cesky-fotbal',
-    pageTitle: 'Český Fotbal',
-  });
-});
-
 router.get('/evropa', (req, res) => {
   res.redirect(301, '/svetovy-fotbal');
 });
 
-router.get('/svetovy-fotbal', async (req, res) => {
+router.get('/rubriky', async (req, res) => {
   return renderCategoryPage(req, res, {
-    category: ['Světový Fotbal', 'Evropa'],
-    activeNav: 'svetovy-fotbal',
-    pageTitle: 'Světový Fotbal',
+    scope: 'rubric',
+    activeNav: 'rubriky',
+    activeSubnav: '',
+    pageTitle: 'Rubriky',
+    pageSubtitle: 'Sloupky a pravidelné rubriky 11ky.',
+    emptyTitle: 'Zatím tu žádná rubrika není.',
+    emptySubtitle: 'Jakmile redakce označí článek jako rubriku, objeví se tady.',
+    tagPillsMode: 'none',
+    tagOptions: [],
+    rubricCards: listRubrics(),
+  });
+});
+
+router.get('/rubriky/:slug', async (req, res) => {
+  const rubric = getRubric(req.params.slug);
+  if (!rubric) {
+    return res.status(404).render('404', { title: 'Nenalezeno - 11ka', activeNav: 'rubriky' });
+  }
+  const notifyQ = String(req.query.oznameni || '').trim();
+  const rubricNotifyStatus =
+    notifyQ === 'ok' || notifyQ === 'off' || notifyQ === 'dupe' || notifyQ === 'bad' ? notifyQ : null;
+  return renderCategoryPage(req, res, {
+    scope: 'rubric',
+    rubricSlug: rubric.slug,
+    activeNav: 'rubriky',
+    activeSubnav: rubric.slug,
+    pageTitle: rubric.label,
+    pageSubtitle: rubric.description || '',
+    emptyTitle: 'V této rubrice zatím nic není.',
+    emptySubtitle: 'Nové díly se tu objeví, jakmile je redakce vydá.',
+    tagPillsMode: 'none',
+    tagOptions: [],
+    rubricPage: buildRubricPage(req, rubric),
+    rubricNotifyStatus,
+  });
+});
+
+router.post(
+  '/rubriky/:slug/oznameni',
+  rubricNotifyLimiter,
+  express.urlencoded({ extended: true }),
+  (req, res) => {
+    const rubric = getRubric(req.params.slug);
+    if (!rubric) {
+      return res.status(404).render('404', { title: 'Nenalezeno - 11ka', activeNav: 'rubriky' });
+    }
+    const action = String(req.body.action || 'on').trim();
+    const email = (req.user && req.user.email) || req.body.email;
+    const userId = req.user && req.user.id;
+    let status = 'bad';
+    if (action === 'off') {
+      status = rubricsService.unsubscribe(rubric.id, email) ? 'off' : 'bad';
+    } else {
+      status = rubricsService.subscribe(rubric.id, { email, userId });
+    }
+    return res.redirect(302, `/rubriky/${encodeURIComponent(rubric.slug)}?oznameni=${encodeURIComponent(status)}`);
+  }
+);
+
+router.get('/rubriky/:slug/oznameni/odhlasit', (req, res) => {
+  const rubric = getRubric(req.params.slug);
+  if (!rubric) {
+    return res.status(404).render('404', { title: 'Nenalezeno - 11ka', activeNav: 'rubriky' });
+  }
+  const email = String(req.query.email || '').trim();
+  const token = String(req.query.token || '');
+  const okToken = newsletterService.verifyUnsubscribeToken(email, token);
+  const removed = okToken ? rubricsService.unsubscribe(rubric.id, email) : false;
+  return res.redirect(
+    302,
+    `/rubriky/${encodeURIComponent(rubric.slug)}?oznameni=${removed ? 'off' : 'bad'}`
+  );
+});
+
+REGION_PARENTS.forEach((parent) => {
+  router.get(`/${parent.slug}`, async (req, res) => {
+    return renderRegionCategory(req, res, parent, null);
+  });
+
+  router.get(`/${parent.slug}/:subcat`, async (req, res) => {
+    const subcat = getTypeSubcat(req.params.subcat);
+    if (!subcat) {
+      return res.status(404).render('404', { title: 'Nenalezeno - 11ka', activeNav: parent.id });
+    }
+    return renderRegionCategory(req, res, parent, subcat);
   });
 });
 
@@ -1253,7 +1664,7 @@ router.get('/redakce', (req, res) => {
 
   const sefredaktori = members.filter((m) => m.role === 'sefredaktor');
   const redaktori = members.filter((m) => m.role === 'redaktor');
-  const vedeni = members.filter((m) => m.role === 'vedeni');
+  const vedeni = members.filter((m) => m.role === 'vedeni' || m.role === 'majitel');
 
   res.render('redakce', {
     title: 'Redakce - 11ka',
@@ -1369,6 +1780,51 @@ router.get('/11ka-pomaha', (req, res) => {
       title: '11ka Pomáhá - 11ka.cz',
       description: 'Dobročinné aktivity a projekty, které redakce 11ka.cz podporuje.',
       path: '/11ka-pomaha',
+    }),
+  });
+});
+
+router.get('/uzivatele', (req, res) => {
+  const adMap = adsService.getActiveMap();
+  const profiles = usersService.listRecentPublic(24);
+  res.render('uzivatele', {
+    title: 'Uživatelé - 11ka',
+    activeNav: 'home',
+    profiles,
+    adMap,
+    ...seoForPage({
+      title: 'Uživatelé - 11ka.cz',
+      description: 'Veřejné profily čtenářů a redakce 11ka.cz.',
+      path: '/uzivatele',
+    }),
+  });
+});
+
+router.get('/uzivatel/:slug', (req, res) => {
+  const key = String(req.params.slug || '').trim();
+  let user = usersService.getBySlug(key);
+  if (!user && /^\d+$/.test(key)) {
+    user = usersService.getById(parseInt(key, 10));
+  }
+  if (!user) {
+    return res.status(404).render('404', { title: 'Nenalezeno - 11ka', activeNav: 'home' });
+  }
+  const profile = usersService.hydratePublicProfile(user);
+  const adMap = adsService.getActiveMap();
+  const articleCount = articlesService.countPublishedByAuthor(user.id);
+  res.render('uzivatel', {
+    title: `${profile.display_name || 'Profil'} - 11ka`,
+    activeNav: 'home',
+    profile,
+    articleCount,
+    authorHref: profile.isStaff ? `/redaktor/${encodeURIComponent(String(user.id))}` : null,
+    isOwnProfile: !!(req.user && req.user.id === user.id),
+    adMap,
+    ...seoForPage({
+      title: `${profile.display_name || 'Profil'} - 11ka.cz`,
+      description: profile.public_bio || `Veřejný profil uživatele ${profile.display_name || '11ka'}.`,
+      path: usersService.profilePath(user),
+      ogType: 'profile',
     }),
   });
 });
@@ -1804,7 +2260,7 @@ router.get('/clanek', (req, res) => {
   res.redirect('/');
 });
 
-router.get('/clanek/:slug', (req, res) => {
+router.get('/clanek/:slug', async (req, res) => {
   const article = articlesService.getBySlug(req.params.slug);
   if (!article || article.status !== 'published') {
     return res.status(404).render('404', { title: 'Nenalezeno - 11ka', activeNav: 'home' });
@@ -1813,17 +2269,39 @@ router.get('/clanek/:slug', (req, res) => {
   articlesService.incrementView(article.id, req);
   const author = usersService.getById(article.author_id);
   const adMap = adsService.getActiveMap();
-  const section = article.category && SECTION_META[article.category] ? SECTION_META[article.category] : null;
+  const resolved = resolveArticleSection(article);
+  const section =
+    resolved && resolved.href
+      ? { label: resolved.label, href: resolved.href, nav: resolved.nav }
+      : article.category && SECTION_META[article.category]
+        ? SECTION_META[article.category]
+        : resolved
+          ? { label: resolved.label, href: resolved.href, nav: resolved.nav }
+          : null;
 
   const sidebarMostRead = mostReadService.getMostReadCards({ layout: 'sidebar' });
+  const articleRating = articleRatingsService.getSummary(article.id);
+  const userRatingStars =
+    req.user && req.user.id ? articleRatingsService.getUserStars(article.id, req.user.id) : null;
+  const ratingLoginNext = `/clanek/${encodeURIComponent(article.slug)}#hodnoceni`;
 
   const tags = article.category ? [article.category] : ['11ka'];
   const relatedArticles = articlesService
-    .listRelatedPublished(article.id, article.category, 3)
+    .listRelatedForArticle(article, 6)
     .map((a) => mapArticleCard(a));
-  // Komentáře jsou dočasně vypnuté (na webu se nezobrazují a nejdou přidávat).
-  // const comments = commentsService.listForArticle(article.id, 50);
+  const mentionedTeams = articlesService.getMentionedTeams(article.id);
+  let linkedMatch = null;
+  const parsedMatch = articlesService.parseMatchKey(article.match_key);
+  if (parsedMatch && parsedMatch.type === 'chance') {
+    try {
+      linkedMatch = chanceLigaLogos.withLogos(await livesportChance.getMatchDetail(parsedMatch.slug));
+      if (linkedMatch && !linkedMatch.detailHref) linkedMatch.detailHref = parsedMatch.href;
+    } catch {
+      linkedMatch = null;
+    }
+  }
   const activeNav = section ? section.nav : 'home';
+  const activeSubnav = resolved && resolved.subnav ? resolved.subnav : '';
   const breadcrumbSectionLabel = section ? section.label : article.category || 'Článek';
   const breadcrumbSectionHref = section ? section.href : null;
   const breadcrumbTitle = article.title;
@@ -1845,6 +2323,7 @@ router.get('/clanek/:slug', (req, res) => {
   res.render('article', {
     title: `${article.title} - 11ka`,
     activeNav,
+    activeSubnav,
     cmsArticle: true,
     breadcrumbs: [
       { label: 'Domů', href: '/' },
@@ -1872,12 +2351,26 @@ router.get('/clanek/:slug', (req, res) => {
       readTime: '',
     },
     sidebarMostRead,
+    articleRating,
+    userRatingStars,
+    ratingLoginNext,
+    ratingError:
+      req.query.rate === 'bad'
+        ? 'Hodnocení se nepodařilo uložit.'
+        : req.query.rate === 'auth'
+          ? 'Pro hodnocení se přihlaste.'
+          : null,
+    ratingSuccess: req.query.rate === 'ok',
     tags,
     relatedArticles,
-    // comments,
-    // commentError: req.query.comment === 'bad' ? 'Vyplňte jméno a komentář.' : null,
-    // commentSuccess: req.query.comment === 'ok',
+    mentionedTeams,
+    linkedMatch,
     shareUrls,
+    audioDurationSec: articleTts.estimateDurationSec({
+      title: article.title,
+      excerpt: article.excerpt,
+      body_html: articleBodyHtml,
+    }),
     adMap,
     articleMidPromoAd: adsService.pickCreative('article_between_google_penalty'),
     penaltyGame: penaltyGameService.getPublicConfig(),
@@ -1938,6 +2431,17 @@ router.get('/clanek/:slug', (req, res) => {
               url: absoluteUrl('/logo.png'),
             },
           },
+          ...(articleRating.count
+            ? {
+                aggregateRating: {
+                  '@type': 'AggregateRating',
+                  ratingValue: Number(articleRating.avg.toFixed(1)),
+                  bestRating: 3,
+                  worstRating: 1,
+                  ratingCount: articleRating.count,
+                },
+              }
+            : {}),
         },
         {
           '@context': 'https://schema.org',
@@ -1955,26 +2459,37 @@ router.get('/clanek/:slug', (req, res) => {
   });
 });
 
-router.post('/clanek/:slug/komentare', express.urlencoded({ extended: true }), (req, res) => {
-  // Dočasně vypnuto (neodstraňujeme implementaci, jen ji blokujeme).
-  return res.status(404).render('404', { title: 'Nedostupné - 11ka', activeNav: 'home' });
+const ratingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-  /*
+router.post('/clanek/:slug/hodnoceni', ratingLimiter, express.urlencoded({ extended: true }), (req, res) => {
   const article = articlesService.getBySlug(req.params.slug);
   if (!article || article.status !== 'published') {
     return res.status(404).render('404', { title: 'Nenalezeno - 11ka', activeNav: 'home' });
   }
-  try {
-    commentsService.createComment({
-      article_id: article.id,
-      author_name: req.body.author_name,
-      body: req.body.body,
-    });
-    return res.redirect(`/clanek/${encodeURIComponent(article.slug)}?comment=ok#comments-heading-cms`);
-  } catch {
-    return res.redirect(`/clanek/${encodeURIComponent(article.slug)}?comment=bad#comments-heading-cms`);
+  const articlePath = `/clanek/${encodeURIComponent(article.slug)}`;
+  if (!req.user || !req.user.id) {
+    const nextUrl = safeNextPath(`${articlePath}#hodnoceni`) || articlePath;
+    return res.redirect(`/prihlaseni?next=${encodeURIComponent(nextUrl)}`);
   }
-  */
+  try {
+    articleRatingsService.rateArticle({
+      articleId: article.id,
+      userId: req.user.id,
+      stars: req.body.stars,
+    });
+    return res.redirect(`${articlePath}?rate=ok#hodnoceni`);
+  } catch {
+    return res.redirect(`${articlePath}?rate=bad#hodnoceni`);
+  }
+});
+
+router.post('/clanek/:slug/komentare', (_req, res) => {
+  return res.status(404).render('404', { title: 'Nenalezeno - 11ka', activeNav: 'home' });
 });
 
 module.exports = router;

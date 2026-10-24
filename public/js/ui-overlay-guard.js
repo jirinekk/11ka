@@ -10,11 +10,18 @@
 
     var recruitment = document.querySelector('[data-recruitment-modal]');
     var recruitmentOpen = recruitment && recruitment.classList.contains('recruitment-modal--open');
-    var overlayScrollLocked = recruitmentOpen;
+    var whatsNew = document.querySelector('[data-whats-new]');
+    var whatsNewOpen = whatsNew && whatsNew.classList.contains('whats-new--open');
+    var overlayScrollLocked = recruitmentOpen || whatsNewOpen;
 
     if (recruitment && !recruitmentOpen) {
       document.documentElement.classList.remove('recruitment-modal-open');
       document.body.classList.remove('recruitment-modal-open');
+    }
+
+    if (whatsNew && !whatsNewOpen) {
+      document.documentElement.classList.remove('whats-new-open');
+      document.body.classList.remove('whats-new-open');
     }
 
     if (!overlayScrollLocked && document.body.style.position === 'fixed') {

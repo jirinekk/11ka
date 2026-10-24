@@ -9,7 +9,7 @@
           <p class="mt-2 text-sm text-11muted">Tým 11ka.</p>
         </header>
 
-        <% function roleLabel(r) { return r === 'sefredaktor' ? 'Šéfredaktor' : r === 'redaktor' ? 'Redaktor' : r === 'vedeni' ? 'Vedení' : r; } %>
+        <% function roleLabel(r) { return r === 'sefredaktor' ? 'Šéfredaktor' : r === 'redaktor' ? 'Redaktor' : (r === 'vedeni' || r === 'majitel') ? 'Vedení' : r; } %>
 
         <% (groups || []).forEach(function (g) { %>
         <% if (g.members && g.members.length) { %>

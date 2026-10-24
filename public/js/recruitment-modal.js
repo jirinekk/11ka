@@ -94,13 +94,26 @@
     }
   }
 
+  function whatsNewOpen() {
+    var el = document.querySelector('[data-whats-new]');
+    return !!(el && el.classList.contains('whats-new--open'));
+  }
+
   function scheduleOpen() {
     if (dismissed) return;
+    if (whatsNewOpen()) {
+      document.addEventListener('11ka:whats-new-closed', scheduleOpen, { once: true });
+      return;
+    }
     if (openTimer) window.clearTimeout(openTimer);
     openTimer = window.setTimeout(function () {
       openTimer = null;
+      if (whatsNewOpen()) {
+        document.addEventListener('11ka:whats-new-closed', scheduleOpen, { once: true });
+        return;
+      }
       openModal();
-    }, 400);
+    }, 12000);
   }
 
   modal.querySelectorAll('[data-recruitment-close]').forEach(function (btn) {

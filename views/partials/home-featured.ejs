@@ -1,0 +1,6 @@
+<% var items = (typeof slides !== 'undefined' && slides && slides.length) ? slides : []; %>
+<% if (items.length) { %>
+<section class="home-featured" aria-label="Hlavní články">
+  <%- include('hero-slider', { slides: items, ariaLabel: 'Hlavní články', variant: 'home' }) %>
+</section>
+<% } %>

@@ -5,7 +5,7 @@
 <% var isFirstSection = typeof sectionIndex !== 'undefined' && sectionIndex === 0; %>
 <section class="home-category-section" aria-labelledby="home-section-<%= sectionId %>">
   <div class="home-section-head">
-    <h2 id="home-section-<%= sectionId %>" class="font-display text-xl font-bold text-11accent sm:text-2xl"><%= sectionTitle %></h2>
+    <h2 id="home-section-<%= sectionId %>" class="font-display text-xl font-bold text-white sm:text-2xl"><%= sectionTitle %></h2>
     <a href="<%= sectionHref %>" class="btn-11 btn-11--sm btn-11--accent-outline shrink-0">Ukázat vše</a>
   </div>
   <% if (sectionArticles.length) { %>
@@ -29,10 +29,10 @@
           <a href="/stitky/<%= encodeURIComponent(item.tag) %>" class="tag-pill tag-pill--sm"><%= item.tag %></a>
         </div>
         <% } %>
-        <h3 class="text-base font-semibold leading-snug text-white">
+        <h3 class="home-category-card__title text-base font-semibold leading-snug text-white">
           <a href="<%= item.href %>" class="hover:text-11accent"><%= item.title %></a>
         </h3>
-        <p class="mt-2 line-clamp-3 flex-1 text-sm text-11muted"><%= item.excerpt %></p>
+        <p class="home-category-card__excerpt mt-2 line-clamp-2 flex-1 text-sm text-11muted"><%= item.excerpt %></p>
         <time class="mt-3 text-xs text-slate-500" datetime="<%= item.isoTime || '' %>"><%= item.timeAgo %></time>
       </div>
     </article>

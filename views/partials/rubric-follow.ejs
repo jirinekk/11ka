@@ -1,0 +1,81 @@
+<%
+  var rubric = typeof rubricPage !== 'undefined' ? rubricPage : null;
+  var notifyOn = !!(rubric && rubric.notify_enabled);
+  if (rubric && (rubric.owner_name || notifyOn)) {
+    var subscribed = !!rubric.subscribed;
+    var notifyStatus = typeof rubricNotifyStatus !== 'undefined' ? rubricNotifyStatus : null;
+    var loggedIn = typeof currentUser !== 'undefined' && currentUser && currentUser.id;
+    var ownerName = rubric.owner_name || '';
+    var ownerHref = rubric.owner_href || '';
+    var ownerAvatar = rubric.owner_avatar || '';
+    var ownerInitials = rubric.owner_initials || '11';
+    var notifyMsg = '';
+    if (notifyStatus === 'ok') notifyMsg = 'Oznámení jsou zapnutá. Dáme vědět e-mailem, až vyjde nový díl.';
+    else if (notifyStatus === 'off') notifyMsg = 'Oznámení jsou vypnutá.';
+    else if (notifyStatus === 'dupe') notifyMsg = 'Tento e-mail už oznámení dostává.';
+    else if (notifyStatus === 'bad') notifyMsg = 'Zadejte platný e-mail, nebo se přihlaste.';
+%>
+<div class="rubric-hero<%= ownerName ? '' : ' rubric-hero--notify-only' %>">
+  <% if (ownerName) { %>
+  <% if (ownerHref) { %><a href="<%= ownerHref %>" class="rubric-hero__author"><% } else { %><div class="rubric-hero__author"><% } %>
+    <% if (ownerAvatar) { %>
+    <img src="<%= ownerAvatar %>" alt="" class="rubric-hero__avatar" width="48" height="48" />
+    <% } else { %>
+    <span class="rubric-hero__avatar rubric-hero__avatar--fallback" aria-hidden="true"><%= ownerInitials %></span>
+    <% } %>
+    <span class="rubric-hero__author-text">
+      <span class="rubric-hero__kicker">Hlavní tvůrce</span>
+      <span class="rubric-hero__name"><%= ownerName %></span>
+    </span>
+  <% if (ownerHref) { %></a><% } else { %></div><% } %>
+  <% } %>
+
+  <% if (notifyOn) { %>
+  <div class="rubric-hero__notify">
+    <% if (notifyMsg) { %>
+    <p class="rubric-hero__status<%= notifyStatus === 'bad' ? ' is-bad' : (notifyStatus === 'off' ? ' is-off' : ' is-ok') %>"><%= notifyMsg %></p>
+    <% } %>
+    <% if (subscribed) { %>
+    <form method="post" action="/rubriky/<%= encodeURIComponent(rubric.slug) %>/oznameni">
+      <input type="hidden" name="action" value="off" />
+      <button type="submit" class="rubric-hero__btn rubric-hero__btn--on" aria-pressed="true">
+        <svg class="rubric-hero__bell" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M15 17H9m6 0a3 3 0 01-6 0m6 0H5.5c-.7 0-1.1-.8-.7-1.4L6 14V10a6 6 0 1112 0v4l1.2 1.6c.4.6 0 1.4-.7 1.4H15z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Sledujete
+      </button>
+    </form>
+    <% } else if (loggedIn) { %>
+    <form method="post" action="/rubriky/<%= encodeURIComponent(rubric.slug) %>/oznameni">
+      <input type="hidden" name="action" value="on" />
+      <button type="submit" class="rubric-hero__btn">
+        <svg class="rubric-hero__bell" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M15 17H9m6 0a3 3 0 01-6 0m6 0H5.5c-.7 0-1.1-.8-.7-1.4L6 14V10a6 6 0 1112 0v4l1.2 1.6c.4.6 0 1.4-.7 1.4H15z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Dostat oznámení
+      </button>
+    </form>
+    <% } else { %>
+    <form class="rubric-hero__mail" method="post" action="/rubriky/<%= encodeURIComponent(rubric.slug) %>/oznameni">
+      <input type="hidden" name="action" value="on" />
+      <label class="sr-only" for="rubric-notify-email">E-mail</label>
+      <input
+        id="rubric-notify-email"
+        name="email"
+        type="email"
+        required
+        placeholder="váš@email.cz"
+        class="rubric-hero__input"
+      />
+      <button type="submit" class="rubric-hero__btn">
+        <svg class="rubric-hero__bell" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M15 17H9m6 0a3 3 0 01-6 0m6 0H5.5c-.7 0-1.1-.8-.7-1.4L6 14V10a6 6 0 1112 0v4l1.2 1.6c.4.6 0 1.4-.7 1.4H15z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Dostat oznámení
+      </button>
+    </form>
+    <% } %>
+  </div>
+  <% } %>
+</div>
+<% } %>

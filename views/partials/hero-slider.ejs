@@ -1,14 +1,17 @@
 <% var _slides = (typeof slides !== 'undefined' && slides && slides.length) ? slides : []; %>
 <% var _ariaLabel = (typeof ariaLabel !== 'undefined' && ariaLabel) ? ariaLabel : 'Hlavní články'; %>
+<% var _variant = (typeof variant !== 'undefined' && variant) ? String(variant) : ''; %>
+<% var _isHome = _variant === 'home'; %>
 <% if (_slides.length) { %>
 <div
-  class="hero-slider"
+  class="hero-slider<%= _variant ? ' hero-slider--' + _variant : '' %>"
   data-hero-slider
   data-count="<%= _slides.length %>"
   role="region"
   aria-roledescription="carousel"
   aria-label="<%= _ariaLabel %>"
 >
+  <% if (_isHome) { %><div class="hero-slider__board"><% } %>
   <div class="hero-slider__viewport">
     <% _slides.forEach(function (s, idx) { %>
     <% var _slideCategory = (s.category && String(s.category).trim()) ? String(s.category).trim() : ''; %>
@@ -28,20 +31,29 @@
           fetchpriority="<%= idx === 0 ? 'high' : 'low' %>"
           decoding="<%= idx === 0 ? 'sync' : 'async' %>"
           class="hero-slider__image"
-          data-hero-pos-mobile="<%= s.heroPositionMobile || s.heroPosition || '50% 50%' %>"
-          data-hero-pos-desktop="<%= s.heroPositionDesktop || s.heroPosition || '50% 50%' %>"
+          data-hero-pos-mobile="<%= s.heroPositionMobile || s.heroPosition || (_isHome ? '50% 22%' : '50% 50%') %>"
+          data-hero-pos-desktop="<%= s.heroPositionDesktop || s.heroPosition || (_isHome ? '50% 18%' : '50% 50%') %>"
         />
       </div>
-      <div class="hero-slider__overlay" aria-hidden="true"></div>
+      <div class="hero-slider__overlay" aria-hidden="true">
+        <span class="hero-slider__glow"></span>
+      </div>
       <div class="hero-slider__content">
         <div class="hero-slider__content-inner">
           <h2 class="hero-slider__title font-article-title"><%= s.title %></h2>
+          <% if (s.excerpt) { %>
+          <p class="hero-slider__excerpt"><%= s.excerpt %></p>
+          <% } %>
           <p class="hero-slider__meta">
-            <span class="hero-slider__author"><%= s.author %></span>
-            <span class="hero-slider__sep" aria-hidden="true">·</span>
-            <time datetime="<%= s.isoTime || '' %>"><%= s.timeAgo %></time>
+            <% if (s.author) { %><span class="hero-slider__author"><%= s.author %></span><% } %>
+            <% if (s.author && s.timeAgo) { %><span class="hero-slider__sep" aria-hidden="true">·</span><% } %>
+            <% if (s.timeAgo) { %><time datetime="<%= s.isoTime || '' %>"><%= s.timeAgo %></time><% } %>
           </p>
           <div class="hero-slider__actions">
+            <span class="hero-slider__cta">
+              Číst článek
+              <svg class="hero-slider__cta-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
             <% if (_slideCategory || _slideTag) { %>
             <div class="hero-slider__labels">
               <% if (_slideCategory) { %>
@@ -52,10 +64,6 @@
               <% } %>
             </div>
             <% } %>
-            <span class="hero-slider__cta">
-              Číst článek
-              <svg class="hero-slider__cta-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </span>
           </div>
         </div>
       </div>
@@ -64,14 +72,6 @@
   </div>
 
   <% if (_slides.length > 1) { %>
-  <div class="hero-slider__nav" aria-hidden="false">
-    <button type="button" class="hero-slider__nav-btn hero-slider__nav-btn--prev" data-hero-prev aria-label="Předchozí článek">
-      <svg class="hero-slider__nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <button type="button" class="hero-slider__nav-btn hero-slider__nav-btn--next" data-hero-next aria-label="Další článek">
-      <svg class="hero-slider__nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-  </div>
   <div class="hero-slider__chrome">
     <div class="hero-slider__progress-row">
       <div class="hero-slider__segments" role="tablist" aria-label="Snímky carouselu">
@@ -87,9 +87,20 @@
         </button>
         <% }); %>
       </div>
-      <span class="hero-slider__counter" data-hero-counter aria-live="polite">1 / <%= _slides.length %></span>
+      <div class="hero-slider__chrome-end">
+        <span class="hero-slider__counter" data-hero-counter aria-live="polite">1 / <%= _slides.length %></span>
+        <div class="hero-slider__nav">
+          <button type="button" class="hero-slider__nav-btn hero-slider__nav-btn--prev" data-hero-prev aria-label="Předchozí článek">
+            <svg class="hero-slider__nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button type="button" class="hero-slider__nav-btn hero-slider__nav-btn--next" data-hero-next aria-label="Další článek">
+            <svg class="hero-slider__nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
   <% } %>
+  <% if (_isHome) { %></div><% } %>
 </div>
 <% } %>

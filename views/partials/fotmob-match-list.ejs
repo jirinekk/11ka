@@ -1,0 +1,17 @@
+<% var leagues = typeof matchLeagues !== 'undefined' && matchLeagues ? matchLeagues : []; %>
+<% if (!leagues.length) { %>
+<div class="fm-empty">Pro tento den zatím nejsou žádné zápasy.</div>
+<% } else { %>
+<% leagues.forEach(function (league) { %>
+<section class="fm-league">
+  <header class="fm-league__head">
+    <h2 class="fm-league__title"><%= league.label %></h2>
+  </header>
+  <div class="fm-league__list">
+    <% (league.matches || []).forEach(function (m) { %>
+    <%- include('fotmob-match-row', { match: m }) %>
+    <% }); %>
+  </div>
+</section>
+<% }); %>
+<% } %>

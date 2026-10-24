@@ -1,0 +1,38 @@
+<% var list = typeof items !== 'undefined' && items ? items : []; %>
+<% if (!list.length) { return; } %>
+<div class="card-11 p-4">
+  <h2 class="mb-1 text-lg font-bold text-11accent">Oblíbené články</h2>
+  <ol class="fav-sidebar">
+    <% list.forEach(function (item) { %>
+    <li class="fav-sidebar__item">
+      <a href="<%= item.href %>" class="fav-sidebar__link group">
+        <span class="fav-sidebar__rank" aria-hidden="true"><%= item.rank %></span>
+        <span class="fav-sidebar__thumb">
+          <img
+            src="<%= item.image %>"
+            alt=""
+            loading="lazy"
+            fetchpriority="low"
+            decoding="async"
+            class="fav-sidebar__img"
+            style="object-position: <%= item.heroPosition || '50% 50%' %>;"
+          />
+        </span>
+        <span class="fav-sidebar__copy">
+          <span class="fav-sidebar__title font-article-title"><%= item.title %></span>
+          <% if (item.avgLabel) { %>
+          <span class="fav-sidebar__score">
+            <span class="fav-sidebar__stars" aria-hidden="true">
+              <% for (var s = 1; s <= 3; s++) { %>
+              <svg viewBox="0 0 24 24" class="<%= s <= item.rounded ? 'is-on' : '' %>"><path d="M12 2.6l2.47 5.01 5.53.8-4 3.9.94 5.49L12 15.2l-4.94 2.6.94-5.49-4-3.9 5.53-.8L12 2.6z"/></svg>
+              <% } %>
+            </span>
+            <span><%= item.avgLabel %></span>
+          </span>
+          <% } %>
+        </span>
+      </a>
+    </li>
+    <% }); %>
+  </ol>
+</div>

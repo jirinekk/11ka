@@ -1,4 +1,8 @@
+const fs = require('fs');
+const path = require('path');
 const { getDb } = require('../db');
+
+const SEED_PATH = path.join(__dirname, '..', 'data', 'seed-accreditations.json');
 
 const VALID_STATUSES = new Set(['requested', 'pending', 'approved', 'rejected']);
 
@@ -305,6 +309,69 @@ function getApplicantStatsByEmail(email) {
   };
 }
 
+function loadSeedRequests() {
+  try {
+    if (!fs.existsSync(SEED_PATH)) return [];
+    const raw = JSON.parse(fs.readFileSync(SEED_PATH, 'utf8'));
+    const list = Array.isArray(raw) ? raw : raw && Array.isArray(raw.requests) ? raw.requests : [];
+    return list.filter((item) => item && item.email && item.name && item.match_name);
+  } catch (e) {
+    console.error('[11ka] seed-accreditations.json unreadable:', e && e.message);
+    return [];
+  }
+}
+
+function seedRequestKey(row) {
+  return [
+    normalizePersonKey(row && row.email),
+    String((row && row.match_name) || '')
+      .trim()
+      .toLowerCase(),
+    String((row && row.match_date) || '').trim(),
+  ].join('|');
+}
+
+function insertSeedRequest(item) {
+  const type = item.accreditation_type === 'pisi' ? 'pisi' : 'photo';
+  const status = normalizeStatus(item.status);
+  const hidden = Number(item.hidden_from_web) === 1 ? 1 : 0;
+  const sent = Number(item.email_sent) === 1 ? 1 : 0;
+  const createdAt = item.created_at || new Date().toISOString();
+  const matchDate = isValidMatchDate(item.match_date) ? String(item.match_date).trim() : null;
+  getDb()
+    .prepare(
+      `INSERT INTO accreditation_requests
+        (email, phone, name, match_name, match_date, accreditation_type, email_sent, status, hidden_from_web, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      String(item.email).trim(),
+      String(item.phone || '').trim(),
+      String(item.name).trim(),
+      String(item.match_name).trim(),
+      matchDate,
+      type,
+      sent,
+      status,
+      hidden,
+      createdAt
+    );
+}
+
+function seedIfEmpty() {
+  const seeded = loadSeedRequests();
+  if (!seeded.length) return 0;
+  const existing = new Set(getDb().prepare(`SELECT email, match_name, match_date FROM accreditation_requests`).all().map(seedRequestKey));
+  const missing = seeded.filter((item) => !existing.has(seedRequestKey(item)));
+  if (!missing.length) return 0;
+  const insertMany = getDb().transaction((items) => {
+    for (const item of items) insertSeedRequest(item);
+  });
+  insertMany(missing);
+  console.log(`[11ka] Seeded ${missing.length} accreditation request(s) from data/seed-accreditations.json`);
+  return missing.length;
+}
+
 function listByEmail(email) {
   const key = normalizePersonKey(email);
   if (!key) return [];
@@ -339,6 +406,7 @@ module.exports = {
   countApplicants,
   getApplicantStatsByEmail,
   listByEmail,
+  seedIfEmpty,
   normalizePersonKey,
   normalizeStatus,
   getStatusLabel,

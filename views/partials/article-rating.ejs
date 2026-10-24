@@ -1,0 +1,58 @@
+<%
+  var rating = typeof articleRating !== 'undefined' && articleRating ? articleRating : { count: 0, avg: 0, avgLabel: '', rounded: 0, countLabel: 'Zatím bez hodnocení' };
+  var mine = typeof userRatingStars !== 'undefined' && userRatingStars ? Number(userRatingStars) : 0;
+  var loggedIn = typeof currentUser !== 'undefined' && currentUser;
+  var displayFill = mine || (loggedIn ? 0 : rating.rounded);
+  var loginNext = typeof ratingLoginNext !== 'undefined' && ratingLoginNext ? ratingLoginNext : '';
+  var slug = typeof articleSlug !== 'undefined' ? articleSlug : '';
+%>
+<div class="article-rate" id="hodnoceni">
+  <p class="article-rate__label">Ohodnotit článek</p>
+  <% if (loggedIn) { %>
+  <form class="article-rate__form" method="post" action="/clanek/<%= encodeURIComponent(slug) %>/hodnoceni">
+    <div class="article-rate__stars" role="group" aria-label="Hodnocení od 1 do 3 hvězd">
+      <% for (var s = 1; s <= 3; s++) { %>
+      <button
+        type="submit"
+        name="stars"
+        value="<%= s %>"
+        class="article-rate__star<%= s <= displayFill ? ' is-on' : '' %>"
+        aria-label="<%= s %> z 3"
+        aria-pressed="<%= mine === s ? 'true' : 'false' %>"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.47 5.01 5.53.8-4 3.9.94 5.49L12 15.2l-4.94 2.6.94-5.49-4-3.9 5.53-.8L12 2.6z"/></svg>
+      </button>
+      <% } %>
+    </div>
+  </form>
+  <% } else { %>
+  <div class="article-rate__stars article-rate__stars--static" aria-hidden="true">
+    <% for (var s = 1; s <= 3; s++) { %>
+    <span class="article-rate__star<%= s <= displayFill ? ' is-on' : '' %>">
+      <svg viewBox="0 0 24 24"><path d="M12 2.6l2.47 5.01 5.53.8-4 3.9.94 5.49L12 15.2l-4.94 2.6.94-5.49-4-3.9 5.53-.8L12 2.6z"/></svg>
+    </span>
+    <% } %>
+  </div>
+  <% } %>
+  <p class="article-rate__meta">
+    <% if (rating.count) { %>
+    <span class="article-rate__avg"><%= rating.avgLabel %></span>
+    <span aria-hidden="true">·</span>
+    <span><%= rating.countLabel %></span>
+    <% } else { %>
+    <span><%= rating.countLabel %></span>
+    <% } %>
+  </p>
+  <% if (!loggedIn) { %>
+  <p class="article-rate__login">
+    <a href="/prihlaseni?next=<%= encodeURIComponent(loginNext) %>">Přihlaste se</a>
+    a ohodnoťte
+  </p>
+  <% } %>
+  <% if (typeof ratingSuccess !== 'undefined' && ratingSuccess) { %>
+  <p class="article-rate__flash">Díky za hodnocení.</p>
+  <% } %>
+  <% if (typeof ratingError !== 'undefined' && ratingError) { %>
+  <p class="article-rate__flash article-rate__flash--err"><%= ratingError %></p>
+  <% } %>
+</div>

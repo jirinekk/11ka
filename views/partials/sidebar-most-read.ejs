@@ -16,7 +16,7 @@
   <% if (limitKey) { %>data-most-read-limit="<%= limitKey %>"<% } %>
   data-most-read-signature="<%= list.filter(function (i) { return i.id != null; }).map(function (i) { return i.id + ':' + (i.viewCount || 0); }).join('|') %>"
 >
-  <h2 class="mb-1 text-lg font-bold text-11accent">Nejčtenější články</h2>
+  <h2 class="mb-1 text-lg font-bold text-11accent">Nejčtenější</h2>
   <ul class="most-read-sidebar" data-most-read-target>
     <%- include('most-read-sidebar-list', { items: list }) %>
   </ul>

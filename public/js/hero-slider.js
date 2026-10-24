@@ -15,8 +15,8 @@
   var remainingMs = 7000;
   var paused = false;
   var animating = false;
-  var INTERVAL_MS = 7000;
-  var TRANSITION_MS = 800;
+  var INTERVAL_MS = 7500;
+  var TRANSITION_MS = 900;
   var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function clearAdvanceTimer() {
@@ -81,6 +81,7 @@
   function pauseAutoplay() {
     if (paused || count <= 1) return;
     clearAdvanceTimer();
+    root.classList.add('is-paused');
     if (reducedMotion) {
       paused = true;
       return;
@@ -93,6 +94,7 @@
 
   function resumeAutoplay() {
     if (!paused || count <= 1) return;
+    root.classList.remove('is-paused');
     scheduleAdvance(remainingMs, true);
   }
 
@@ -111,6 +113,7 @@
     if (next === idx) return;
 
     paused = false;
+    root.classList.remove('is-paused');
     if (reducedMotion) {
       idx = next;
       setSlideState();

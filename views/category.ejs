@@ -11,6 +11,22 @@
           <% if (pageSubtitle && pageSubtitle !== 'Seřazeno od nejnovějších.') { %>
           <p class="mt-2 text-sm text-11muted"><%= pageSubtitle %></p>
           <% } %>
+          <% if (typeof rubricCards !== 'undefined' && rubricCards && rubricCards.length) { %>
+          <div class="mt-5 grid gap-3 sm:grid-cols-2">
+            <% rubricCards.forEach(function (card) { %>
+            <a href="/rubriky/<%= encodeURIComponent(card.slug) %>" class="card-11 block p-4 transition hover:border-11accent/35">
+              <p class="text-sm font-semibold text-white"><%= card.label %></p>
+              <% if (card.description) { %>
+              <p class="mt-1 line-clamp-2 text-sm text-11muted"><%= card.description %></p>
+              <% } %>
+              <% if (card.owner_name) { %>
+              <p class="mt-2 text-xs text-slate-500">Tvůrce: <%= card.owner_name %></p>
+              <% } %>
+            </a>
+            <% }); %>
+          </div>
+          <% } %>
+          <%- include('partials/rubric-follow') %>
           <% var _tagPillsMode = (typeof tagPillsMode !== 'undefined' && tagPillsMode) ? tagPillsMode : 'full'; %>
           <% var _showTagBar = _tagPillsMode !== 'none' && (_tagPillsMode === 'all-only' || (tagOptions && tagOptions.length)); %>
           <% if (_showTagBar) { %>
@@ -62,7 +78,7 @@
                 <h3 class="text-base font-semibold leading-snug text-white">
                   <a href="<%= item.href %>" class="hover:text-11accent"><%= item.title %></a>
                 </h3>
-                <p class="mt-2 line-clamp-3 flex-1 text-sm text-11muted"><%= item.excerpt %></p>
+                <p class="mt-2 line-clamp-2 flex-1 text-sm text-11muted"><%= item.excerpt %></p>
                 <time class="mt-3 text-xs text-slate-500" datetime="<%= item.isoTime || '' %>"><%= item.timeAgo %></time>
               </div>
             </article>
@@ -124,18 +140,11 @@
       </div>
 
       <aside class="space-y-6 lg:sticky lg:top-24">
-        <div class="card-11 p-4 perf-cv home-side-ad-card">
-          <p class="mb-2 text-center text-xs font-medium uppercase tracking-wide text-11muted">Reklama</p>
-          <div
-            id="ssp-zone-411438"
-            class="home-side-ad-wrap mx-auto h-[600px] w-[300px] overflow-hidden"
-            data-ssp-zone="411438"
-            data-ssp-width="300"
-            data-ssp-height="600"
-          ></div>
-        </div>
+        <%- include('partials/sidebar-ssp-ad') %>
 
         <%- include('partials/sidebar-live-matches') %>
+
+        <%- include('partials/chance-liga-table', { standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [], compactTable: true, tableRail: true, tableHref: '/zapasy/live#tabulka' }) %>
 
         <div class="card-11 p-4">
           <h2 class="mb-2 text-lg font-bold text-11accent">Newsletter</h2>
@@ -177,7 +186,7 @@
 </main>
 
 <% if (typeof heroSlides !== 'undefined' && heroSlides && heroSlides.length) { %>
-<script src="/js/hero-slider.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
+<script src="/js/hero-slider.js?v=<%= encodeURIComponent((typeof assetVersion !== 'undefined' ? assetVersion : '1') + '-hero4') %>" defer></script>
 <% } %>
 
 <%- include('partials/footer') %>

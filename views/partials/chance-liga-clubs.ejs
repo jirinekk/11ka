@@ -1,0 +1,14 @@
+<% var clubs = typeof clubList !== 'undefined' && clubList ? clubList : []; %>
+<% if (clubs.length) { %>
+<section class="cl-clubs" aria-label="Kluby Chance Ligy">
+  <div class="cl-clubs__grid">
+    <% clubs.forEach(function (club) { %>
+    <a class="cl-club-card" href="<%= club.href %>">
+      <img src="<%= club.logo %>" alt="" width="48" height="48" />
+      <span class="cl-club-card__name"><%= club.short %></span>
+      <span class="cl-club-card__full"><%= club.name %></span>
+    </a>
+    <% }); %>
+  </div>
+</section>
+<% } %>

@@ -1,0 +1,31 @@
+<% var m = typeof linkedMatch !== 'undefined' && linkedMatch ? linkedMatch : null; %>
+<% if (m) { %>
+<a class="article-match" href="<%= m.detailHref || m.href || '#' %>">
+  <span class="article-match__comp"><%= m.league || 'Chance Liga' %><% if (m.round) { %> · <%= m.round %><% } %></span>
+  <span class="article-match__duel">
+    <span class="article-match__side">
+      <% if (m.homeLogo) { %>
+      <img src="<%= m.homeLogo %>" alt="" width="28" height="28" />
+      <% } %>
+      <span><%= m.homeLabel || m.home %></span>
+    </span>
+    <span class="article-match__mid">
+      <% if (m.isLive) { %>
+      <span class="article-match__live">Živě</span>
+      <span class="article-match__score"><%= m.score || '0:0' %></span>
+      <% } else if (m.isDone) { %>
+      <span class="article-match__score"><%= m.score || '0:0' %></span>
+      <% } else { %>
+      <span class="article-match__vs">VS</span>
+      <% } %>
+    </span>
+    <span class="article-match__side">
+      <% if (m.awayLogo) { %>
+      <img src="<%= m.awayLogo %>" alt="" width="28" height="28" />
+      <% } %>
+      <span><%= m.awayLabel || m.away %></span>
+    </span>
+  </span>
+  <span class="article-match__cta">Info k zápasu</span>
+</a>
+<% } %>

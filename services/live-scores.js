@@ -9,6 +9,8 @@ const CHNL_SCHEDULE_URL = 'https://www.fnliga.cz/zapasy/';
 
 const fs = require('fs');
 const path = require('path');
+const livesportChance = require('./livesport-chance');
+const chanceLigaLogos = require('./chance-liga-logos');
 
 const CS_REGION_NAMES =
   typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
@@ -189,6 +191,68 @@ function decodeHtmlText(input) {
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
+}
+
+function absoluteUrl(base, src) {
+  const s = String(src || '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith('//')) return `https:${s}`;
+  try {
+    return new URL(s, base).toString();
+  } catch {
+    return '';
+  }
+}
+
+function normalizeRoundLabel(raw) {
+  const t = decodeHtmlText(raw).replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const kolo = t.match(/^(\d+)\s*\.?\s*kolo$/i);
+  if (kolo) return `${Number(kolo[1])}. kolo`;
+  return t;
+}
+
+function teamInitials(name) {
+  const cleaned = String(name || '')
+    .replace(/^\d+\./, '')
+    .replace(/\b(FC|FK|SK|AC|SC|MFK|1\.FC)\b/gi, '')
+    .trim();
+  const parts = (cleaned || String(name || '')).split(/\s+/).filter(Boolean);
+  const letters = parts
+    .map((p) => p.charAt(0))
+    .join('')
+    .replace(/[^A-Za-zÀ-ž]/g, '')
+    .slice(0, 3);
+  return letters.toUpperCase() || '?';
+}
+
+function formatMatchMeta(iso, roundLabel) {
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return roundLabel || '';
+  const d = new Date(ts);
+  const weekdayRaw = new Intl.DateTimeFormat('cs-CZ', {
+    weekday: 'short',
+    timeZone: 'Europe/Prague',
+  }).format(d);
+  const wd = String(weekdayRaw || '').replace(/\./g, '').trim();
+  const weekday = wd ? wd.charAt(0).toUpperCase() + wd.slice(1) : '';
+  const date = new Intl.DateTimeFormat('cs-CZ', {
+    day: 'numeric',
+    month: 'numeric',
+    timeZone: 'Europe/Prague',
+  })
+    .format(d)
+    .replace(/\.$/, '');
+  const time = formatKickoffTimeCz(iso) || '';
+  const when = [weekday, date].filter(Boolean).join(', ') + (time ? `, ${time}` : '');
+  return roundLabel ? `${roundLabel} · ${when}` : when;
+}
+
+function toDisplayScore(score) {
+  const raw = String(score || '').replace(/\s+/g, '');
+  if (!raw || raw === '-:-') return '';
+  return raw.replace(':', '–');
 }
 
 function toIsoFromCzDateTime(datePart, timePart) {
@@ -739,10 +803,19 @@ async function fetchText(url) {
 function parseChanceLigaUpcomingFromHtml(html, limit = 6) {
   const src = String(html || '');
   const out = [];
-  const rowRe = /<tr class="game">([\s\S]*?)<\/tr>/g;
+  const rowRe = /<tr\b([^>]*)>([\s\S]*?)<\/tr>/g;
+  let round = '';
   let m;
-  while ((m = rowRe.exec(src)) && out.length < limit) {
-    const chunk = m[1];
+  while ((m = rowRe.exec(src))) {
+    if (out.length >= limit) break;
+    const attrs = m[1] || '';
+    const chunk = m[2] || '';
+    const header = chunk.match(/<td class="header"[^>]*>\s*([^<]+)/i);
+    if (header) {
+      round = normalizeRoundLabel(header[1]);
+      continue;
+    }
+    if (!/\bgame\b/.test(attrs) && !/class="team home/.test(chunk)) continue;
     const dateMatch = chunk.match(/hidden-xs">(?:[a-z]{2},\s*)?(\d{2}\/\d{2}\/\d{2,4})<\/span>/i);
     const timeMatch = chunk.match(/<td class="time hidden-xs">(\d{1,2}:\d{2})<\/td>/i);
     const scoreMatch = chunk.match(/<td class="score"><a[^>]*>\s*([^<]+)\s*<\/a>/i);
@@ -754,13 +827,19 @@ function parseChanceLigaUpcomingFromHtml(html, limit = 6) {
     const score = scoreMatch ? String(scoreMatch[1] || '').trim() : '-:-';
     const iso = toIsoFromCzDateTime(dateMatch[1], timeMatch[1]);
     if (!iso) continue;
+    const logos = Array.from(chunk.matchAll(/<td class="logo">[\s\S]*?<img src="([^"]+)"/gi)).map((x) => x[1]);
+    const detailMatch = chunk.match(/href="(\/zapas\/[^"#]+)"/i);
     const state = parseStateFromScoreAndDate(score, iso);
     const status = state === 'post' ? 'Konec' : state === 'in' ? 'Živě' : (formatKickoffTimeCz(iso) || timeMatch[1]);
     out.push({
-      id: null,
+      id: detailMatch ? detailMatch[1] : null,
       date: iso,
       home,
       away,
+      homeLogo: absoluteUrl('https://www.chanceliga.cz', logos[0]),
+      awayLogo: absoluteUrl('https://www.chanceliga.cz', logos[1]),
+      detailHref: absoluteUrl('https://www.chanceliga.cz', detailMatch && detailMatch[1]),
+      round: round,
       score,
       status,
       state,
@@ -773,10 +852,18 @@ function parseChanceLigaUpcomingFromHtml(html, limit = 6) {
 function parseChnlUpcomingFromHtml(html, limit = 6) {
   const src = String(html || '');
   const out = [];
-  const rowRe = /<tr>([\s\S]*?)<\/tr>/g;
+  const rowRe = /<tr\b[^>]*>([\s\S]*?)<\/tr>/g;
+  let round = '';
   let m;
-  while ((m = rowRe.exec(src)) && out.length < limit) {
-    const chunk = m[1];
+  while ((m = rowRe.exec(src))) {
+    if (out.length >= limit) break;
+    const chunk = m[1] || '';
+    const roundMatch = chunk.match(/schedule_table__round[^>]*>\s*<span>([^<]+)/i);
+    if (roundMatch) {
+      round = normalizeRoundLabel(roundMatch[1]);
+      continue;
+    }
+    if (!/schedule_table__team/.test(chunk)) continue;
     const dateMatch = chunk.match(/<span>(\d{2}\.\d{2}\.\d{2,4})<\/span>/);
     const timeMatch = chunk.match(/<span>[a-z]{2}\s*(\d{1,2}:\d{2})\s*hod\.<\/span>/i);
     const scoreMatch = chunk.match(/schedule_table__score__box">\s*<a[^>]*>\s*([^<]+)\s*<\/a>/);
@@ -789,13 +876,19 @@ function parseChnlUpcomingFromHtml(html, limit = 6) {
     const score = scoreMatch ? String(scoreMatch[1] || '').trim() : '-:-';
     const iso = toIsoFromCzDateTime(dateMatch[1], timeMatch[1]);
     if (!iso) continue;
+    const logos = Array.from(chunk.matchAll(/schedule_table__score__logo[\s\S]*?<img src="([^"]+)"/gi)).map((x) => x[1]);
+    const detailMatch = chunk.match(/href="(\/zapas\/[^"#]+)"/i);
     const state = parseStateFromScoreAndDate(score, iso);
     const status = state === 'post' ? 'Konec' : state === 'in' ? 'Živě' : (formatKickoffTimeCz(iso) || timeMatch[1]);
     out.push({
-      id: null,
+      id: detailMatch ? detailMatch[1] : null,
       date: iso,
       home,
       away,
+      homeLogo: absoluteUrl('https://www.fnliga.cz', logos[0]),
+      awayLogo: absoluteUrl('https://www.fnliga.cz', logos[1]),
+      detailHref: absoluteUrl('https://www.fnliga.cz', detailMatch && detailMatch[1]),
+      round: round,
       score,
       status,
       state,
@@ -2951,10 +3044,112 @@ async function getMatchDetail(eventId) {
   }
 }
 
+let chanceBoardCache = { expiresAt: 0, data: null };
+
+function formatCzDayHeading(iso) {
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return '';
+  const d = new Date(ts);
+  const weekday = new Intl.DateTimeFormat('cs-CZ', {
+    weekday: 'long',
+    timeZone: 'Europe/Prague',
+  }).format(d);
+  const date = new Intl.DateTimeFormat('cs-CZ', {
+    day: 'numeric',
+    month: 'numeric',
+    timeZone: 'Europe/Prague',
+  }).format(d);
+  const cap = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  return `${cap} ${date}`;
+}
+
+function pickUpcomingMatches(all, limit, now) {
+  const rows = (all || []).filter((m) => m && m.date).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+  const cutoff = now - 3 * 60 * 60 * 1000;
+  const future = rows.filter((m) => {
+    const ts = Date.parse(m.date);
+    return Number.isFinite(ts) && ts >= cutoff;
+  });
+  return future.slice(0, limit).map((m) => {
+    const isLive = m.state === 'in';
+    const isDone = m.state === 'post';
+    const raw = String(m.score || '').replace(/\s+/g, '').replace('–', ':');
+    const score = isLive || isDone ? (/^\d+:\d+$/.test(raw) ? raw : '0:0') : '0:0';
+    return {
+      home: m.home,
+      away: m.away,
+      homeLogo: m.homeLogo || '',
+      awayLogo: m.awayLogo || '',
+      homeInitials: teamInitials(m.home),
+      awayInitials: teamInitials(m.away),
+      date: m.date,
+      time: formatKickoffTimeCz(m.date) || m.status,
+      score,
+      isLive,
+      isDone,
+      league: m.league || 'Chance Liga',
+      round: m.round || '',
+      meta: formatMatchMeta(m.date, m.round || ''),
+      detailHref: m.detailHref && String(m.detailHref).startsWith('/') ? m.detailHref : '',
+      kickoff: m.date,
+    };
+  });
+}
+
+async function listChanceLigaSchedule({ limit = 40 } = {}) {
+  const now = Date.now();
+  if (chanceBoardCache.data && now < chanceBoardCache.expiresAt) {
+    return chanceBoardCache.data;
+  }
+  try {
+    const [aHtml, bHtml, lsMatches] = await Promise.all([
+      fetchText(CHANCE_LIGA_SCHEDULE_URL).catch(() => ''),
+      fetchText(CHNL_SCHEDULE_URL).catch(() => ''),
+      livesportChance.listUpcoming(limit).catch(() => []),
+    ]);
+    const officialChance = pickUpcomingMatches(parseChanceLigaUpcomingFromHtml(aHtml, 200), limit, now);
+    let chanceMatches = officialChance;
+    if (lsMatches && lsMatches.length) {
+      chanceMatches = livesportChance.attachLivesport(
+        officialChance.length ? officialChance : lsMatches,
+        lsMatches,
+      );
+    }
+    chanceMatches = (chanceMatches || []).map((m) =>
+      chanceLigaLogos.withLogos({
+        ...m,
+        meta: m.meta || formatMatchMeta(m.date, m.round || ''),
+        score: m.isLive || m.isDone ? m.score || '0:0' : '0:0',
+        homeInitials: m.homeInitials || teamInitials(m.home),
+        awayInitials: m.awayInitials || teamInitials(m.away),
+        detailHref: m.detailHref && String(m.detailHref).startsWith('/zapasy/chance/') ? m.detailHref : '',
+      }),
+    );
+
+    const leagues = [
+      {
+        id: 'chance-liga',
+        label: 'Chance Liga',
+        matches: chanceMatches,
+      },
+      {
+        id: 'chance-narodni',
+        label: 'Chance Národní liga',
+        matches: pickUpcomingMatches(parseChnlUpcomingFromHtml(bHtml, 200), limit, now),
+      },
+    ].filter((league) => league.matches && league.matches.length);
+    chanceBoardCache = { expiresAt: now + 5 * 60 * 1000, data: leagues };
+    return leagues;
+  } catch {
+    return chanceBoardCache.data || [];
+  }
+}
+
 module.exports = {
   getLiveScores,
   getDayMatches,
   getOfficialChanceDayMatches,
+  listChanceLigaSchedule,
   getMatchDetail,
   translateLeague,
 };

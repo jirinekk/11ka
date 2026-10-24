@@ -1,0 +1,97 @@
+<%
+  var leagues = (typeof chanceMatchLeagues !== 'undefined' && chanceMatchLeagues) ? chanceMatchLeagues : [];
+  var boardHref = (typeof chanceLigaHref !== 'undefined' && chanceLigaHref) ? chanceLigaHref : '/zapasy/live';
+  var showAll = typeof chanceLigaShowAll === 'undefined' || chanceLigaShowAll;
+  var defaultLeague = leagues.find(function (l) { return l.id === 'chance-liga'; }) || leagues[0];
+  var defaultId = defaultLeague ? defaultLeague.id : '';
+%>
+<% if (leagues.length) { %>
+<section class="cl-matches home-category-section" data-cl-matches aria-label="Zápasy">
+  <div class="home-section-head cl-matches__bar">
+    <h2 class="cl-matches__title"><%= typeof chanceLigaTitle !== 'undefined' && chanceLigaTitle ? chanceLigaTitle : 'Zápasy' %></h2>
+    <div class="cl-matches__nav">
+      <% if (leagues.length > 1) { %>
+      <div class="cl-matches__tabs" role="tablist" aria-label="Soutěže">
+        <% leagues.forEach(function (league) { %>
+        <button
+          type="button"
+          class="cl-matches__tab<%= league.id === defaultId ? ' is-active' : '' %>"
+          role="tab"
+          aria-selected="<%= league.id === defaultId ? 'true' : 'false' %>"
+          data-cl-tab="<%= league.id %>"
+        ><%= league.label %></button>
+        <% }); %>
+      </div>
+      <% } %>
+      <div class="cl-matches__arrows">
+        <button type="button" class="cl-matches__arrow" data-cl-prev aria-label="Předchozí zápasy" onclick="var r=this.closest('[data-cl-matches]');var s=r&&(r.querySelector('[data-cl-pane].is-active [data-cl-scroller]')||r.querySelector('[data-cl-scroller]'));var c=s&&s.querySelector('.cl-card');if(s)s.scrollBy({left:-(c?c.getBoundingClientRect().width+16:300),behavior:'smooth'});">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="cl-matches__arrow" data-cl-next aria-label="Další zápasy" onclick="var r=this.closest('[data-cl-matches]');var s=r&&(r.querySelector('[data-cl-pane].is-active [data-cl-scroller]')||r.querySelector('[data-cl-scroller]'));var c=s&&s.querySelector('.cl-card');if(s)s.scrollBy({left:(c?c.getBoundingClientRect().width+16:300),behavior:'smooth'});">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <% if (showAll) { %>
+      <a href="<%= boardHref %>" class="btn-11 btn-11--sm btn-11--accent-outline shrink-0">Ukázat vše</a>
+      <% } %>
+    </div>
+  </div>
+
+  <% leagues.forEach(function (league) { %>
+  <div
+    class="cl-matches__pane<%= league.id === defaultId ? ' is-active' : '' %>"
+    data-cl-pane="<%= league.id %>"
+    role="tabpanel"
+    <%= league.id === defaultId ? '' : 'hidden' %>
+  >
+    <div class="cl-matches__scroller" data-cl-scroller>
+      <% (league.matches || []).forEach(function (m) { %>
+      <article class="cl-card<%= m.isLive ? ' is-live' : '' %>">
+        <p class="cl-card__comp"><%= m.league || league.label %></p>
+        <p class="cl-card__meta"><%= m.meta || m.time || '' %></p>
+        <div class="cl-card__duel">
+          <div class="cl-card__side">
+            <% var homeTag = m.homeHref ? 'a' : 'span'; %>
+            <<%= homeTag %><% if (m.homeHref) { %> href="<%= m.homeHref %>" class="cl-card__club"<% } %>>
+              <% if (m.homeLogo) { %>
+              <img class="cl-card__crest" src="<%= m.homeLogo %>" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+              <% } else { %>
+              <span class="cl-card__crest-fallback" aria-hidden="true"><%= m.homeInitials || '' %></span>
+              <% } %>
+              <span class="cl-card__name"><%= m.homeLabel || m.home %></span>
+            </<%= homeTag %>>
+          </div>
+          <div class="cl-card__mid">
+            <% if (m.isLive) { %>
+            <span class="cl-card__live">Živě</span>
+            <span class="cl-card__score"><%= m.score || '0:0' %></span>
+            <% } else if (m.isDone) { %>
+            <span class="cl-card__score"><%= m.score || '0:0' %></span>
+            <% } else { %>
+            <span class="cl-card__vs" aria-label="versus">VS</span>
+            <% } %>
+          </div>
+          <div class="cl-card__side">
+            <% var awayTag = m.awayHref ? 'a' : 'span'; %>
+            <<%= awayTag %><% if (m.awayHref) { %> href="<%= m.awayHref %>" class="cl-card__club"<% } %>>
+              <% if (m.awayLogo) { %>
+              <img class="cl-card__crest" src="<%= m.awayLogo %>" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+              <% } else { %>
+              <span class="cl-card__crest-fallback" aria-hidden="true"><%= m.awayInitials || '' %></span>
+              <% } %>
+              <span class="cl-card__name"><%= m.awayLabel || m.away %></span>
+            </<%= awayTag %>>
+          </div>
+        </div>
+        <a class="cl-card__detail" href="<%= m.detailHref || boardHref %>">Info k zápasu</a>
+      </article>
+      <% }); %>
+    </div>
+  </div>
+  <% }); %>
+</section>
+<% } else { %>
+<section class="cl-matches" aria-label="Zápasy">
+  <p class="cl-matches__empty"><%= typeof chanceLigaTitle !== 'undefined' && chanceLigaTitle === 'Výsledky' ? 'Zatím žádné výsledky.' : 'Rozpis se právě načítá.' %></p>
+</section>
+<% } %>

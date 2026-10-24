@@ -13,14 +13,21 @@ const {
   canManageAds,
   canViewStats,
   ROLE_LABELS,
+  STAFF_ROLES,
   hasAnyRole,
   hasRole,
+  isStaffUser,
   isAkreditaceOnly,
   isRedaktorWorkflow,
   requireAiDraftAccess,
   canAccessAiDrafts,
 } = require('../middleware/auth');
 const { rolesFromBody } = require('../lib/roles');
+const { asStringArray, asIntArray } = require('../lib/safe-path');
+const chanceLigaLogos = require('../services/chance-liga-logos');
+const livesportChance = require('../services/livesport-chance');
+const { listRubrics, isRubricSlug } = require('../config/rubrics');
+const rubricsService = require('../services/rubrics');
 const aiArticleDraft = require('../services/ai-article-draft');
 const aiQueue = require('../services/ai-queue');
 const aiIngest = require('../services/ai-ingest');
@@ -66,7 +73,6 @@ function resolveLineupJson(raw, options = {}) {
   return { ok: true, lineupJson: result.lineup ? serializeLineup(result.lineup) : null };
 }
 
-const { ROLES } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -92,6 +98,7 @@ function adminNavFromPath(p) {
   if (p === '/administrace/pomaha') return 'pomaha';
   if (p === '/administrace/reklamy') return 'reklamy';
   if (p === '/administrace/penalty') return 'penalty';
+  if (p.startsWith('/administrace/rubriky')) return 'rubriky';
   if (p === '/administrace/kitswapy') return 'kitswapy';
   if (p.startsWith('/administrace/zapasy')) return 'zapasy';
   if (p === '/administrace/statistiky') return 'statistiky';
@@ -129,7 +136,11 @@ const multipartArticleLimits = { fileSize: UPLOAD_MAX_BYTES, fieldSize: UPLOAD_M
 function ensureUploadDirs() {
   for (const sub of ['articles', 'avatars', 'inline', 'penalty/keepers', 'teams', 'ads']) {
     const d = path.join(publicUpload, sub);
-    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+    try {
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+    } catch (err) {
+      console.warn('[11ka] cannot create upload dir', d, err && err.message);
+    }
   }
 }
 
@@ -377,6 +388,9 @@ const uploadInline = multer({
 
 router.use(requireLogin);
 router.use((req, res, next) => {
+  if (!isStaffUser(req.user)) {
+    return res.redirect('/ucet');
+  }
   res.locals.adminNav = adminNavFromPath(req.path);
   next();
 });
@@ -561,12 +575,87 @@ function resolveScheduleIso(dt) {
   return { ok: true, iso };
 }
 
-function renderArticleEdit(res, locals, statusCode) {
+function communityFieldsFromBody(body) {
+  const mentionedTeamCodes = asStringArray(body && body.mentioned_teams);
+  const relatedArticleIds = asIntArray(body && body.related_ids);
+  const isRubric = body && (body.is_rubric === '1' || body.is_rubric === 'on');
+  const rubricSlug = isRubric && isRubricSlug(body.rubric_slug) ? String(body.rubric_slug).trim() : null;
+  const matchKey = articlesService.normalizeMatchKey(body && body.match_key);
+  return { mentionedTeamCodes, relatedArticleIds, rubricSlug, matchKey };
+}
+
+function selectedTeamCodesFrom(locals) {
+  if (locals.form && Object.prototype.hasOwnProperty.call(locals.form, 'mentioned_teams')) {
+    return asStringArray(locals.form.mentioned_teams);
+  }
+  if (locals.article && locals.article.id) {
+    return articlesService.listArticleTeamCodes(locals.article.id);
+  }
+  return [];
+}
+
+function selectedRelatedIdsFrom(locals) {
+  if (locals.form && Object.prototype.hasOwnProperty.call(locals.form, 'related_ids')) {
+    return asIntArray(locals.form.related_ids);
+  }
+  if (locals.article) {
+    return articlesService.parseRelatedIds(locals.article.related_article_ids);
+  }
+  return [];
+}
+
+function selectedMatchKeyFrom(locals) {
+  if (locals.form && Object.prototype.hasOwnProperty.call(locals.form, 'match_key')) {
+    return articlesService.normalizeMatchKey(locals.form.match_key) || '';
+  }
+  if (locals.article) {
+    return articlesService.normalizeMatchKey(locals.article.match_key) || '';
+  }
+  return '';
+}
+
+async function loadMatchPicker(selectedKey) {
+  let matches = [];
+  try {
+    matches = await livesportChance.listPickerMatches(48);
+  } catch {
+    matches = [];
+  }
+  const selected = articlesService.normalizeMatchKey(selectedKey);
+  if (selected && !matches.some((m) => m.matchKey === selected)) {
+    const parsed = articlesService.parseMatchKey(selected);
+    matches.unshift({
+      matchKey: selected,
+      home: parsed ? parsed.slug : selected,
+      away: '',
+      homeLabel: parsed ? parsed.slug : selected,
+      awayLabel: '',
+      date: '',
+    });
+  }
+  return matches;
+}
+
+async function renderArticleEdit(res, locals, statusCode) {
+  const selectedRelatedIds = selectedRelatedIdsFrom(locals);
+  const selectedMatchKey = selectedMatchKeyFrom(locals);
+  const matchPickerMatches = await loadMatchPicker(selectedMatchKey);
   const payload = {
     ...locals,
     authors: locals.authors != null ? locals.authors : listArticleAuthors(),
     scheduledAtLocal: articleEditSchedVal(locals.article, locals.form),
     scheduledAtMin: formatPragueDatetimeLocal(new Date().toISOString()),
+    chanceLigaClubs: chanceLigaLogos.listClubs(),
+    rubrics: listRubrics(),
+    selectedTeamCodes: selectedTeamCodesFrom(locals),
+    selectedRelatedIds,
+    selectedMatchKey,
+    matchPickerMatches,
+    relatedPickerArticles: articlesService.listForRelatedPicker(
+      locals.article && locals.article.id,
+      selectedRelatedIds,
+      40
+    ),
   };
   if (statusCode) return res.status(statusCode).render('admin/article-edit', payload);
   return res.render('admin/article-edit', payload);
@@ -819,12 +908,16 @@ router.post(
 );
 
 /* --- Users (Vedení) --- */
+function listStaffUsers() {
+  return usersService.listAll().filter((u) => isStaffUser(u));
+}
+
 router.get('/administrace/uzivatele', requireRole('vedeni'), (req, res) => {
-  const users = usersService.listAll();
+  const users = listStaffUsers();
   res.render('admin/users', {
     title: 'Uživatelé - administrace',
     users,
-    roles: ROLES,
+    roles: STAFF_ROLES,
     roleLabels: ROLE_LABELS,
     error: null,
     success: null,
@@ -893,11 +986,11 @@ router.post(
       }
     }
 
-    const users = usersService.listAll();
+    const users = listStaffUsers();
     res.render('admin/users', {
       title: 'Uživatelé - administrace',
       users,
-      roles: ROLES,
+      roles: STAFF_ROLES,
       roleLabels: ROLE_LABELS,
       error,
       success,
@@ -2318,13 +2411,13 @@ router.post('/administrace/upload-inline', requireRole('vedeni', 'sefredaktor', 
 });
 
 /* --- New article --- */
-router.get('/administrace/clanek/novy', requireRole('vedeni', 'sefredaktor', 'redaktor'), (req, res) => {
+router.get('/administrace/clanek/novy', requireRole('vedeni', 'sefredaktor', 'redaktor'), async (req, res) => {
   const categories = CATEGORY_OPTIONS;
   const tags = adminTagOptions();
   const presetCategory = req.query.category != null ? String(req.query.category).trim() : '';
   const form =
     presetCategory && CATEGORY_OPTIONS.includes(presetCategory) ? { category: presetCategory } : null;
-  renderArticleEdit(res, {
+  await renderArticleEdit(res, {
     title: 'Nový článek - administrace',
     article: null,
     error: null,
@@ -2412,6 +2505,7 @@ router.post(
       category,
       tag,
       status: 'draft',
+      ...communityFieldsFromBody(req.body),
     });
 
     const id = article.id;
@@ -2462,13 +2556,13 @@ router.post(
 );
 
 /* --- Edit article --- */
-router.get('/administrace/clanek/:id/edit', requireRole('vedeni', 'sefredaktor', 'redaktor'), (req, res) => {
+router.get('/administrace/clanek/:id/edit', requireRole('vedeni', 'sefredaktor', 'redaktor'), async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const article = articlesService.getById(id);
   if (!article) return res.status(404).send('Článek nenalezen');
   if (!canEditArticle(req.user, article)) return res.status(403).send('Nemáte oprávnění upravovat tento článek');
 
-  renderArticleEdit(res, {
+  await renderArticleEdit(res, {
     title: 'Upravit článek - administrace',
     article,
     error: null,
@@ -2642,6 +2736,7 @@ router.post(
             status: 'scheduled',
             scheduled_at: scheduleResolved.iso,
             published_at: null,
+            ...communityFieldsFromBody(req.body),
           });
           return res.redirect('/administrace/clanek/' + id + '/edit?success=1');
         }
@@ -2691,6 +2786,7 @@ router.post(
       body_html: bodyHtmlFinal,
       ...(bodyBlocksJsonPatch !== undefined ? { body_blocks_json: bodyBlocksJsonPatch } : {}),
       status,
+      ...communityFieldsFromBody(req.body),
     };
 
     if (action === 'publish' && canPublish(req.user)) {
@@ -2702,6 +2798,68 @@ router.post(
     res.redirect('/administrace/clanek/' + id + '/edit?success=1');
   }
 );
+
+function renderRubrikyAdmin(req, res, extras = {}) {
+  const editId = parseInt((req.query && req.query.id) || (req.body && req.body.id), 10);
+  const items = rubricsService.listRubrics();
+  const editingItem =
+    extras.editingItem ||
+    (Number.isFinite(editId) && extras.keepEdit !== false ? rubricsService.getById(editId) : null);
+  res.render('admin/rubriky', {
+    title: 'Rubriky - administrace',
+    items,
+    editingItem,
+    authors: listArticleAuthors(),
+    labelMax: rubricsService.LABEL_MAX,
+    descMax: rubricsService.DESC_MAX,
+    error: extras.error || null,
+    success: extras.success || null,
+  });
+}
+
+router.get('/administrace/rubriky', requireRole('vedeni', 'sefredaktor'), (req, res) => {
+  const ok = String((req.query && req.query.ok) || '').trim();
+  const success =
+    ok === 'created' ? 'Rubrika je vytvořená.' : ok === 'saved' ? 'Rubrika je uložená.' : ok === 'deleted' ? 'Rubrika je smazaná.' : null;
+  renderRubrikyAdmin(req, res, { success, keepEdit: ok ? false : undefined });
+});
+
+router.post('/administrace/rubriky', requireRole('vedeni', 'sefredaktor'), (req, res) => {
+  const action = String(req.body.action || '').trim();
+  const id = parseInt(req.body.id, 10);
+  try {
+    if (action === 'create') {
+      rubricsService.createRubric({
+        label: req.body.label,
+        slug: req.body.slug,
+        description: req.body.description,
+        owner_user_id: req.body.owner_user_id,
+        notify_enabled: req.body.notify_enabled === '1' || req.body.notify_enabled === 'on',
+      });
+      return res.redirect('/administrace/rubriky?ok=created');
+    }
+    if (action === 'update' && Number.isFinite(id)) {
+      rubricsService.updateRubric(id, {
+        label: req.body.label,
+        description: req.body.description,
+        owner_user_id: req.body.owner_user_id,
+        notify_enabled: req.body.notify_enabled === '1' || req.body.notify_enabled === 'on',
+      });
+      return res.redirect('/administrace/rubriky?ok=saved');
+    }
+    if (action === 'delete' && Number.isFinite(id)) {
+      rubricsService.removeRubric(id);
+      return res.redirect('/administrace/rubriky?ok=deleted');
+    }
+    return renderRubrikyAdmin(req, res, { error: 'Neplatná akce.' });
+  } catch (e) {
+    const msg = e.code === 'INVALID' || e.code === 'NOT_FOUND' ? e.message : 'Uložení se nezdařilo.';
+    return renderRubrikyAdmin(req, res, {
+      error: msg,
+      editingItem: action === 'update' && Number.isFinite(id) ? rubricsService.getById(id) : null,
+    });
+  }
+});
 
 router.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {

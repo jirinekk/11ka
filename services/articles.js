@@ -3,6 +3,8 @@ const path = require('path');
 const { getDb } = require('../db');
 const { sanitizeArticleBody } = require('../lib/html');
 const { uniqueSlug } = require('../lib/slug');
+const chanceLigaLogos = require('./chance-liga-logos');
+const { getRubric } = require('../config/rubrics');
 
 let _hasTagColumnCache = null;
 let _hasBlocksColumnCache = null;
@@ -205,6 +207,209 @@ function normalizeSources(value) {
   if (value == null || value === '') return null;
   const trimmed = String(value).trim();
   return trimmed || null;
+}
+
+function hasArticlesColumn(name) {
+  try {
+    const cols = getDb().prepare(`PRAGMA table_info(articles)`).all();
+    return Array.isArray(cols) && cols.some((c) => c && c.name === name);
+  } catch {
+    return false;
+  }
+}
+
+function parseRelatedIds(raw) {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => parseInt(item, 10))
+      .filter((n) => Number.isFinite(n) && n > 0);
+  }
+  if (raw == null || raw === '') return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item) => parseInt(item, 10))
+        .filter((n) => Number.isFinite(n) && n > 0);
+    }
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
+function normalizeRubricSlug(value) {
+  const slug = String(value || '').trim();
+  return getRubric(slug) ? slug : null;
+}
+
+function listArticleTeamCodes(articleId) {
+  return getDb()
+    .prepare(`SELECT team_code FROM article_teams WHERE article_id = ? ORDER BY team_code`)
+    .all(articleId)
+    .map((row) => row.team_code);
+}
+
+function setArticleTeams(articleId, codes) {
+  const unique = [];
+  const seen = new Set();
+  for (const raw of codes || []) {
+    const code = String(raw || '').trim().toLowerCase();
+    if (!chanceLigaLogos.isClubCode(code) || seen.has(code)) continue;
+    seen.add(code);
+    unique.push(code);
+  }
+  const db = getDb();
+  const tx = db.transaction(() => {
+    db.prepare(`DELETE FROM article_teams WHERE article_id = ?`).run(articleId);
+    const insert = db.prepare(
+      `INSERT INTO article_teams (article_id, team_code) VALUES (?, ?)`
+    );
+    for (const code of unique) insert.run(articleId, code);
+  });
+  tx();
+  return unique;
+}
+
+function normalizeMatchKey(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (raw.startsWith('chance:')) {
+    const slug = raw.slice(7).trim();
+    return slug ? `chance:${slug}` : null;
+  }
+  return null;
+}
+
+function parseMatchKey(value) {
+  const key = normalizeMatchKey(value);
+  if (!key) return null;
+  const slug = key.slice(7);
+  return { type: 'chance', slug, href: `/zapasy/chance/${encodeURIComponent(slug)}` };
+}
+
+function persistCommunityFields(articleId, { mentionedTeamCodes, relatedArticleIds, rubricSlug, matchKey } = {}) {
+  if (!articleId) return;
+  if (mentionedTeamCodes !== undefined) {
+    setArticleTeams(articleId, mentionedTeamCodes);
+  }
+  if (relatedArticleIds !== undefined && hasArticlesColumn('related_article_ids')) {
+    const ids = parseRelatedIds(relatedArticleIds).filter((id) => id !== Number(articleId));
+    getDb()
+      .prepare(`UPDATE articles SET related_article_ids = ? WHERE id = ?`)
+      .run(JSON.stringify(ids), articleId);
+  }
+  if (rubricSlug !== undefined && hasArticlesColumn('rubric_slug')) {
+    getDb()
+      .prepare(`UPDATE articles SET rubric_slug = ? WHERE id = ?`)
+      .run(normalizeRubricSlug(rubricSlug), articleId);
+  }
+  if (matchKey !== undefined && hasArticlesColumn('match_key')) {
+    getDb()
+      .prepare(`UPDATE articles SET match_key = ? WHERE id = ?`)
+      .run(normalizeMatchKey(matchKey), articleId);
+  }
+}
+
+function listPublishedByMatchKey(matchKey, limit = 8) {
+  const key = normalizeMatchKey(matchKey);
+  if (!key || !hasArticlesColumn('match_key')) return [];
+  const lim = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(24, Number(limit))) : 8;
+  return getDb()
+    .prepare(
+      `SELECT a.*, u.display_name AS author_display
+       FROM articles a
+       JOIN users u ON u.id = a.author_id
+       WHERE a.status = 'published' AND a.match_key = ?
+       ORDER BY COALESCE(a.published_at, a.created_at) DESC, a.id DESC
+       LIMIT ?`
+    )
+    .all(key, lim);
+}
+
+function getMentionedTeams(articleId) {
+  return chanceLigaLogos.clubsFromCodes(listArticleTeamCodes(articleId));
+}
+
+function listPublishedByTeamCode(code, limit = 6) {
+  const key = String(code || '').trim().toLowerCase();
+  if (!key) return [];
+  const lim = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(24, Number(limit))) : 6;
+  try {
+    return getDb()
+      .prepare(
+        `SELECT a.*, u.display_name AS author_display
+         FROM articles a
+         JOIN article_teams t ON t.article_id = a.id
+         JOIN users u ON u.id = a.author_id
+         WHERE a.status = 'published' AND t.team_code = ?
+         ORDER BY COALESCE(a.published_at, a.created_at) DESC, a.id DESC
+         LIMIT ?`
+      )
+      .all(key, lim);
+  } catch {
+    return [];
+  }
+}
+
+function listRelatedByIds(ids, excludeId, limit) {
+  const unique = [];
+  const seen = new Set();
+  for (const id of ids || []) {
+    const n = Number(id);
+    if (!Number.isFinite(n) || n <= 0 || n === Number(excludeId) || seen.has(n)) continue;
+    seen.add(n);
+    unique.push(n);
+  }
+  if (!unique.length) return [];
+  const lim = limit != null ? limit : unique.length;
+  const rows = getDb()
+    .prepare(
+      `SELECT
+         a.id,
+         a.slug,
+         a.title,
+         a.excerpt,
+         a.category,
+         a.tag,
+         a.hero_image_path,
+         a.hero_position,
+         a.hero_card_position,
+         a.published_at,
+         a.created_at
+       FROM articles a
+       WHERE a.status = 'published'
+         AND a.id IN (${unique.map(() => '?').join(', ')})`
+    )
+    .all(...unique);
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return unique.map((id) => byId.get(id)).filter(Boolean).slice(0, lim);
+}
+
+function listForRelatedPicker(excludeId, selectedIds = [], limit = 40) {
+  const lim = limit != null ? limit : 40;
+  const latest = getDb()
+    .prepare(
+      `SELECT a.id, a.slug, a.title, a.published_at, a.created_at, a.status
+       FROM articles a
+       WHERE a.status = 'published' AND (? IS NULL OR a.id != ?)
+       ORDER BY COALESCE(a.published_at, a.created_at) DESC, a.id DESC
+       LIMIT ?`
+    )
+    .all(excludeId || null, excludeId || 0, lim);
+  const have = new Set(latest.map((row) => row.id));
+  const extras = [];
+  for (const id of selectedIds) {
+    if (have.has(id) || id === Number(excludeId)) continue;
+    const row = getDb()
+      .prepare(
+        `SELECT a.id, a.slug, a.title, a.published_at, a.created_at, a.status
+         FROM articles a WHERE a.id = ? AND a.status = 'published'`
+      )
+      .get(id);
+    if (row) extras.push(row);
+  }
+  return extras.concat(latest);
 }
 
 function normalizeLineupJson(value) {
@@ -622,8 +827,13 @@ function listPublishedByCategoryPaged(category, limit, offset, tag) {
     .all(...(canTag ? [tg, tg] : []), ...cats, lim, off);
 }
 
-function countPublishedByCategory(category, tag) {
-  const { clause, params } = categoryScopeClause({ category, tag });
+function countPublishedByCategory(category, tag, extra = {}) {
+  const { clause, params } = categoryScopeClause({
+    category,
+    tag,
+    typeCategory: extra.typeCategory,
+    regionTags: extra.regionTags,
+  });
   if (clause === ' AND 1=0') return 0;
   return getDb()
     .prepare(`SELECT COUNT(*) AS n FROM articles a WHERE a.status = 'published'${clause}`)
@@ -678,8 +888,11 @@ function listRelatedPublished(articleId, category, limit) {
          a.slug,
          a.title,
          a.excerpt,
+         a.category,
+         a.tag,
          a.hero_image_path,
          a.hero_position,
+         a.hero_card_position,
          a.published_at,
          a.created_at
        FROM articles a
@@ -690,6 +903,14 @@ function listRelatedPublished(articleId, category, limit) {
        LIMIT ?`
     )
     .all(articleId, cat, cat, lim);
+}
+
+function listRelatedForArticle(article, limit = 3) {
+  if (!article) return [];
+  const lim = limit != null ? limit : 3;
+  const stored = listRelatedByIds(parseRelatedIds(article.related_article_ids), article.id, lim);
+  if (stored.length) return stored;
+  return listRelatedPublished(article.id, article.category, lim);
 }
 
 function searchPublished(query, limit, tag) {
@@ -752,12 +973,68 @@ function normalizeListingCategories(category) {
   return [];
 }
 
-function categoryScopeClause({ category, tag }) {
+const TYPE_LISTING_CATEGORIES = ['Zápasy', 'Analýzy', 'Rozhovory'];
+
+function normalizeListingTags(tags) {
+  if (Array.isArray(tags)) {
+    return tags.map((t) => (t != null ? String(t).trim() : '')).filter(Boolean);
+  }
+  if (tags != null && String(tags).trim()) {
+    return [String(tags).trim()];
+  }
+  return [];
+}
+
+function appendExactTagFilter(clause, params, tag) {
+  const tg = tag != null ? String(tag).trim() : '';
+  if (!tg) return { clause, params };
+  return {
+    clause: `${clause} AND IFNULL(a.tag, '') = ?`,
+    params: [...params, tg],
+  };
+}
+
+function categoryScopeClause({ category, tag, typeCategory, regionTags } = {}) {
   const cats = normalizeListingCategories(category);
   const tg = tag != null ? String(tag).trim() : '';
+  const typeCat = typeCategory != null ? String(typeCategory).trim() : '';
+  const rTags = normalizeListingTags(regionTags);
+
+  if (typeCat) {
+    const parts = [];
+    const params = [];
+    if (cats.length) {
+      parts.push(
+        `(LOWER(TRIM(a.category)) IN (${cats.map(() => 'LOWER(?)').join(', ')}) AND IFNULL(a.tag, '') = ?)`
+      );
+      params.push(...cats, typeCat);
+    }
+    if (rTags.length) {
+      parts.push(
+        `(LOWER(TRIM(a.category)) = LOWER(?) AND IFNULL(a.tag, '') IN (${rTags.map(() => '?').join(', ')}))`
+      );
+      params.push(typeCat, ...rTags);
+    } else {
+      parts.push(`LOWER(TRIM(a.category)) = LOWER(?)`);
+      params.push(typeCat);
+    }
+    if (!parts.length) {
+      return { clause: ' AND 1=0', params: [] };
+    }
+    return appendExactTagFilter(` AND (${parts.join(' OR ')})`, params, tg);
+  }
 
   if (!cats.length) {
     return { clause: ' AND 1=0', params: [] };
+  }
+
+  if (rTags.length) {
+    const parts = [
+      `LOWER(TRIM(a.category)) IN (${cats.map(() => 'LOWER(?)').join(', ')})`,
+      `(LOWER(TRIM(a.category)) IN (${TYPE_LISTING_CATEGORIES.map(() => 'LOWER(?)').join(', ')}) AND IFNULL(a.tag, '') IN (${rTags.map(() => '?').join(', ')}))`,
+    ];
+    const params = [...cats, ...TYPE_LISTING_CATEGORIES, ...rTags];
+    return appendExactTagFilter(` AND (${parts.join(' OR ')})`, params, tg);
   }
 
   if (tg) {
@@ -791,11 +1068,31 @@ function listingSearchLike(query) {
   return `%${q.replace(/[%_]/g, '\\$&')}%`;
 }
 
-function appendListingFilters(sql, params, { scope, category, tag, query }) {
+function appendListingFilters(sql, params, { scope, category, tag, query, typeCategory, regionTags, rubricSlug }) {
   const canTag = hasArticlesTagColumn();
   const tg = tag != null ? String(tag).trim() : '';
   const like = listingSearchLike(query);
   const cats = normalizeListingCategories(category);
+
+  if (scope === 'rubric') {
+    if (!hasArticlesColumn('rubric_slug')) return null;
+    const slug = rubricSlug != null ? String(rubricSlug).trim() : '';
+    if (slug) {
+      sql += ` AND IFNULL(a.rubric_slug, '') = ?`;
+      params.push(slug);
+    } else {
+      sql += ` AND IFNULL(TRIM(a.rubric_slug), '') != ''`;
+    }
+    if (like) {
+      sql += ` AND (
+           a.title LIKE ? ESCAPE '\\'
+           OR IFNULL(a.excerpt, '') LIKE ? ESCAPE '\\'
+           OR IFNULL(a.body_html, '') LIKE ? ESCAPE '\\'
+         )`;
+      params.push(like, like, like);
+    }
+    return sql;
+  }
 
   if (scope === 'search') {
     if (!like) return null;
@@ -837,8 +1134,8 @@ function appendListingFilters(sql, params, { scope, category, tag, query }) {
     return sql;
   }
 
-  if (cats.length >= 1) {
-    const scoped = categoryScopeClause({ category, tag });
+  if (cats.length >= 1 || (typeCategory && String(typeCategory).trim())) {
+    const scoped = categoryScopeClause({ category, tag, typeCategory, regionTags });
     if (scoped.clause === ' AND 1=0') return null;
     sql += scoped.clause;
     params.push(...scoped.params);
@@ -856,7 +1153,15 @@ function appendListingFilters(sql, params, { scope, category, tag, query }) {
   return sql;
 }
 
-function countForListing({ scope = 'category', category, tag, query } = {}) {
+function countForListing({ scope = 'category', category, tag, query, typeCategory, regionTags, rubricSlug } = {}) {
+  if (scope === 'rubric') {
+    if (!hasArticlesColumn('rubric_slug')) return 0;
+    let sql = `SELECT COUNT(*) AS n FROM articles a WHERE a.status = 'published'`;
+    const params = [];
+    sql = appendListingFilters(sql, params, { scope, query, rubricSlug });
+    if (!sql) return 0;
+    return getDb().prepare(sql).get(...params).n;
+  }
   if (scope === 'search') {
     return countSearchPublished(query, tag);
   }
@@ -870,18 +1175,18 @@ function countForListing({ scope = 'category', category, tag, query } = {}) {
     return countPublished(tag);
   }
   if (listingSearchLike(query)) {
-    return countPublishedByCategoryQuery(category, query, tag);
+    return countPublishedByCategoryQuery(category, query, tag, { typeCategory, regionTags });
   }
-  return countPublishedByCategory(category, tag);
+  return countPublishedByCategory(category, tag, { typeCategory, regionTags });
 }
 
-function runListingQuery({ scope, category, tag, query, orderBy, limit, offset }) {
+function runListingQuery({ scope, category, tag, query, typeCategory, regionTags, rubricSlug, orderBy, limit, offset }) {
   let sql = `SELECT a.*, u.display_name AS author_display, u.email AS author_email
        FROM articles a
        JOIN users u ON u.id = a.author_id
        WHERE a.status = 'published'`;
   const params = [];
-  sql = appendListingFilters(sql, params, { scope, category, tag, query });
+  sql = appendListingFilters(sql, params, { scope, category, tag, query, typeCategory, regionTags, rubricSlug });
   if (!sql) return [];
   sql += ` ORDER BY ${orderBy}`;
   if (limit != null) {
@@ -895,23 +1200,29 @@ function runListingQuery({ scope, category, tag, query, orderBy, limit, offset }
   return getDb().prepare(sql).all(...params);
 }
 
-function listLatestForListing({ scope = 'category', category, tag, query, limit = 3 } = {}) {
+function listLatestForListing({ scope = 'category', category, tag, query, typeCategory, regionTags, rubricSlug, limit = 3 } = {}) {
   return runListingQuery({
     scope,
     category,
     tag,
     query,
+    typeCategory,
+    regionTags,
+    rubricSlug,
     orderBy: 'COALESCE(a.published_at, a.created_at) DESC, a.id DESC',
     limit,
   });
 }
 
-function listMostReadForListing({ scope = 'category', category, tag, query, limit = 6 } = {}) {
+function listMostReadForListing({ scope = 'category', category, tag, query, typeCategory, regionTags, rubricSlug, limit = 6 } = {}) {
   return runListingQuery({
     scope,
     category,
     tag,
     query,
+    typeCategory,
+    regionTags,
+    rubricSlug,
     orderBy: 'COALESCE(a.view_count, 0) DESC, COALESCE(a.published_at, a.created_at) DESC, a.id DESC',
     limit,
   });
@@ -922,6 +1233,9 @@ function listPagedForListing({
   category,
   tag,
   query,
+  typeCategory,
+  regionTags,
+  rubricSlug,
   limit = 6,
   offset = 0,
 } = {}) {
@@ -930,22 +1244,27 @@ function listPagedForListing({
     category,
     tag,
     query,
+    typeCategory,
+    regionTags,
+    rubricSlug,
     orderBy: 'COALESCE(a.published_at, a.created_at) DESC, a.id DESC',
     limit,
     offset,
   });
 }
 
-function countPublishedByCategoryQuery(category, query, tag) {
+function countPublishedByCategoryQuery(category, query, tag, extra = {}) {
   const q = query ? String(query).trim() : '';
   const like = `%${q.replace(/[%_]/g, '\\$&')}%`;
   const tg = tag != null ? String(tag).trim() : '';
   const db = getDb();
-  if (!q) return countPublishedByCategory(category, tg);
+  if (!q) return countPublishedByCategory(category, tg, extra);
 
   const { clause, params: scopeParams } = categoryScopeClause({
     category,
     tag: tg,
+    typeCategory: extra.typeCategory,
+    regionTags: extra.regionTags,
   });
   if (clause === ' AND 1=0') return 0;
 
@@ -1070,6 +1389,10 @@ function createArticle({
   tag,
   sources,
   status,
+  mentionedTeamCodes,
+  relatedArticleIds,
+  rubricSlug,
+  matchKey,
 }) {
   const now = new Date().toISOString();
   const body = sanitizeArticleBody(body_html);
@@ -1230,6 +1553,12 @@ function createArticle({
       .prepare(`UPDATE articles SET sources = ? WHERE id = ?`)
       .run(normalizeSources(sources), created.id);
   }
+  persistCommunityFields(created.id, {
+    mentionedTeamCodes,
+    relatedArticleIds,
+    rubricSlug,
+    matchKey,
+  });
   return getById(created.id);
 }
 
@@ -1495,14 +1824,34 @@ function updateArticle(id, patch) {
     );
   }
 
+  persistCommunityFields(id, {
+    mentionedTeamCodes: patch.mentionedTeamCodes,
+    relatedArticleIds: patch.relatedArticleIds,
+    rubricSlug: patch.rubricSlug,
+    matchKey: patch.matchKey,
+  });
+
   const updated = getById(id);
   if (!wasPublished && status === 'published' && updated) {
     setImmediate(() => {
       try {
-        const { notifyNewArticle } = require('./mail');
+        const { notifyNewArticle, notifyRubricArticle } = require('./mail');
         notifyNewArticle(updated).catch((err) =>
           console.error('[11ka] newsletter mail:', err && err.message)
         );
+        const slug = updated.rubric_slug;
+        if (slug) {
+          try {
+            const rubric = require('./rubrics').getBySlug(slug);
+            if (rubric && rubric.notify_enabled) {
+              notifyRubricArticle(updated, rubric).catch((err) =>
+                console.error('[11ka] rubric mail:', err && err.message)
+              );
+            }
+          } catch (e) {
+            console.error('[11ka] rubric mail:', e && e.message);
+          }
+        }
       } catch (e) {
         console.error('[11ka] newsletter mail:', e && e.message);
       }
@@ -1602,28 +1951,196 @@ function statsSummary(topLimit, topOffset, query) {
   return { totalViews, byStatus, top, topTotal };
 }
 
+const SEED_ARTICLES_PATH = path.join(__dirname, '..', 'data', 'seed-articles.json');
+const DEMO_PLACEHOLDER_SLUG = 'slavia-sparta-derby';
+
+function loadSeedArticlesFile() {
+  try {
+    if (!fs.existsSync(SEED_ARTICLES_PATH)) return [];
+    const raw = JSON.parse(fs.readFileSync(SEED_ARTICLES_PATH, 'utf8'));
+    const list = Array.isArray(raw) ? raw : raw && Array.isArray(raw.articles) ? raw.articles : [];
+    return list.filter((item) => item && item.title && item.slug);
+  } catch (e) {
+    console.error('[11ka] seed-articles.json unreadable:', e && e.message);
+    return [];
+  }
+}
+
+function normalizeSeedTag(tag) {
+  const value = tag != null ? String(tag).trim() : '';
+  if (!value) return null;
+  if (value === 'Fortuna Lyga') return 'Fortuna Liga';
+  return value;
+}
+
+function ensureSeedAuthorId(displayName, fallbackId) {
+  const name = String(displayName || '').trim() || 'Redakce';
+  const existing = getDb()
+    .prepare(
+      `SELECT id FROM users
+       WHERE display_name = ? COLLATE NOCASE
+       ORDER BY CASE role
+         WHEN 'majitel' THEN 1
+         WHEN 'vedeni' THEN 2
+         WHEN 'sefredaktor' THEN 3
+         WHEN 'redaktor' THEN 4
+         ELSE 5
+       END, id ASC
+       LIMIT 1`
+    )
+    .get(name);
+  if (existing) return existing.id;
+
+  try {
+    const usersService = require('./users');
+    const crypto = require('crypto');
+    const email = `seed.${uniqueSlug(name, () => false)}@11ka.local`;
+    const byEmail = usersService.getByEmail(email);
+    if (byEmail) return byEmail.id;
+    return usersService.createUser({
+      email,
+      password: crypto.randomBytes(24).toString('hex'),
+      role: 'redaktor',
+      roles: ['redaktor'],
+      display_name: name,
+    });
+  } catch (e) {
+    console.error('[11ka] seed author failed:', name, e && e.message);
+    return fallbackId;
+  }
+}
+
+function seedArticleSlug(item) {
+  const raw = String(item.slug || '').trim();
+  if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(raw) && raw.length <= 120) return raw;
+  return uniqueSlug(item.slug || item.title, (s) => slugExists(s, null));
+}
+
+function seedArticleStatus(value) {
+  const status = String(value || 'published').trim();
+  if (status === 'draft' || status === 'pending' || status === 'scheduled' || status === 'published') {
+    return status;
+  }
+  return 'published';
+}
+
+function insertSeedArticle(item, fallbackAuthorId) {
+  const now = new Date().toISOString();
+  const slug = seedArticleSlug(item);
+  if (slugExists(slug, null)) return false;
+  const status = seedArticleStatus(item.status);
+  const publishedAt = item.published_at || (status === 'published' ? now : null);
+  const createdAt = item.created_at || publishedAt || now;
+  const heroPosition = normalizeHeroPosition(item.hero_position) || '50% 50%';
+  const authorId = ensureSeedAuthorId(item.author_name, fallbackAuthorId);
+  const canHero = hasArticlesHeroPositionColumn();
+  const canTag = hasArticlesTagColumn();
+  const body = sanitizeArticleBody(item.body_html || '');
+  const tag = normalizeSeedTag(item.tag);
+  const cols = [
+    'slug',
+    'title',
+    'excerpt',
+    'body_html',
+    'hero_image_path',
+    'hero_credit',
+    'status',
+    'scheduled_at',
+    'published_at',
+    'author_id',
+    'view_count',
+    'category',
+    'created_at',
+    'updated_at',
+  ];
+  const vals = [
+    slug,
+    String(item.title).trim(),
+    item.excerpt ? String(item.excerpt).trim() : null,
+    body,
+    item.hero_image_path || null,
+    item.hero_credit ? String(item.hero_credit).trim() : null,
+    status,
+    item.scheduled_at || null,
+    publishedAt,
+    authorId,
+    Number.isFinite(Number(item.view_count)) ? Number(item.view_count) : 0,
+    item.category ? String(item.category).trim() : null,
+    createdAt,
+    now,
+  ];
+  if (canHero) {
+    cols.splice(5, 0, 'hero_position');
+    vals.splice(5, 0, heroPosition);
+  }
+  if (canTag) {
+    cols.splice(cols.indexOf('created_at'), 0, 'tag');
+    vals.splice(vals.length - 2, 0, tag);
+  }
+  const placeholders = cols.map(() => '?').join(', ');
+  const info = getDb()
+    .prepare(`INSERT INTO articles (${cols.join(', ')}) VALUES (${placeholders})`)
+    .run(...vals);
+  persistCommunityFields(info.lastInsertRowid, {
+    mentionedTeamCodes: item.mentioned_teams || item.mentionedTeamCodes,
+    relatedArticleIds: item.related_article_ids || item.relatedArticleIds,
+    rubricSlug: item.rubric_slug || item.rubricSlug,
+  });
+  return true;
+}
+
 function seedDemoIfEmpty() {
-  const c = getDb().prepare(`SELECT COUNT(*) AS n FROM articles`).get().n;
-  if (c > 0) return;
-  const admin = getDb().prepare(`SELECT id FROM users ORDER BY id LIMIT 1`).get();
-  if (!admin) return;
+  const db = getDb();
+  const countRow = db.prepare(`SELECT COUNT(*) AS n FROM articles`).get();
+  let count = countRow ? countRow.n : 0;
+  if (count === 1) {
+    const dummy = db.prepare(`SELECT id FROM articles WHERE slug = ?`).get(DEMO_PLACEHOLDER_SLUG);
+    if (dummy) {
+      db.prepare(`DELETE FROM articles WHERE id = ?`).run(dummy.id);
+      count = 0;
+    }
+  }
+
+  const fallbackAuthor = db.prepare(`SELECT id FROM users ORDER BY id LIMIT 1`).get();
+  if (!fallbackAuthor) return;
+
+  const seeded = loadSeedArticlesFile();
+  if (seeded.length) {
+    const existing = new Set(
+      db.prepare(`SELECT slug FROM articles`).all().map((row) => row && row.slug).filter(Boolean)
+    );
+    const missing = seeded.filter((item) => item && item.slug && !existing.has(item.slug));
+    if (missing.length) {
+      const insertMany = db.transaction((items) => {
+        for (const item of items) insertSeedArticle(item, fallbackAuthor.id);
+      });
+      insertMany(missing);
+      console.log(`[11ka] Seeded ${missing.length} published article(s) from data/seed-articles.json`);
+      try {
+        require('./article-ratings').seedDemoIfEmpty();
+      } catch (e) {
+        console.error('[11ka] article ratings seed failed:', e && e.message);
+      }
+    }
+    return;
+  }
+
+  if (count > 0) return;
 
   const title = 'Slavia Praha dominuje v derby proti Spartě';
-  const slug = 'slavia-sparta-derby';
+  const slug = DEMO_PLACEHOLDER_SLUG;
   const excerpt =
-    'V emotivním šlágru kola proměnili domácí převahu ve druhém poločase v rozhodující góly.';
+    'V emotivním šlágru kola proměnili domácí převahu ve druhém poločase v rozhodoucí góly.';
   const body = sanitizeArticleBody(
     `<p>${excerpt}</p><p>Článek byl vytvořen jako ukázka po instalaci CMS.</p>`
   );
   const now = new Date().toISOString();
-  getDb()
-    .prepare(
-      `INSERT INTO articles (
-        slug, title, excerpt, body_html, hero_image_path, hero_credit, status,
-        scheduled_at, published_at, author_id, view_count, category, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, NULL, NULL, 'published', NULL, ?, ?, 0, 'Český Fotbal', ?, ?)`
-    )
-    .run(slug, title, excerpt, body, now, admin.id, now, now);
+  db.prepare(
+    `INSERT INTO articles (
+      slug, title, excerpt, body_html, hero_image_path, hero_credit, status,
+      scheduled_at, published_at, author_id, view_count, category, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, NULL, NULL, 'published', NULL, ?, ?, 0, 'Český Fotbal', ?, ?)`
+  ).run(slug, title, excerpt, body, now, fallbackAuthor.id, now, now);
 }
 
 module.exports = {
@@ -1654,6 +2171,18 @@ module.exports = {
   listPublishedForSitemap,
   listPublishedForRss,
   listRelatedPublished,
+  listRelatedForArticle,
+  listForRelatedPicker,
+  parseRelatedIds,
+  persistCommunityFields,
+  normalizeMatchKey,
+  parseMatchKey,
+  listPublishedByMatchKey,
+  listArticleTeamCodes,
+  getMentionedTeams,
+  listPublishedByTeamCode,
+  setArticleTeams,
+  normalizeRubricSlug,
   listMostRead,
   listMostReadWeekly,
   listMostReadPaged,

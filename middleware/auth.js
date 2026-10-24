@@ -1,8 +1,10 @@
 const {
   ROLES,
+  STAFF_ROLES,
   ROLE_LABELS,
   hasRole,
   hasAnyRole,
+  isStaffUser,
   isAkreditaceOnly,
   isRedaktorWorkflow,
   userRoles,
@@ -10,6 +12,7 @@ const {
   parseRoles,
 } = require('../lib/roles');
 const { canAccessAiDrafts } = require('../config/ai-drafts');
+const authCookie = require('../lib/auth-cookie');
 
 function sessionUserFallback(req) {
   if (!req.session || !req.session.userId) return null;
@@ -116,6 +119,10 @@ function attachUser(usersService) {
     let u = null;
     try {
       u = usersService.getById(req.session.userId);
+      if (!u && req.session.email) {
+        u = usersService.getByEmail(req.session.email);
+        if (u) req.session.userId = u.id;
+      }
     } catch (err) {
       console.error('[11ka] attachUser getById failed:', err && err.message);
       req.user = sessionUserFallback(req);
@@ -123,6 +130,7 @@ function attachUser(usersService) {
     }
 
     if (!u) {
+      authCookie.clear(res);
       req.session.destroy(() => {});
       return next();
     }
@@ -139,13 +147,16 @@ function attachUser(usersService) {
       roles,
       display_name: u.display_name,
       avatar_path: u.avatar_path,
+      slug: u.slug || null,
     };
+    authCookie.set(res, req.user);
     next();
   };
 }
 
 module.exports = {
   ROLES,
+  STAFF_ROLES,
   ROLE_LABELS,
   requireLogin,
   requireRole,
@@ -159,6 +170,7 @@ module.exports = {
   attachUser,
   hasRole,
   hasAnyRole,
+  isStaffUser,
   isAkreditaceOnly,
   isRedaktorWorkflow,
   userRoles,

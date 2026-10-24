@@ -12,7 +12,8 @@
   var maxRounds = pg.maxRounds || 5;
   var lb = (typeof penaltyLeaderboard !== 'undefined' && penaltyLeaderboard) ? penaltyLeaderboard : [];
 %>
-<div class="penalty-game-wrap mt-8 min-w-0">
+<% var penaltySidebar = typeof sidebar !== 'undefined' && sidebar; %>
+<div class="penalty-game-wrap min-w-0<%= penaltySidebar ? ' penalty-game-wrap--sidebar' : ' mt-8' %>">
 <section
   class="penalty-game penalty-game--menu min-w-0"
   aria-labelledby="penalty-game-heading"

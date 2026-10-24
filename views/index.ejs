@@ -1,47 +1,37 @@
 <%- include('partials/header') %>
 
 <main id="main-content" class="flex-1" tabindex="-1">
-  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+  <div class="mx-auto max-w-[1400px] px-4 py-6 lg:px-6 lg:py-8">
     <h1 class="sr-only">11ka.cz - hlavní přehled článků</h1>
 
-    <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-      <% var slides = (typeof heroSlides !== 'undefined' && heroSlides && heroSlides.length) ? heroSlides : [hero]; %>
-      <article class="card-11 min-w-0 overflow-hidden p-0">
-        <%- include('partials/hero-slider', { slides: slides }) %>
-      </article>
-      <div class="min-w-0">
-        <%- include('partials/sidebar-most-read', { items: typeof sidebarMostRead !== 'undefined' ? sidebarMostRead : [], mostReadLimit: 4 }) %>
-      </div>
-    </div>
+    <div class="site-shell">
+      <div class="site-shell__main min-w-0 space-y-8">
+        <% var slides = (typeof heroSlides !== 'undefined' && heroSlides && heroSlides.length) ? heroSlides : [hero]; %>
+        <%- include('partials/home-featured', { slides: slides }) %>
 
-    <%- include('partials/home-mobile-ad') %>
+        <%- include('partials/home-mobile-ad') %>
 
-    <div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-      <div class="min-w-0 space-y-8">
         <% (typeof homeSections !== 'undefined' ? homeSections : []).forEach(function (section, sectionIndex) { %>
         <%- include('partials/home-category-section', Object.assign({}, section, { sectionIndex: sectionIndex, showSectionAd: section.title === 'Český Fotbal' })) %>
         <% if (section && section.title === 'Český Fotbal' && typeof homeLeaderboardPlacementsBySlug !== 'undefined' && homeLeaderboardPlacementsBySlug['cesky-fotbal']) { %>
         <%- include('partials/home-leaderboard-ad', homeLeaderboardPlacementsBySlug['cesky-fotbal']) %>
         <% } %>
+        <% if (section && section.title === 'Český Fotbal') { %>
+        <%- include('partials/chance-liga-board', { chanceMatchLeagues: typeof chanceMatchLeagues !== 'undefined' ? chanceMatchLeagues : [], chanceLigaHref: '/zapasy/live' }) %>
+        <% } %>
         <% }); %>
       </div>
 
-      <aside class="space-y-6 lg:sticky lg:top-24">
-        <% var adSide = typeof adMap !== 'undefined' && adMap && adMap.home_sidebar_300; %>
-        <div class="card-11 p-4 perf-cv home-side-ad-card">
-          <p class="mb-2 text-center text-xs font-medium uppercase tracking-wide text-11muted">Reklama</p>
-          <div
-            id="ssp-zone-411438"
-            class="home-side-ad-wrap mx-auto h-[600px] w-[300px] overflow-hidden"
-            data-ssp-zone="411438"
-            data-ssp-width="300"
-            data-ssp-height="600"
-          ></div>
+      <aside class="site-shell__rail space-y-6">
+        <div class="news-rail">
+          <%- include('partials/sidebar-most-read', { items: typeof sidebarMostRead !== 'undefined' ? sidebarMostRead : [], mostReadLimit: 4 }) %>
         </div>
+
+        <%- include('partials/sidebar-ssp-ad') %>
 
         <%- include('partials/sidebar-kitswaps', { kitswaps: typeof kitswaps !== 'undefined' ? kitswaps : [] }) %>
 
-        <%- include('partials/sidebar-live-matches') %>
+        <%- include('partials/chance-liga-table', { standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [], compactTable: true, tableRail: true, tableHref: '/zapasy/live#tabulka' }) %>
 
         <div class="card-11 p-4 perf-cv">
           <h2 class="mb-2 text-lg font-bold text-11accent">Newsletter</h2>
@@ -60,8 +50,13 @@
           </form>
         </div>
 
-        <%- include('partials/sidebar-social') %>
         <%- include('partials/promo-banner', { promoBanner: typeof homeBelowSocialAd !== 'undefined' ? homeBelowSocialAd : null }) %>
+        <% if (typeof sidebarFavorites !== 'undefined' && sidebarFavorites && sidebarFavorites.length) { %>
+        <div class="news-rail">
+          <%- include('partials/sidebar-favorites', { items: sidebarFavorites }) %>
+        </div>
+        <% } %>
+        <%- include('partials/sidebar-social') %>
       </aside>
     </div>
   </div>
@@ -108,9 +103,12 @@
 <script src="/js/home-leaderboard-ads.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
 <% } %>
 
-<script src="/js/hero-slider.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
 <% if (typeof kitswaps !== 'undefined' && kitswaps && kitswaps.length > 1) { %>
 <script src="/js/kitswap-carousel.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
+<% } %>
+
+<% if (typeof heroSlides !== 'undefined' && heroSlides && heroSlides.length) { %>
+<script src="/js/hero-slider.js?v=<%= encodeURIComponent((typeof assetVersion !== 'undefined' ? assetVersion : '1') + '-hero5') %>" defer></script>
 <% } %>
 
 <%- include('partials/footer') %>

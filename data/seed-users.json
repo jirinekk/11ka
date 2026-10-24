@@ -1,0 +1,233 @@
+{
+  "source": "storage/11ka.sqlite staff export + 11ka.cz/redakce",
+  "imported_at": "2026-10-20T19:48:38Z",
+  "users": [
+    {
+      "email": "admin@11ka.local",
+      "password_hash": "$2b$12$25RaxKTHwbIy4jNdJ3XNzuR.ZPSlb4wAkPYUke8DRWl5ZZVLdpibG",
+      "role": "majitel",
+      "roles": [
+        "majitel",
+        "vedeni"
+      ],
+      "display_name": "Jiří Galba",
+      "slug": "jiri-galba",
+      "author_bio": "Spolumajitel stránky, a zakladatel, píše když má čas a zájem, nejvíce ho baví samozřejmě pražské S.",
+      "created_at": "2026-03-22T18:06:58.557Z"
+    },
+    {
+      "email": "krystof.jehne@gmail.com",
+      "password_hash": "$2b$12$UbE5ovCUmua4/uJW9Wjs1evxzR869vXZUlI0m2kM9Hw3eDW6Zod1u",
+      "role": "sefredaktor",
+      "roles": [
+        "sefredaktor"
+      ],
+      "display_name": "Kryštof Jan Jehne",
+      "slug": "krystof-jan-jehne",
+      "author_bio": "Působí jako zástupce šéfredaktora a specializuje se na zpravodajství o Spartě. Je zakladatelem a majitelem projektu SrdceSparty. Na webu se věnuje publicistice, analýzám a sledování aktuálních témat v českém fotbale i v národním týmu.",
+      "created_at": "2026-03-27T08:18:38.264Z"
+    },
+    {
+      "email": "stepinadavid@icloud.com",
+      "password_hash": "$2b$12$z6074.oEa0WbJSEAX3zkIefQjwXfwJjUew4LjZsZYLbXrdQl2Oo0q",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "David Štěpina",
+      "slug": "david-stepina",
+      "created_at": "2026-03-27T08:19:18.053Z"
+    },
+    {
+      "email": "fhlavsa@11ka.cz",
+      "password_hash": "$2b$12$9ACXYYq4bl6kxVoNlxiOO.Zif/kSmI97n9ynDurupq.5DQPLN5OoK",
+      "role": "sefredaktor",
+      "roles": [
+        "sefredaktor"
+      ],
+      "display_name": "Ferdinand Hlavsa",
+      "slug": "ferdinand-hlavsa",
+      "created_at": "2026-03-27T08:19:55.864Z"
+    },
+    {
+      "email": "jiribonifac.prochazka@gmail.com",
+      "password_hash": "$2b$12$H3yBpGZ9nZybqe8bK4RflOcahDhc98c2tZEkX61zywmoiNyZNK1CW",
+      "role": "sefredaktor",
+      "roles": [
+        "sefredaktor"
+      ],
+      "display_name": "Jiří Procházka",
+      "slug": "jiri-prochazka",
+      "created_at": "2026-03-28T23:54:43.198Z"
+    },
+    {
+      "email": "misaperina@email.cz",
+      "password_hash": "$2b$12$M7k69RPzt6HJM5oqzcWLJ.35QpFxy.sSl0L1mkCed9094IiZh2MPa",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Michal Peřina",
+      "slug": "michal-perina",
+      "created_at": "2026-03-29T19:53:44.881Z"
+    },
+    {
+      "email": "jbrabec@11ka.cz",
+      "password_hash": "$2b$12$AVrqIPlKoDypgjlAqfGkhOVHjbzygnL/vqh35jMtXQiYgkEdMqH1.",
+      "role": "majitel",
+      "roles": [
+        "majitel",
+        "vedeni"
+      ],
+      "display_name": "Jan Brabec",
+      "slug": "jan-brabec",
+      "author_bio": "Zakladatel a spolumajitel stránky",
+      "created_at": "2026-04-01T20:03:05.673Z"
+    },
+    {
+      "email": "karelschafer28@gmail.com",
+      "password_hash": "$2b$12$nipiNdNJppNN8YHOk57s1ehO/y4icrF0omk4tohjRGJQ6f4RGRtzi",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Karel Schäfer",
+      "slug": "karel-schafer",
+      "created_at": "2026-04-12T21:17:48.920Z"
+    },
+    {
+      "email": "polkaruzova@gmail.com",
+      "password_hash": "$2b$12$9FFwABxx10i6WSmEbThi5ucmKFiEedFC5xfKTFPU5uwFJV7hDWvQ6",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Radek Klier",
+      "slug": "radek-klier",
+      "created_at": "2026-04-20T10:19:01.299Z"
+    },
+    {
+      "email": "lukasglezgo@outlook.sk",
+      "password_hash": "$2b$12$GwodiqZ/brO0JULXvpkwvORFlhIYpzKEdVZcinXXrW6jjz8R5BlUO",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Lukáš Glezgo",
+      "slug": "lukas-glezgo",
+      "created_at": "2026-04-23T21:54:18.273Z"
+    },
+    {
+      "email": "pavel.heisig11@gmail.com",
+      "password_hash": "$2b$12$bQ2Gq56U.mIYGc9xNAtZy.D9K6UupzRF3.djBFkyJk1NxY6hOeRLC",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Pavel Heisig",
+      "slug": "pavel-heisig",
+      "created_at": "2026-04-26T11:56:03.519Z"
+    },
+    {
+      "email": "petr.pesek70@gmail.com",
+      "password_hash": "$2b$12$R40gI/uQoJ1bBNBQENzeT.noTJ.LEl4enIme4Cua0vt053i5NCKQq",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Petr Pešek",
+      "slug": "petr-pesek",
+      "author_bio": "Jeden z mála redaktorů co pro 11ku i fotí. Fanda Pardubic a londýnské Chelsea, na kterou se dostat je můj největší sen.",
+      "created_at": "2026-05-20T19:25:24.585Z"
+    },
+    {
+      "email": "tomas.nem@email.cz",
+      "password_hash": "$2b$12$GXEQnPot3M3by0FtRX0J8OOFDtEauy3EzViCnfNJS1lsipY77/OiW",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Tomáš Němec",
+      "slug": "tomas-nemec",
+      "created_at": "2026-05-27T08:29:17.127Z"
+    },
+    {
+      "email": "voborilf@seznam.cz",
+      "password_hash": "$2b$12$MtfoPQCqwtUSwNQTVJSU7e7McPkpMeTIcKbxN9zg.vSRi0VepRcOi",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Filip Vobořil",
+      "slug": "filip-voboril",
+      "created_at": "2026-05-27T08:29:38.113Z"
+    },
+    {
+      "email": "petr.illner.press@gmail.com",
+      "password_hash": "$2b$12$U1xHe88.CaKm1N8h7FzXCuZR1nbaPF/sKIU/DA.LRzV15L9iNtxIu",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Petr Illner",
+      "slug": "petr-illner",
+      "created_at": "2026-05-27T08:30:04.418Z"
+    },
+    {
+      "email": "danielkrob.dk@gmail.com",
+      "password_hash": "$2b$12$6XVLmEBVNWdnCV8Y7cnbuOoPAIkLk9x449IORNONI8mmoYZYL4Wrq",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Daniel Krob",
+      "slug": "daniel-krob",
+      "created_at": "2026-05-27T08:30:22.905Z"
+    },
+    {
+      "email": "tereziesenkyrikova@gmail.com",
+      "password_hash": "$2b$12$ahqZfPgvhIaHuwyKH7rLFeloMwk.T6TpvQGuuZGjfVzP0h8jvYdby",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Terezie Šenkyříková",
+      "slug": "terezie-senkyrikova",
+      "created_at": "2026-05-27T08:30:41.423Z"
+    },
+    {
+      "email": "bochnak.david@seznam.cz",
+      "password_hash": "$2b$12$eUwuZ2G4YnkUc6AvlDmFnOKN5IGl/x3ouJa0qtHG61/1XEgiG2EDS",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "David Bochňák",
+      "slug": "david-bochnak",
+      "created_at": "2026-06-05T14:30:26.293Z"
+    },
+    {
+      "email": "mkubes@11ka.cz",
+      "password_hash": "$2b$12$yDuwul5Ad59Ihz4offFbl.65fhyftQiYXs/MqklCJSnPYGK11Joce",
+      "role": "redaktor",
+      "roles": [
+        "redaktor",
+        "spravce_akreditace"
+      ],
+      "display_name": "Matěj Kubeš",
+      "slug": "matej-kubes",
+      "created_at": "2026-07-28T16:57:24.404Z"
+    },
+    {
+      "email": "daniel.holy@11ka.local",
+      "role": "redaktor",
+      "roles": [
+        "redaktor"
+      ],
+      "display_name": "Daniel Holý",
+      "slug": "daniel-holy",
+      "needs_password": true,
+      "note": "Present on 11ka.cz/redakce (id 23) but missing from local sqlite dump; no production hash."
+    }
+  ]
+}

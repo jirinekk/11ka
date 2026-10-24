@@ -82,6 +82,10 @@
     </div>
   </div>
 
+  <%- include('whats-new') %>
+  <script src="/js/whats-new.js?v=<%= encodeURIComponent((typeof assetVersion !== 'undefined' ? assetVersion : '1') + '-wn1') %>" defer></script>
+  <script src="/js/matches-carousel.js?v=<%= encodeURIComponent((typeof assetVersion !== 'undefined' ? assetVersion : '1') + '-fm3') %>" defer></script>
+  <script src="/js/sidebar-hiring-promo.js?v=<%= encodeURIComponent((typeof assetVersion !== 'undefined' ? assetVersion : '1') + '-hpb1') %>" defer></script>
   <script src="/js/cookie-banner-ui.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>"></script>
   <script src="/js/ssp-zone-init.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>
   <script src="/js/site-consent.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>

@@ -9,7 +9,7 @@
 <% var canAiDrafts = typeof canAccessAiDrafts === 'function' ? canAccessAiDrafts(currentUser) : false; %>
 <% var adminHomeHref = akreditaceOnly ? '/administrace/akreditace' : '/administrace'; %>
 <% function admLink(k) { return admNav === k ? 'bg-11accent/10 text-11accent' : 'text-slate-300 hover:bg-white/5 hover:text-white'; } %>
-<body data-admin="1" class="flex min-h-screen flex-col bg-11bg font-sans text-slate-200 antialiased">
+<body data-admin="1" class="site-v2 flex min-h-screen flex-col bg-11bg font-sans text-slate-200 antialiased">
   <header class="admin-bar--liquid sticky top-0 z-[55] shrink-0 overflow-visible">
     <div class="flex min-h-14 items-center justify-between gap-3 px-4 py-2 lg:px-6">
       <div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
@@ -55,6 +55,7 @@
             <a href="/administrace/statistiky" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'statistiky' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Statistiky</a>
             <% } %>
             <% if (!akreditaceOnly && canSef) { %>
+            <a href="/administrace/rubriky" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'rubriky' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Rubriky</a>
             <a href="/administrace/kitswapy" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'kitswapy' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Kitswapy</a>
             <a href="/administrace/zapasy" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'zapasy' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Zápasy</a>
             <a href="/administrace/penalty" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'penalty' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Penalty</a>
@@ -106,6 +107,7 @@
         <a href="/administrace/statistiky" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('statistiky') %>">Statistiky</a>
         <% } %>
         <% if (!akreditaceOnly && canSef) { %>
+        <a href="/administrace/rubriky" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('rubriky') %>">Rubriky</a>
         <a href="/administrace/kitswapy" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('kitswapy') %>">Kitswapy</a>
         <a href="/administrace/zapasy" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('zapasy') %>">Zápasy</a>
         <a href="/administrace/penalty" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('penalty') %>">Penalty</a>

@@ -153,6 +153,78 @@ async function notifyNewArticle(article) {
   }
 }
 
+/**
+ * @param {{ title: string, slug: string, excerpt?: string | null }} article
+ * @param {{ slug: string, label: string, id: number }} rubric
+ */
+async function notifyRubricArticle(article, rubric) {
+  if (!article || !rubric) return;
+  const tx = createTransporterForProfile('NEWSLETTER');
+  if (!tx) return;
+
+  const from = getNewsletterFrom();
+  if (!from) return;
+
+  let recipients = [];
+  try {
+    const rubricsService = require('./rubrics');
+    recipients = rubricsService.listSubscriberEmails(rubric.id);
+  } catch (e) {
+    console.error('[11ka] rubric subscribers:', e && e.message);
+    return;
+  }
+  if (!recipients.length) return;
+
+  const base = (process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.SERVER_PORT || process.env.PORT || 3000}`).replace(
+    /\/$/,
+    ''
+  );
+  const url = `${base}/clanek/${encodeURIComponent(article.slug)}`;
+  const rubricUrl = `${base}/rubriky/${encodeURIComponent(rubric.slug)}`;
+  const subject = `11ka - nový díl rubriky ${rubric.label}: ${article.title}`;
+  const excerpt = article.excerpt || '';
+  const logoUrl = `${base}/logo.png`;
+  const newsletterService = require('./newsletter');
+
+  for (const to of recipients) {
+    try {
+      const token = newsletterService.buildUnsubscribeToken(to);
+      const unsubscribeUrl = `${rubricUrl}/oznameni/odhlasit?email=${encodeURIComponent(to)}&token=${encodeURIComponent(token)}`;
+      const text = `${rubric.label}\n${article.title}\n\n${excerpt}\n\n${url}\n\nOdhlášení z oznámení této rubriky: ${unsubscribeUrl}\n`;
+      const html = `
+<div style="margin:0;padding:24px;background:#0b111b;font-family:Inter,Segoe UI,Arial,sans-serif;color:#e2e8f0;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;margin:0 auto;background:#151c2c;border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:hidden;">
+    <tr>
+      <td style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.08);">
+        <img src="${logoUrl}" alt="11ka" style="height:34px;width:auto;display:block;" />
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px;">
+        <p style="margin:0 0 10px 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#16dffb;">${escapeHtml(rubric.label)}</p>
+        <h1 style="margin:0 0 12px 0;font-size:26px;line-height:1.25;color:#ffffff;">${escapeHtml(article.title)}</h1>
+        <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;color:#cbd5e1;">${escapeHtml(excerpt)}</p>
+        <p style="margin:0;">
+          <a href="${url}" style="display:inline-block;background:#16dffb;color:#0b111b;text-decoration:none;font-weight:700;font-size:14px;padding:10px 16px;border-radius:10px;">Číst článek</a>
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:14px 24px;border-top:1px solid rgba(255,255,255,0.08);font-size:12px;color:#94a3b8;line-height:1.45;">
+        Oznámení rubriky <a href="${rubricUrl}" style="color:#16dffb;text-decoration:none;">${escapeHtml(rubric.label)}</a>
+        <br />
+        Odhlásit oznámení: <a href="${unsubscribeUrl}" style="color:#16dffb;text-decoration:none;">${unsubscribeUrl}</a>
+      </td>
+    </tr>
+  </table>
+</div>`;
+      await tx.sendMail({ from, to, subject, text, html });
+    } catch (err) {
+      console.error('[11ka] Rubric mail na', to, ':', err.message);
+    }
+  }
+}
+
 function sanitizeField(value, maxLen = 500) {
   return String(value || '')
     .replace(/[\r\n]+/g, ' ')
@@ -256,5 +328,6 @@ module.exports = {
   isSmtpConfigured,
   verifySmtpConnection,
   notifyNewArticle,
+  notifyRubricArticle,
   sendAccreditationRequest,
 };

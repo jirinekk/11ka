@@ -1,38 +1,79 @@
 const { getDb } = require('../db');
+const usersService = require('./users');
 
-function listForArticle(articleId, limit = 50) {
-  return getDb()
-    .prepare(
-      `SELECT id, article_id, author_name, body, created_at
-       FROM comments
-       WHERE article_id = ?
-       ORDER BY created_at DESC, id DESC
-       LIMIT ?`
-    )
-    .all(articleId, limit);
+const COMMENT_MAX = 2000;
+
+function sanitizeCommentBody(text) {
+  return String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .trim()
+    .slice(0, COMMENT_MAX);
 }
 
-function createComment({ article_id, author_name, body }) {
-  const name = String(author_name || '').trim();
-  const text = String(body || '').trim();
-  if (!article_id || !name || !text) {
+function listForArticle(articleId, limit = 80) {
+  const lim = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(200, Number(limit))) : 80;
+  return getDb()
+    .prepare(
+      `SELECT
+         c.id,
+         c.article_id,
+         c.user_id,
+         c.author_name,
+         c.body,
+         c.created_at,
+         u.slug AS author_slug,
+         u.display_name AS author_display,
+         u.avatar_path AS author_avatar
+       FROM comments c
+       LEFT JOIN users u ON u.id = c.user_id
+       WHERE c.article_id = ?
+       ORDER BY c.created_at ASC, c.id ASC
+       LIMIT ?`
+    )
+    .all(articleId, lim)
+    .map((row) => {
+      const name = row.author_display || row.author_name;
+      const href = row.author_slug
+        ? `/uzivatel/${encodeURIComponent(row.author_slug)}`
+        : row.user_id
+          ? usersService.profilePath({ id: row.user_id, slug: row.author_slug })
+          : null;
+      return {
+        ...row,
+        author_name: name,
+        author_href: href,
+        author_avatar: row.author_avatar || null,
+      };
+    });
+}
+
+function createComment({ article_id, user, body }) {
+  if (!article_id || !user || !user.id) {
     throw new Error('invalid_comment');
   }
-  if (name.length > 80 || text.length > 2000) {
-    throw new Error('comment_too_long');
+  const text = sanitizeCommentBody(body);
+  if (!text) {
+    throw new Error('invalid_comment');
+  }
+  const name = String(user.display_name || user.email || 'Čtenář').trim().slice(0, 80);
+  if (!name) {
+    throw new Error('invalid_comment');
   }
   const now = new Date().toISOString();
   const info = getDb()
     .prepare(
-      `INSERT INTO comments (article_id, author_name, body, created_at)
-       VALUES (?, ?, ?, ?)`
+      `INSERT INTO comments (article_id, user_id, author_name, body, created_at)
+       VALUES (?, ?, ?, ?, ?)`
     )
-    .run(article_id, name, text, now);
+    .run(article_id, user.id, name, text, now);
   return info.lastInsertRowid;
 }
 
 module.exports = {
+  COMMENT_MAX,
   listForArticle,
   createComment,
+  sanitizeCommentBody,
 };
-

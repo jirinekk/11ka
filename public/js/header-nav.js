@@ -170,6 +170,70 @@
     if (e.key === 'Escape') {
       setMenu(false);
       setMobileSearch(false);
+      closeDesktopDropdowns();
     }
+  });
+
+  var desktopItems = header.querySelectorAll('[data-nav-dd]');
+  var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+
+  function closeDesktopDropdowns(except) {
+    desktopItems.forEach(function (item) {
+      if (except && item === except) return;
+      item.classList.remove('is-open');
+      var trigger = item.querySelector('[data-nav-link]');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  desktopItems.forEach(function (item) {
+    var trigger = item.querySelector('[data-nav-link]');
+    item.addEventListener('mouseenter', function () {
+      if (!finePointer.matches) return;
+      closeDesktopDropdowns(item);
+      item.classList.add('is-open');
+      if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    });
+    item.addEventListener('mouseleave', function () {
+      if (!finePointer.matches) return;
+      item.classList.remove('is-open');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    });
+    if (trigger) {
+      trigger.addEventListener('click', function (e) {
+        if (finePointer.matches) return;
+        if (!item.classList.contains('is-open')) {
+          e.preventDefault();
+          closeDesktopDropdowns(item);
+          item.classList.add('is-open');
+          trigger.setAttribute('aria-expanded', 'true');
+        }
+      });
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!header.contains(e.target)) closeDesktopDropdowns();
+  });
+
+  var accordionGroups = document.querySelectorAll('[data-nav-accordion]');
+  accordionGroups.forEach(function (group) {
+    var toggle = group.querySelector('.header11__menu-toggle');
+    var panel = group.querySelector('.header11__menu-sub');
+    if (!toggle || !panel) return;
+    toggle.addEventListener('click', function () {
+      var willOpen = !group.classList.contains('is-open');
+      accordionGroups.forEach(function (other) {
+        if (other === group) return;
+        other.classList.remove('is-open');
+        var otherToggle = other.querySelector('.header11__menu-toggle');
+        var otherPanel = other.querySelector('.header11__menu-sub');
+        if (otherToggle) otherToggle.setAttribute('aria-expanded', 'false');
+        if (otherPanel) otherPanel.hidden = true;
+      });
+      group.classList.toggle('is-open', willOpen);
+      toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      panel.hidden = !willOpen;
+    });
   });
 })();

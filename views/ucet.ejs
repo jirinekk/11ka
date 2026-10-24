@@ -4,6 +4,9 @@
   <div class="card-11 p-6">
     <h1 class="text-xl font-bold text-white">Správa účtu</h1>
     <p class="mt-1 text-sm text-11muted"><%= user.email %></p>
+    <% if (typeof profileHref !== 'undefined' && profileHref) { %>
+    <p class="mt-2 text-sm"><a href="<%= profileHref %>" class="text-11accent hover:underline">Veřejný profil</a></p>
+    <% } %>
     <% if (error) { %>
     <p class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p>
     <% } %>
@@ -15,6 +18,46 @@
         <label class="mb-1 block text-xs font-medium text-11muted" for="display_name">Zobrazované jméno</label>
         <input id="display_name" name="display_name" type="text" value="<%= user.display_name || '' %>" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
       </div>
+      <div class="border-t border-white/10 pt-5">
+        <h2 class="text-sm font-semibold text-white">Bio na profilu</h2>
+        <p class="mt-1 text-xs text-11muted">Krátký text na vašem veřejném profilu (max. <%= typeof publicBioMax !== 'undefined' ? publicBioMax : 500 %> znaků).</p>
+        <textarea
+          id="public_bio"
+          name="public_bio"
+          rows="4"
+          maxlength="<%= typeof publicBioMax !== 'undefined' ? publicBioMax : 500 %>"
+          placeholder="Kdo jste a jaký fotbal sledujete…"
+          class="input-11 mt-3 w-full resize-y rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm leading-relaxed text-white placeholder:text-slate-500 focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
+        ><%= typeof publicBio !== 'undefined' ? publicBio : '' %></textarea>
+      </div>
+      <%
+        var clubs = typeof chanceLigaClubs !== 'undefined' && chanceLigaClubs ? chanceLigaClubs : [];
+        var favCode = typeof favoriteTeamCode !== 'undefined' ? String(favoriteTeamCode || '') : '';
+        var stars = typeof starredCodes !== 'undefined' && starredCodes ? starredCodes : [];
+      %>
+      <div class="border-t border-white/10 pt-5">
+        <h2 class="text-sm font-semibold text-white">Chance Liga</h2>
+        <p class="mt-1 text-xs text-11muted">Jeden oblíbený klub a libovolný počet hvězdiček. Ukážou se na veřejném profilu.</p>
+        <label class="mt-3 block text-xs font-medium text-11muted" for="favorite_team_code">Oblíbený klub</label>
+        <select id="favorite_team_code" name="favorite_team_code" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white">
+          <option value="">- žádný -</option>
+          <% clubs.forEach(function (club) { %>
+          <option value="<%= club.code %>" <%= favCode === club.code ? 'selected' : '' %>><%= club.name %></option>
+          <% }); %>
+        </select>
+        <p class="mt-4 text-xs font-medium text-11muted">Hvězdičky</p>
+        <div class="mt-2 grid gap-2 sm:grid-cols-2">
+          <% clubs.forEach(function (club) { %>
+          <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-[#111827] px-2.5 py-2 text-sm text-slate-200">
+            <input type="checkbox" name="starred_teams" value="<%= club.code %>" class="rounded border-white/20 bg-[#0b1220] text-11accent focus:ring-11accent/40" <%= stars.indexOf(club.code) !== -1 ? 'checked' : '' %> />
+            <img src="<%= club.logo %>" alt="" class="h-6 w-6 object-contain" width="24" height="24" />
+            <span class="min-w-0 truncate"><%= club.name %></span>
+            <span class="ml-auto text-11accent" aria-hidden="true">★</span>
+          </label>
+          <% }); %>
+        </div>
+      </div>
+      <% if (typeof isStaff !== 'undefined' && isStaff) { %>
       <div class="border-t border-white/10 pt-5">
         <h2 class="text-sm font-semibold text-white">O autorovi</h2>
         <p class="mt-1 text-xs text-11muted">
@@ -35,6 +78,7 @@
           class="input-11 mt-3 w-full resize-y rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm leading-relaxed text-white placeholder:text-slate-500 focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
         ><%= typeof bioDraft !== 'undefined' ? bioDraft : '' %></textarea>
       </div>
+      <% } %>
       <div>
         <span class="mb-1 block text-xs font-medium text-11muted">Profilová fotka</span>
         <div class="flex flex-wrap items-center gap-4">
@@ -57,7 +101,27 @@
       </div>
       <button type="submit" class="w-full rounded-xl bg-11accent py-2.5 text-sm font-semibold text-11bg transition hover:brightness-110">Uložit</button>
     </form>
+    <% var rubricSubs = typeof rubricSubscriptions !== 'undefined' && rubricSubscriptions ? rubricSubscriptions : []; %>
+    <% if (rubricSubs.length) { %>
+    <div class="mt-8 border-t border-white/10 pt-5">
+      <h2 class="text-sm font-semibold text-white">Oznámení z rubrik</h2>
+      <p class="mt-1 text-xs text-11muted">E-mail, když vyjde nový díl.</p>
+      <ul class="mt-3 space-y-2">
+        <% rubricSubs.forEach(function (item) { %>
+        <li class="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#111827] px-3 py-2">
+          <a href="/rubriky/<%= encodeURIComponent(item.slug) %>" class="min-w-0 truncate text-sm text-white hover:text-11accent"><%= item.label %></a>
+          <form method="post" action="/ucet/rubriky-oznameni">
+            <input type="hidden" name="slug" value="<%= item.slug %>" />
+            <button type="submit" class="text-xs text-11muted hover:text-white">Vypnout</button>
+          </form>
+        </li>
+        <% }); %>
+      </ul>
+    </div>
+    <% } %>
+    <% if (typeof isStaff !== 'undefined' && isStaff) { %>
     <p class="mt-6 text-center"><a href="/administrace" class="text-sm text-11accent hover:underline">Administrace</a></p>
+    <% } %>
   </div>
 </main>
 

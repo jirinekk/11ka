@@ -1,0 +1,130 @@
+<%- include('../partials/admin-layout-start') %>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">Rubriky</h1>
+  <p class="mt-1 text-sm text-11muted">
+    Tvorba sloupků, hlavní tvůrce a oznámení pro čtenáře.
+  </p>
+</div>
+
+<% if (error) { %><p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p><% } %>
+<% if (success) { %><p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p><% } %>
+
+<section class="card-11 mt-8 p-6">
+  <h2 class="text-lg font-semibold text-white"><%= editingItem ? 'Upravit rubriku' : 'Nová rubrika' %></h2>
+  <form class="mt-4 grid gap-3 sm:grid-cols-2" method="post" action="/administrace/rubriky">
+    <input type="hidden" name="action" value="<%= editingItem ? 'update' : 'create' %>" />
+    <% if (editingItem) { %><input type="hidden" name="id" value="<%= editingItem.id %>" /><% } %>
+
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted" for="rubric-label">Název *</label>
+      <input
+        id="rubric-label"
+        name="label"
+        required
+        maxlength="<%= typeof labelMax !== 'undefined' ? labelMax : 80 %>"
+        value="<%= (editingItem && editingItem.label) || '' %>"
+        class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+      />
+    </div>
+
+    <% if (!editingItem) { %>
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted" for="rubric-slug">Adresa (volitelné)</label>
+      <input
+        id="rubric-slug"
+        name="slug"
+        maxlength="80"
+        placeholder="např. hlas-edenu"
+        class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+      />
+      <p class="mt-1 text-xs text-11muted">Když necháte prázdné, vygeneruje se z názvu. Veřejná adresa bude <span class="text-slate-400">/rubriky/…</span></p>
+    </div>
+    <% } else { %>
+    <div class="sm:col-span-2">
+      <p class="text-xs text-11muted">Adresa</p>
+      <p class="mt-1 text-sm text-slate-300">/rubriky/<%= editingItem.slug %></p>
+    </div>
+    <% } %>
+
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted" for="rubric-description">Popis</label>
+      <textarea
+        id="rubric-description"
+        name="description"
+        rows="3"
+        maxlength="<%= typeof descMax !== 'undefined' ? descMax : 500 %>"
+        placeholder="O čem rubrika je a jaký má tón…"
+        class="input-11 mt-1 w-full resize-y rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white placeholder:text-slate-500"
+      ><%= (editingItem && editingItem.description) || '' %></textarea>
+    </div>
+
+    <div class="sm:col-span-2">
+      <label class="text-xs text-11muted" for="rubric-owner">Hlavní tvůrce</label>
+      <select id="rubric-owner" name="owner_user_id" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white">
+        <option value="">— nikdo —</option>
+        <% (authors || []).forEach(function (u) { %>
+        <option value="<%= u.id %>" <%= editingItem && Number(editingItem.owner_user_id) === Number(u.id) ? 'selected' : '' %>>
+          <%= u.display_name || u.email %> <% if (u.display_name) { %>(<%= u.email %>)<% } %>
+        </option>
+        <% }); %>
+      </select>
+      <p class="mt-1 text-xs text-11muted">Vyberte redaktora, který rubriku vede. Ukáže se na stránce rubriky.</p>
+    </div>
+
+    <div class="sm:col-span-2">
+      <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+        <input
+          type="checkbox"
+          name="notify_enabled"
+          value="1"
+          class="rounded border-white/20 bg-[#111827] text-11accent focus:ring-11accent/40"
+          <%= editingItem ? (editingItem.notify_enabled ? 'checked' : '') : 'checked' %>
+        />
+        Povolit oznámení
+      </label>
+      <p class="mt-1 text-xs text-11muted">Čtenáři si na stránce rubriky můžou zapnout e-mail, když vyjde nový díl.</p>
+    </div>
+
+    <div class="sm:col-span-2 flex flex-wrap gap-2">
+      <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg"><%= editingItem ? 'Uložit změny' : 'Vytvořit rubriku' %></button>
+      <% if (editingItem) { %>
+      <a href="/administrace/rubriky" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/5">Zrušit úpravu</a>
+      <% } %>
+    </div>
+  </form>
+</section>
+
+<section class="mt-8 space-y-3">
+  <h2 class="text-xs font-semibold uppercase tracking-wider text-11muted">
+    Aktuální rubriky (<%= (items || []).length %>)
+  </h2>
+  <% if (!(items && items.length)) { %>
+  <p class="text-sm text-11muted">Zatím žádná. Vytvořte první výše.</p>
+  <% } %>
+  <% (items || []).forEach(function (item) { %>
+  <article class="card-11 flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
+    <div class="min-w-0 flex-1">
+      <a href="/rubriky/<%= encodeURIComponent(item.slug) %>" class="text-sm font-semibold text-white hover:text-11accent" target="_blank" rel="noopener"><%= item.label %></a>
+      <% if (item.description) { %>
+      <p class="mt-1 text-sm text-11muted"><%= item.description %></p>
+      <% } %>
+      <p class="mt-2 text-xs text-slate-500">
+        Tvůrce: <span class="text-slate-300"><%= item.owner_name || 'není' %></span>
+        · články <%= item.article_count || 0 %>
+        · oznámení <%= item.notify_enabled ? ((item.subscriber_count || 0) + ' odběratelů') : 'vypnutá' %>
+      </p>
+    </div>
+    <div class="flex shrink-0 flex-wrap items-center gap-2">
+      <a href="/administrace/rubriky?id=<%= item.id %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/5">Upravit</a>
+      <form method="post" action="/administrace/rubriky" onsubmit="return confirm('Smazat rubriku <%= String(item.label).replace(/'/g, '') %>? Články zůstanou, jen ztratí zařazení.');">
+        <input type="hidden" name="action" value="delete" />
+        <input type="hidden" name="id" value="<%= item.id %>" />
+        <button type="submit" class="rounded-lg border border-red-500/30 px-3 py-1.5 text-sm text-red-200 hover:bg-red-500/10">Smazat</button>
+      </form>
+    </div>
+  </article>
+  <% }); %>
+</section>
+
+<%- include('../partials/admin-layout-end') %>

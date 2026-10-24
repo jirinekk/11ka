@@ -10,7 +10,7 @@
     </svg>
   </summary>
   <div
-    class="absolute right-0 top-full z-[70] mt-2 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#111827] py-1 shadow-xl shadow-black/50 ring-1 ring-white/5"
+    class="absolute right-0 top-full z-[70] mt-2 w-52 overflow-hidden rounded-[10px] border border-white/10 bg-[#0d1117] py-1 shadow-xl shadow-black/50"
   >
     <% if (typeof accountMenuInAdmin !== 'undefined' && accountMenuInAdmin) { %>
     <a
@@ -18,11 +18,17 @@
       class="block px-4 py-2.5 text-sm text-white transition hover:bg-white/5"
     >Zpět na web</a>
     <div class="my-1 h-px bg-white/10"></div>
-    <% } else { %>
+    <% } else if (typeof isStaffUser === 'function' ? isStaffUser(currentUser) : true) { %>
     <a
       href="<%= typeof isAkreditaceOnly === 'function' && isAkreditaceOnly(currentUser) ? '/administrace/akreditace' : '/administrace' %>"
       class="block px-4 py-2.5 text-sm font-medium text-11accent transition hover:bg-11accent/10"
     >Administrace</a>
+    <% } %>
+    <% if (currentUser && currentUser.slug) { %>
+    <a
+      href="/uzivatel/<%= encodeURIComponent(currentUser.slug) %>"
+      class="block px-4 py-2.5 text-sm text-white transition hover:bg-white/5"
+    >Můj profil</a>
     <% } %>
     <a
       href="/ucet"

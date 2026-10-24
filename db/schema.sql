@@ -4,12 +4,15 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('majitel', 'vedeni', 'sefredaktor', 'redaktor', 'spravce_akreditace')),
+  role TEXT NOT NULL CHECK (role IN ('majitel', 'vedeni', 'sefredaktor', 'redaktor', 'spravce_akreditace', 'ctenar')),
   roles TEXT,
   display_name TEXT,
   avatar_path TEXT,
   author_bio TEXT,
   author_bio_pending TEXT,
+  slug TEXT UNIQUE COLLATE NOCASE,
+  public_bio TEXT,
+  favorite_team_code TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -36,6 +39,9 @@ CREATE TABLE IF NOT EXISTS articles (
   view_count INTEGER NOT NULL DEFAULT 0,
   category TEXT,
   tag TEXT,
+  rubric_slug TEXT,
+  related_article_ids TEXT,
+  match_key TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -55,12 +61,37 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
 CREATE TABLE IF NOT EXISTS comments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   article_id INTEGER NOT NULL REFERENCES articles (id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users (id) ON DELETE SET NULL,
   author_name TEXT NOT NULL,
   body TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_comments_article ON comments (article_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS article_ratings (
+  article_id INTEGER NOT NULL REFERENCES articles (id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  stars INTEGER NOT NULL CHECK (stars IN (1, 2, 3)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (article_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_article_ratings_article ON article_ratings (article_id);
+CREATE INDEX IF NOT EXISTS idx_article_ratings_user ON article_ratings (user_id);
+
+CREATE TABLE IF NOT EXISTS user_team_stars (
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  team_code TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, team_code)
+);
+
+CREATE TABLE IF NOT EXISTS article_teams (
+  article_id INTEGER NOT NULL REFERENCES articles (id) ON DELETE CASCADE,
+  team_code TEXT NOT NULL,
+  PRIMARY KEY (article_id, team_code)
+);
 
 CREATE TABLE IF NOT EXISTS ads (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -175,3 +206,26 @@ CREATE TABLE IF NOT EXISTS match_teams (
 );
 
 CREATE INDEX IF NOT EXISTS idx_match_teams_sort ON match_teams (sort_order, name, id);
+
+CREATE TABLE IF NOT EXISTS rubrics (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL,
+  description TEXT,
+  owner_user_id INTEGER REFERENCES users (id) ON DELETE SET NULL,
+  notify_enabled INTEGER NOT NULL DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rubrics_sort ON rubrics (sort_order, label, id);
+
+CREATE TABLE IF NOT EXISTS rubric_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rubric_id INTEGER NOT NULL REFERENCES rubrics (id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users (id) ON DELETE SET NULL,
+  email TEXT NOT NULL COLLATE NOCASE,
+  created_at TEXT NOT NULL,
+  UNIQUE (rubric_id, email)
+);
+CREATE INDEX IF NOT EXISTS idx_rubric_subscriptions_email ON rubric_subscriptions (email);
