@@ -1,6 +1,6 @@
 {
-  "source": "live 11ka.cz/akreditace + previous seed (storage/11ka.sqlite)",
-  "imported_at": "2026-10-26T21:26:36Z",
+  "source": "live 11ka.cz/akreditace + storage/11ka.sqlite",
+  "imported_at": "2026-10-26T22:16:40Z",
   "requests": [
     {
       "email": "krystof.jehne@gmail.com",
@@ -1107,24 +1107,24 @@
       "created_at": "2026-09-17T15:44:16.778Z"
     },
     {
-      "email": "dschweigl@11ka.cz",
-      "phone": "",
-      "name": "Dominik Schweigl",
-      "match_name": "Spara Praha - Slovácko",
-      "match_date": "2026-10-25",
-      "accreditation_type": "photo",
-      "email_sent": 0,
-      "status": "approved",
-      "hidden_from_web": 0,
-      "created_at": "2026-10-25T12:00:00.000Z"
-    },
-    {
       "email": "kjehne@11ka.cz",
       "phone": "",
       "name": "Kryštof Jan Jehne",
       "match_name": "Sparta - Slovácko",
       "match_date": "2026-10-25",
       "accreditation_type": "pisi",
+      "email_sent": 0,
+      "status": "approved",
+      "hidden_from_web": 0,
+      "created_at": "2026-10-25T12:00:00.000Z"
+    },
+    {
+      "email": "dschweigl@11ka.cz",
+      "phone": "",
+      "name": "Dominik Schweigl",
+      "match_name": "Spara Praha - Slovácko",
+      "match_date": "2026-10-25",
+      "accreditation_type": "photo",
       "email_sent": 0,
       "status": "approved",
       "hidden_from_web": 0,
@@ -1258,7 +1258,7 @@
       "match_date": "2026-10-27",
       "accreditation_type": "photo",
       "email_sent": 0,
-      "status": "requested",
+      "status": "approved",
       "hidden_from_web": 0,
       "created_at": "2026-10-27T12:00:00.000Z"
     },
@@ -1267,6 +1267,18 @@
       "phone": "",
       "name": "Jonáš Michale",
       "match_name": "FKMB x Bohemians",
+      "match_date": "2026-10-28",
+      "accreditation_type": "photo",
+      "email_sent": 0,
+      "status": "approved",
+      "hidden_from_web": 0,
+      "created_at": "2026-10-28T12:00:00.000Z"
+    },
+    {
+      "email": "vsvoboda@11ka.cz",
+      "phone": "",
+      "name": "Viktor Svoboda",
+      "match_name": "Sparta - Baník",
       "match_date": "2026-10-28",
       "accreditation_type": "photo",
       "email_sent": 0,
@@ -1287,18 +1299,6 @@
       "created_at": "2026-10-28T12:00:00.000Z"
     },
     {
-      "email": "vsvoboda@11ka.cz",
-      "phone": "",
-      "name": "Viktor Svoboda",
-      "match_name": "Sparta - Baník",
-      "match_date": "2026-10-28",
-      "accreditation_type": "photo",
-      "email_sent": 0,
-      "status": "requested",
-      "hidden_from_web": 0,
-      "created_at": "2026-10-28T12:00:00.000Z"
-    },
-    {
       "email": "photography.janecek@gmail.com",
       "phone": "",
       "name": "Alexandr Janeček",
@@ -1306,7 +1306,7 @@
       "match_date": "2026-10-31",
       "accreditation_type": "photo",
       "email_sent": 0,
-      "status": "pending",
+      "status": "requested",
       "hidden_from_web": 0,
       "created_at": "2026-10-31T12:00:00.000Z"
     },
@@ -1318,7 +1318,7 @@
       "match_date": "2026-11-01",
       "accreditation_type": "photo",
       "email_sent": 0,
-      "status": "pending",
+      "status": "requested",
       "hidden_from_web": 0,
       "created_at": "2026-11-01T12:00:00.000Z"
     },
@@ -1330,7 +1330,7 @@
       "match_date": "2026-11-01",
       "accreditation_type": "photo",
       "email_sent": 0,
-      "status": "pending",
+      "status": "approved",
       "hidden_from_web": 0,
       "created_at": "2026-11-01T12:00:00.000Z"
     },
@@ -1342,7 +1342,7 @@
       "match_date": "2026-11-01",
       "accreditation_type": "photo",
       "email_sent": 0,
-      "status": "pending",
+      "status": "requested",
       "hidden_from_web": 0,
       "created_at": "2026-11-01T12:00:00.000Z"
     },
@@ -1359,18 +1359,6 @@
       "created_at": "2026-11-04T12:00:00.000Z"
     },
     {
-      "email": "kjehne@11ka.cz",
-      "phone": "",
-      "name": "Kryštof Jan Jehne",
-      "match_name": "Sparta - Bournemouth",
-      "match_date": "2026-11-05",
-      "accreditation_type": "pisi",
-      "email_sent": 0,
-      "status": "pending",
-      "hidden_from_web": 0,
-      "created_at": "2026-11-05T12:00:00.000Z"
-    },
-    {
       "email": "mkubes@11ka.cz",
       "phone": "",
       "name": "Matěj Kubeš",
@@ -1383,10 +1371,22 @@
       "created_at": "2026-11-05T12:00:00.000Z"
     },
     {
-      "email": "michael.ruze@gmail.com",
+      "email": "kjehne@11ka.cz",
       "phone": "",
-      "name": "Michael Růžička",
-      "match_name": "Slavia Praha Ž - Sparta Praha Ž",
+      "name": "Kryštof Jan Jehne",
+      "match_name": "Sparta - Bournemouth",
+      "match_date": "2026-11-05",
+      "accreditation_type": "pisi",
+      "email_sent": 0,
+      "status": "pending",
+      "hidden_from_web": 0,
+      "created_at": "2026-11-05T12:00:00.000Z"
+    },
+    {
+      "email": "rvesely@11ka.cz",
+      "phone": "",
+      "name": "Robin Veselý",
+      "match_name": "Slovan Liberec - Bohemians Praha",
       "match_date": "2026-11-07",
       "accreditation_type": "photo",
       "email_sent": 0,
@@ -1395,10 +1395,10 @@
       "created_at": "2026-11-07T12:00:00.000Z"
     },
     {
-      "email": "rvesely@11ka.cz",
+      "email": "michael.ruze@gmail.com",
       "phone": "",
-      "name": "Robin Veselý",
-      "match_name": "Slovan Liberec - Bohemians Praha",
+      "name": "Michael Růžička",
+      "match_name": "Slavia Praha Ž - Sparta Praha Ž",
       "match_date": "2026-11-07",
       "accreditation_type": "photo",
       "email_sent": 0,
@@ -1419,10 +1419,10 @@
       "created_at": "2026-11-08T12:00:00.000Z"
     },
     {
-      "email": "mkubes@11ka.cz",
+      "email": "simonmarik08@gmail.com",
       "phone": "",
-      "name": "Matěj Kubeš",
-      "match_name": "Česko x Španělsko",
+      "name": "Šimon Mařík",
+      "match_name": "Česko - Španělsko",
       "match_date": "2026-11-12",
       "accreditation_type": "photo",
       "email_sent": 0,
@@ -1431,10 +1431,10 @@
       "created_at": "2026-11-12T12:00:00.000Z"
     },
     {
-      "email": "simonmarik08@gmail.com",
+      "email": "mkubes@11ka.cz",
       "phone": "",
-      "name": "Šimon Mařík",
-      "match_name": "Česko - Španělsko",
+      "name": "Matěj Kubeš",
+      "match_name": "Česko x Španělsko",
       "match_date": "2026-11-12",
       "accreditation_type": "photo",
       "email_sent": 0,

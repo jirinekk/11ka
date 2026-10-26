@@ -23,6 +23,13 @@ SQLITE_MAIN = ROOT / "storage" / "11ka.sqlite"
 SQLITE_NEWER = ROOT / "tmp" / "staff-seed-test" / "11ka.sqlite"
 OUT_ARTICLES = ROOT / "data" / "seed-articles.json"
 OUT_ACC = ROOT / "data" / "seed-accreditations.json"
+OUT_USERS = ROOT / "data" / "seed-users.json"
+OUT_FOTO = ROOT / "data" / "seed-foto.json"
+UPLOADS_DIR = ROOT / "public" / "uploads"
+TEST_EMAIL_RE = re.compile(
+    r"@(?:11ka\.test)$|^(?:local-admin|local-redaktor|smoke\.|curl\.|editor\.smoke)@",
+    re.I,
+)
 
 STATUS_MAP = {
     "schváleno": "approved",
@@ -364,6 +371,206 @@ def acc_key(row: dict) -> str:
     )
 
 
+def load_existing_articles() -> dict[str, dict]:
+    if not OUT_ARTICLES.exists():
+        return {}
+    try:
+        raw = json.loads(OUT_ARTICLES.read_text())
+    except Exception:
+        return {}
+    items = raw if isinstance(raw, list) else (raw.get("articles") or [])
+    out: dict[str, dict] = {}
+    for item in items:
+        slug = str((item or {}).get("slug") or "").strip()
+        if slug:
+            out[slug] = item
+    return out
+
+
+def load_existing_users() -> list[dict]:
+    if not OUT_USERS.exists():
+        return []
+    try:
+        raw = json.loads(OUT_USERS.read_text())
+    except Exception:
+        return []
+    items = raw if isinstance(raw, list) else (raw.get("users") or [])
+    return [item for item in items if item and item.get("email")]
+
+
+def is_test_email(email: str) -> bool:
+    value = str(email or "").strip().lower()
+    if not value:
+        return True
+    if value.endswith("@11ka.test"):
+        return True
+    if value in {"local-admin@11ka.local", "local-redaktor@11ka.local", "editor.smoke@11ka.local"}:
+        return True
+    return bool(TEST_EMAIL_RE.search(value))
+
+
+def dump_sqlite_users(path: Path) -> list[dict]:
+    con = open_ro(path)
+    if not con:
+        return []
+    con.row_factory = sqlite3.Row
+    rows = []
+    try:
+        cols = {r[1] for r in con.execute("PRAGMA table_info(users)")}
+        for row in con.execute("SELECT * FROM users ORDER BY id ASC"):
+            email = str(row["email"] or "").strip()
+            if is_test_email(email):
+                continue
+            item = {
+                "email": email,
+                "role": str(row["role"] or "redaktor").strip() or "redaktor",
+                "display_name": str(row["display_name"] or "").strip() or email.split("@")[0],
+            }
+            if "password_hash" in cols and row["password_hash"]:
+                item["password_hash"] = str(row["password_hash"])
+            if "roles" in cols and row["roles"]:
+                try:
+                    roles = json.loads(row["roles"])
+                    if isinstance(roles, list) and roles:
+                        item["roles"] = roles
+                except Exception:
+                    pass
+            if not item.get("roles"):
+                item["roles"] = [item["role"]]
+            if "slug" in cols and row["slug"]:
+                item["slug"] = str(row["slug"]).strip()
+            if "author_bio" in cols and row["author_bio"]:
+                item["author_bio"] = str(row["author_bio"]).strip()
+            if "public_bio" in cols and row["public_bio"]:
+                item["public_bio"] = str(row["public_bio"]).strip()
+            if "avatar_path" in cols and row["avatar_path"]:
+                item["avatar_path"] = abs_media(row["avatar_path"])
+            if "acc_prefill" in cols and row["acc_prefill"]:
+                item["acc_prefill"] = str(row["acc_prefill"])
+            if "created_at" in cols and row["created_at"]:
+                item["created_at"] = str(row["created_at"])
+            rows.append(item)
+    finally:
+        con.close()
+    return rows
+
+
+def scrape_redakce_names() -> list[str]:
+    html_text = fetch(f"{ORIGIN}/redakce")
+    names = [
+        html.unescape(name).strip()
+        for name in re.findall(
+            r'/redaktor/[^"]+"[^>]*class="block truncate[^"]*"[^>]*>([^<]+)',
+            html_text,
+        )
+    ]
+    return [name for name in names if name]
+
+
+def merge_users(base: list[dict], extra: list[dict], live_names: list[str]) -> list[dict]:
+    by_email: dict[str, dict] = {}
+    order: list[str] = []
+    for row in base + extra:
+        email = str(row.get("email") or "").strip().lower()
+        if not email or is_test_email(email):
+            continue
+        if email not in by_email:
+            by_email[email] = dict(row)
+            by_email[email]["email"] = email if email != "admin@11ka.local" else row.get("email")
+            order.append(email)
+            continue
+        cur = by_email[email]
+        for key in ("display_name", "slug", "author_bio", "public_bio", "avatar_path", "password_hash", "role", "created_at"):
+            if not cur.get(key) and row.get(key):
+                cur[key] = row[key]
+        if row.get("roles"):
+            cur["roles"] = row["roles"]
+    known_names = {str(u.get("display_name") or "").strip().lower() for u in by_email.values()}
+    for name in live_names:
+        if name.strip().lower() in known_names:
+            continue
+        slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        email = f"{slug or 'redaktor'}@11ka.local"
+        if email in by_email:
+            continue
+        by_email[email] = {
+            "email": email,
+            "role": "redaktor",
+            "roles": ["redaktor"],
+            "display_name": name,
+            "slug": slug,
+            "needs_password": True,
+            "note": "Present on 11ka.cz/redakce but missing from local sqlite dump; no production hash.",
+        }
+        order.append(email)
+        known_names.add(name.strip().lower())
+    return [by_email[k] for k in order]
+
+
+def dump_sqlite_foto_users(path: Path) -> list[dict]:
+    con = open_ro(path)
+    if not con:
+        return []
+    con.row_factory = sqlite3.Row
+    rows = []
+    try:
+        if "foto_users" not in {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}:
+            return []
+        for row in con.execute(
+            "SELECT id, email, name, slug, avatar, role, status, created_at FROM foto_users ORDER BY name COLLATE NOCASE"
+        ):
+            rows.append(
+                {
+                    "id": row["id"],
+                    "email": row["email"],
+                    "name": row["name"],
+                    "slug": row["slug"],
+                    "avatar": row["avatar"],
+                    "role": row["role"],
+                    "status": row["status"],
+                    "createdAt": row["created_at"],
+                }
+            )
+    finally:
+        con.close()
+    return rows
+
+
+def download_upload(url: str | None) -> str | None:
+    abs_url = abs_media(url)
+    if not abs_url:
+        return None
+    marker = "/uploads/"
+    if marker not in abs_url:
+        return abs_url
+    rel = abs_url.split(marker, 1)[1].split("?", 1)[0].lstrip("/")
+    dest = UPLOADS_DIR / rel
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists() and dest.stat().st_size > 0:
+        return f"/uploads/{rel}"
+    try:
+        req = urllib.request.Request(abs_url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=40) as res:
+            dest.write_bytes(res.read())
+        return f"/uploads/{rel}"
+    except Exception:
+        return abs_url
+
+
+def localize_article_media(item: dict) -> dict:
+    item["hero_image_path"] = download_upload(item.get("hero_image_path"))
+    body = str(item.get("body_html") or "")
+
+    def repl(match: re.Match[str]) -> str:
+        attr, url = match.group(1), match.group(2)
+        local = download_upload(url)
+        return f'{attr}="{local or url}"'
+
+    body = re.sub(r'(src|href)="(https?://11ka\.cz/uploads/[^"]+)"', repl, body)
+    item["body_html"] = body
+    return item
+
+
 def merge_accreditations(base: list[dict], extra: list[dict]) -> list[dict]:
     by_key: dict[str, dict] = {}
     order: list[str] = []
@@ -390,16 +597,16 @@ def merge_accreditations(base: list[dict], extra: list[dict]) -> list[dict]:
 
 
 def main() -> None:
-    articles = dump_sqlite_articles(SQLITE_MAIN)
-    newer = dump_sqlite_articles(SQLITE_NEWER)
-    for slug, item in newer.items():
+    articles = load_existing_articles()
+    for slug, item in dump_sqlite_articles(SQLITE_MAIN).items():
+        articles[slug] = item
+    for slug, item in dump_sqlite_articles(SQLITE_NEWER).items():
         articles[slug] = item
 
     slugs = sitemap_slugs()
-    missing = [s for s in slugs if s not in articles]
     scraped = 0
     failed = []
-    for i, slug in enumerate(missing, 1):
+    for i, slug in enumerate(slugs, 1):
         try:
             html_text = fetch(f"{ORIGIN}/clanek/{slug}")
             parsed = parse_article_html(slug, html_text)
@@ -412,9 +619,16 @@ def main() -> None:
             failed.append(f"{slug} HTTP {exc.code}")
         except Exception as exc:  # noqa: BLE001
             failed.append(f"{slug} {exc}")
-        if i % 10 == 0:
-            print(f"[import] scraped {i}/{len(missing)} missing articles", flush=True)
-        time.sleep(0.12)
+        if i % 25 == 0:
+            print(f"[import] scraped {i}/{len(slugs)} live articles", flush=True)
+        time.sleep(0.08)
+
+    localized = 0
+    for item in articles.values():
+        before = item.get("hero_image_path")
+        localize_article_media(item)
+        if item.get("hero_image_path") != before:
+            localized += 1
 
     ordered = sorted(
         articles.values(),
@@ -424,9 +638,10 @@ def main() -> None:
         ),
         reverse=True,
     )
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
-        "source": "live 11ka.cz sitemap + storage/11ka.sqlite + tmp/staff-seed-test",
-        "imported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source": "live 11ka.cz sitemap + storage/11ka.sqlite",
+        "imported_at": now,
         "articles": ordered,
     }
     OUT_ARTICLES.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
@@ -442,14 +657,30 @@ def main() -> None:
         if tot:
             total = tot
         live_acc.extend(rows)
-        time.sleep(0.12)
+        time.sleep(0.08)
     merged_acc = merge_accreditations(acc_sql, live_acc)
     acc_payload = {
         "source": "live 11ka.cz/akreditace + storage/11ka.sqlite",
-        "imported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "imported_at": now,
         "requests": merged_acc,
     }
     OUT_ACC.write_text(json.dumps(acc_payload, ensure_ascii=False, indent=2) + "\n")
+
+    live_names = scrape_redakce_names()
+    merged_users = merge_users(load_existing_users(), dump_sqlite_users(SQLITE_MAIN), live_names)
+    users_payload = {
+        "source": "live 11ka.cz/redakce + storage/11ka.sqlite staff export",
+        "imported_at": now,
+        "users": merged_users,
+    }
+    OUT_USERS.write_text(json.dumps(users_payload, ensure_ascii=False, indent=2) + "\n")
+
+    foto_users = dump_sqlite_foto_users(SQLITE_MAIN)
+    if foto_users and OUT_FOTO.exists():
+        foto = json.loads(OUT_FOTO.read_text())
+        foto["users"] = foto_users
+        foto["exported_at"] = now
+        OUT_FOTO.write_text(json.dumps(foto, ensure_ascii=False) + "\n")
 
     by_status: dict[str, int] = {}
     for item in ordered:
@@ -460,12 +691,16 @@ def main() -> None:
                 "articles_total": len(ordered),
                 "articles_by_status": by_status,
                 "sitemap": len(slugs),
-                "scraped_missing": scraped,
+                "scraped_live": scraped,
                 "scrape_failed": len(failed),
                 "failed_sample": failed[:12],
+                "heroes_localized": localized,
                 "accreditations_sqlite": len(acc_sql),
                 "accreditations_live": len(live_acc),
                 "accreditations_merged": len(merged_acc),
+                "users": len(merged_users),
+                "redakce_live": live_names,
+                "foto_users": len(foto_users),
                 "articles_file_kb": round(OUT_ARTICLES.stat().st_size / 1024),
             },
             ensure_ascii=False,

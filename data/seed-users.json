@@ -1,6 +1,6 @@
 {
-  "source": "storage/11ka.sqlite staff export + 11ka.cz/redakce",
-  "imported_at": "2026-10-20T19:48:38Z",
+  "source": "live 11ka.cz/redakce + storage/11ka.sqlite staff export",
+  "imported_at": "2026-10-26T22:16:40Z",
   "users": [
     {
       "email": "admin@11ka.local",
@@ -13,7 +13,8 @@
       "display_name": "Jiří Galba",
       "slug": "jiri-galba",
       "author_bio": "Spolumajitel stránky, a zakladatel, píše když má čas a zájem, nejvíce ho baví samozřejmě pražské S.",
-      "created_at": "2026-03-22T18:06:58.557Z"
+      "created_at": "2026-03-22T18:06:58.557Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/0dbcdf16f04017aff1376893cff3d8b5.JPG"
     },
     {
       "email": "krystof.jehne@gmail.com",
@@ -25,7 +26,8 @@
       "display_name": "Kryštof Jan Jehne",
       "slug": "krystof-jan-jehne",
       "author_bio": "Působí jako zástupce šéfredaktora a specializuje se na zpravodajství o Spartě. Je zakladatelem a majitelem projektu SrdceSparty. Na webu se věnuje publicistice, analýzám a sledování aktuálních témat v českém fotbale i v národním týmu.",
-      "created_at": "2026-03-27T08:18:38.264Z"
+      "created_at": "2026-03-27T08:18:38.264Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/62c2cdf2a21506c47651d2ee4bcdfc2f.jpeg"
     },
     {
       "email": "stepinadavid@icloud.com",
@@ -36,7 +38,8 @@
       ],
       "display_name": "David Štěpina",
       "slug": "david-stepina",
-      "created_at": "2026-03-27T08:19:18.053Z"
+      "created_at": "2026-03-27T08:19:18.053Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/9f32067034e86241f771b6e6c078a104.jpg"
     },
     {
       "email": "fhlavsa@11ka.cz",
@@ -47,7 +50,8 @@
       ],
       "display_name": "Ferdinand Hlavsa",
       "slug": "ferdinand-hlavsa",
-      "created_at": "2026-03-27T08:19:55.864Z"
+      "created_at": "2026-03-27T08:19:55.864Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/20e987b06578710be320c7c00623cb6d.JPG"
     },
     {
       "email": "jiribonifac.prochazka@gmail.com",
@@ -93,7 +97,8 @@
       ],
       "display_name": "Karel Schäfer",
       "slug": "karel-schafer",
-      "created_at": "2026-04-12T21:17:48.920Z"
+      "created_at": "2026-04-12T21:17:48.920Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/0dadc586893c8d98a36366382c81c824.jpeg"
     },
     {
       "email": "polkaruzova@gmail.com",
@@ -115,7 +120,8 @@
       ],
       "display_name": "Lukáš Glezgo",
       "slug": "lukas-glezgo",
-      "created_at": "2026-04-23T21:54:18.273Z"
+      "created_at": "2026-04-23T21:54:18.273Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/652c2d897e96598efd3b53c63e668e6f.jpg"
     },
     {
       "email": "pavel.heisig11@gmail.com",
@@ -126,7 +132,8 @@
       ],
       "display_name": "Pavel Heisig",
       "slug": "pavel-heisig",
-      "created_at": "2026-04-26T11:56:03.519Z"
+      "created_at": "2026-04-26T11:56:03.519Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/457701b5647815977a436fc1b9cdf095.jpg"
     },
     {
       "email": "petr.pesek70@gmail.com",
@@ -138,7 +145,8 @@
       "display_name": "Petr Pešek",
       "slug": "petr-pesek",
       "author_bio": "Jeden z mála redaktorů co pro 11ku i fotí. Fanda Pardubic a londýnské Chelsea, na kterou se dostat je můj největší sen.",
-      "created_at": "2026-05-20T19:25:24.585Z"
+      "created_at": "2026-05-20T19:25:24.585Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/54b54390566f8496bff71e80e11aa355.jpg"
     },
     {
       "email": "tomas.nem@email.cz",
@@ -182,7 +190,8 @@
       ],
       "display_name": "Daniel Krob",
       "slug": "daniel-krob",
-      "created_at": "2026-05-27T08:30:22.905Z"
+      "created_at": "2026-05-27T08:30:22.905Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/f3c68f03f92abd6f17b0cb6c60ec7a9d.jpg"
     },
     {
       "email": "tereziesenkyrikova@gmail.com",
@@ -193,7 +202,8 @@
       ],
       "display_name": "Terezie Šenkyříková",
       "slug": "terezie-senkyrikova",
-      "created_at": "2026-05-27T08:30:41.423Z"
+      "created_at": "2026-05-27T08:30:41.423Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/08c063aa2393f08109102c12e115c096.jpg"
     },
     {
       "email": "bochnak.david@seznam.cz",
@@ -216,7 +226,8 @@
       ],
       "display_name": "Matěj Kubeš",
       "slug": "matej-kubes",
-      "created_at": "2026-07-28T16:57:24.404Z"
+      "created_at": "2026-07-28T16:57:24.404Z",
+      "avatar_path": "https://11ka.cz/uploads/avatars/b3882dba845ed9675a213ff7aec66e9d.JPG"
     },
     {
       "email": "daniel.holy@11ka.local",
@@ -227,7 +238,9 @@
       "display_name": "Daniel Holý",
       "slug": "daniel-holy",
       "needs_password": true,
-      "note": "Present on 11ka.cz/redakce (id 23) but missing from local sqlite dump; no production hash."
+      "note": "Present on 11ka.cz/redakce (id 23) but missing from local sqlite dump; no production hash.",
+      "password_hash": "$2b$12$OrAHdETEjE/JofGp61PRY.FjbMPsG23Y4jDFaPL7Ap10ux/e/3WKG",
+      "created_at": "2026-10-21T07:19:42.912Z"
     }
   ]
 }
