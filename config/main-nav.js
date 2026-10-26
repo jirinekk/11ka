@@ -93,6 +93,16 @@ function childrenForParent(parent) {
   ];
 }
 
+function zapasyNavItem() {
+  return {
+    id: 'zapasy',
+    label: 'Zápasy',
+    href: '/zapasy/live',
+    labelHtml:
+      '<span class="header11__link-text header11__link-text--full">Zápasy</span><span class="header11__link-text header11__link-text--short" aria-hidden="true">Zápasy</span>',
+  };
+}
+
 function rubrikyNavItem() {
   const children = listRubrics().map((rubric) => ({
     id: rubric.slug,
@@ -111,6 +121,7 @@ function rubrikyNavItem() {
 
 function getMainNavItems() {
   return [
+    zapasyNavItem(),
     ...REGION_PARENTS.map((parent) => ({
       id: parent.id,
       label: parent.label,

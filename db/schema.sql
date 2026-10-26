@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('majitel', 'vedeni', 'sefredaktor', 'redaktor', 'spravce_akreditace', 'ctenar')),
+  role TEXT NOT NULL CHECK (role IN ('majitel', 'vedeni', 'sefredaktor', 'redaktor', 'fotograf', 'spravce_akreditace', 'ctenar')),
   roles TEXT,
   display_name TEXT,
   avatar_path TEXT,
@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
   slug TEXT UNIQUE COLLATE NOCASE,
   public_bio TEXT,
   favorite_team_code TEXT,
+  acc_prefill TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -229,3 +230,109 @@ CREATE TABLE IF NOT EXISTS rubric_subscriptions (
   UNIQUE (rubric_id, email)
 );
 CREATE INDEX IF NOT EXISTS idx_rubric_subscriptions_email ON rubric_subscriptions (email);
+
+CREATE TABLE IF NOT EXISTS foto_users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE COLLATE NOCASE,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE COLLATE NOCASE,
+  avatar TEXT,
+  role TEXT NOT NULL DEFAULT 'VIEWER',
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS foto_teams (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL COLLATE NOCASE,
+  slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  short_name TEXT NOT NULL,
+  city TEXT,
+  color TEXT NOT NULL DEFAULT '#16dffb',
+  logo TEXT,
+  league TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_foto_teams_league ON foto_teams (league, name);
+CREATE TABLE IF NOT EXISTS foto_players (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL COLLATE NOCASE,
+  slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  number INTEGER,
+  position TEXT,
+  photo TEXT,
+  livesport_id TEXT,
+  role TEXT NOT NULL DEFAULT 'PLAYER',
+  team_id TEXT REFERENCES foto_teams (id) ON DELETE SET NULL,
+  created_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_foto_players_team ON foto_players (team_id, name);
+CREATE INDEX IF NOT EXISTS idx_foto_players_role ON foto_players (role, name);
+CREATE TABLE IF NOT EXISTS foto_albums (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  match_date TEXT NOT NULL,
+  competition TEXT NOT NULL,
+  venue TEXT,
+  notes TEXT,
+  home_score INTEGER,
+  away_score INTEGER,
+  home_team_id TEXT NOT NULL REFERENCES foto_teams (id),
+  away_team_id TEXT NOT NULL REFERENCES foto_teams (id),
+  photographer_id TEXT NOT NULL REFERENCES foto_users (id),
+  cover_photo_id TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_foto_albums_date ON foto_albums (match_date DESC);
+CREATE TABLE IF NOT EXISTS foto_photos (
+  id TEXT PRIMARY KEY,
+  album_id TEXT NOT NULL REFERENCES foto_albums (id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL,
+  mime_type TEXT,
+  size INTEGER NOT NULL DEFAULT 0,
+  width INTEGER NOT NULL DEFAULT 0,
+  height INTEGER NOT NULL DEFAULT 0,
+  original_path TEXT NOT NULL,
+  thumb_path TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'ACTION',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_foto_photos_album ON foto_photos (album_id, sort_order, created_at);
+CREATE TABLE IF NOT EXISTS foto_photo_tags (
+  id TEXT PRIMARY KEY,
+  photo_id TEXT NOT NULL REFERENCES foto_photos (id) ON DELETE CASCADE,
+  player_id TEXT NOT NULL REFERENCES foto_players (id) ON DELETE CASCADE,
+  x REAL NOT NULL,
+  y REAL NOT NULL,
+  UNIQUE (photo_id, player_id)
+);
+CREATE INDEX IF NOT EXISTS idx_foto_photo_tags_player ON foto_photo_tags (player_id);
+CREATE TABLE IF NOT EXISTS foto_album_officials (
+  id TEXT PRIMARY KEY,
+  album_id TEXT NOT NULL REFERENCES foto_albums (id) ON DELETE CASCADE,
+  player_id TEXT NOT NULL REFERENCES foto_players (id) ON DELETE CASCADE,
+  duty TEXT NOT NULL DEFAULT 'Hlavní',
+  UNIQUE (album_id, player_id)
+);
+CREATE TABLE IF NOT EXISTS foto_presets (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  app TEXT,
+  file_name TEXT,
+  file_path TEXT,
+  mime_type TEXT,
+  size INTEGER NOT NULL DEFAULT 0,
+  before_path TEXT,
+  after_path TEXT,
+  created_by_id TEXT REFERENCES foto_users (id) ON DELETE SET NULL,
+  created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS foto_shares (
+  id TEXT PRIMARY KEY,
+  token TEXT NOT NULL UNIQUE,
+  player_id TEXT NOT NULL REFERENCES foto_players (id) ON DELETE CASCADE,
+  created_by_id TEXT REFERENCES foto_users (id) ON DELETE SET NULL,
+  created_at TEXT,
+  revoked_at TEXT,
+  last_seen_at TEXT
+);

@@ -20,9 +20,9 @@
     <div class="my-1 h-px bg-white/10"></div>
     <% } else if (typeof isStaffUser === 'function' ? isStaffUser(currentUser) : true) { %>
     <a
-      href="<%= typeof isAkreditaceOnly === 'function' && isAkreditaceOnly(currentUser) ? '/administrace/akreditace' : '/administrace' %>"
+      href="<%= typeof isAkreditaceOnly === 'function' && isAkreditaceOnly(currentUser) ? '/administrace/akreditace' : (typeof isFotografOnly === 'function' && isFotografOnly(currentUser) ? '/foto' : '/administrace') %>"
       class="block px-4 py-2.5 text-sm font-medium text-11accent transition hover:bg-11accent/10"
-    >Administrace</a>
+    ><%= typeof isFotografOnly === 'function' && isFotografOnly(currentUser) ? 'Foták' : 'Administrace' %></a>
     <% } %>
     <% if (currentUser && currentUser.slug) { %>
     <a

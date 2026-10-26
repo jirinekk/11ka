@@ -1,0 +1,143 @@
+<%
+  var home = typeof homeLineup !== 'undefined' && homeLineup ? homeLineup : null;
+  var away = typeof awayLineup !== 'undefined' && awayLineup ? awayLineup : null;
+  function rateClass(v) {
+    var n = parseFloat(String(v || '').replace(',', '.'));
+    if (!Number.isFinite(n)) return '';
+    if (n >= 8) return 'is-hot';
+    if (n >= 7) return 'is-good';
+    if (n >= 6) return 'is-ok';
+    return 'is-low';
+  }
+  function lastName(name) {
+    var parts = String(name || '').trim().split(/\s+/);
+    return parts.length ? parts[parts.length - 1] : '';
+  }
+  function playerLabel(p) {
+    if (!p) return '';
+    var s = p.suffix ? ' ' + p.suffix : (p.isCaptain ? ' (C)' : '');
+    return (p.name || '') + s;
+  }
+  var homePitch = (home && home.pitch) || [];
+  var awayPitch = (away && away.pitch) || [];
+  var pitch = homePitch.concat(awayPitch);
+  var homeSubs = (home && home.substitutions) || [];
+  var awaySubs = (away && away.substitutions) || [];
+  var hasSubs = homeSubs.length || awaySubs.length;
+  var homeCrest = typeof homeLogo !== 'undefined' ? homeLogo : '';
+  var awayCrest = typeof awayLogo !== 'undefined' ? awayLogo : '';
+%>
+<section class="mc-lineup">
+  <header class="mc-lineup__head">
+    <span class="mc-lineup__form"><%= (home && home.formation) || '' %></span>
+    <h2 class="mc-lineup__title">Rozestavení hráčů</h2>
+    <span class="mc-lineup__form is-away"><%= (away && away.formation) || '' %></span>
+  </header>
+  <% if (pitch.length) { %>
+  <div class="mc-pitch" role="img" aria-label="Rozestavení hráčů">
+    <div class="mc-pitch__lines" aria-hidden="true">
+      <span class="mc-pitch__touch"></span>
+      <span class="mc-pitch__mid"></span>
+      <span class="mc-pitch__circle"></span>
+      <span class="mc-pitch__spot"></span>
+      <span class="mc-pitch__box is-home"></span>
+      <span class="mc-pitch__six is-home"></span>
+      <span class="mc-pitch__box is-away"></span>
+      <span class="mc-pitch__six is-away"></span>
+    </div>
+    <% if (home && home.rating) { %>
+    <span class="mc-pitch__avg is-home">Ø <em class="mc-rate <%= rateClass(home.rating) %>"><%= home.rating %></em></span>
+    <% } %>
+    <% if (away && away.rating) { %>
+    <span class="mc-pitch__avg is-away">Ø <em class="mc-rate <%= rateClass(away.rating) %>"><%= away.rating %></em></span>
+    <% } %>
+    <% pitch.forEach(function (p) { %>
+    <% var crest = p.side === 'away' ? awayCrest : homeCrest; %>
+    <div class="mc-dot<%= p.isBest ? ' is-best' : '' %><%= p.side === 'away' ? ' is-away' : '' %>" style="left: <%= p.left %>%; top: <%= p.top %>%">
+      <span class="mc-dot__face">
+        <img src="<%= p.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
+        <% if (p.rating) { %><em class="mc-rate mc-rate--dot <%= rateClass(p.rating) %>"><%= p.rating %></em><% } %>
+        <% if (p.badges && (p.badges.goals || p.badges.yellow || p.badges.red || p.badges.subIn || p.badges.subOut)) { %>
+        <span class="mc-dot__pins">
+          <% if (p.badges.goals) { %><%- include('mc-ico', { kind: 'goal' }) %><% } %>
+          <% if (p.badges.yellow) { %><%- include('mc-ico', { kind: 'yellow' }) %><% } %>
+          <% if (p.badges.red) { %><%- include('mc-ico', { kind: 'red' }) %><% } %>
+          <% if (p.badges.subOut || p.badges.subIn) { %><%- include('mc-ico', { kind: 'swap' }) %><% } %>
+        </span>
+        <% } %>
+      </span>
+      <span class="mc-dot__tag">
+        <% if (crest) { %><img class="mc-dot__crest" src="<%= crest %>" alt="" /><% } %>
+        <span><%= lastName(p.short || p.name) %></span>
+      </span>
+    </div>
+    <% }); %>
+  </div>
+  <% } %>
+</section>
+
+<% if (hasSubs) { %>
+<section class="mc-sheet">
+  <h2 class="mc-sheet__title">Střídající hráči</h2>
+  <div class="mc-sheet__cols">
+    <ul class="mc-subs">
+      <% homeSubs.forEach(function (s) { %>
+      <li>
+        <% if (s.in) { %>
+        <img src="<%= s.in.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
+        <div class="mc-subs__meta">
+          <p class="mc-subs__name"><%= s.in.name %><% if (s.in.rating) { %> <em class="mc-rate mc-rate--sm <%= rateClass(s.in.rating) %>"><%= s.in.rating %></em><% } %></p>
+          <p class="mc-subs__out"><%- include('mc-ico', { kind: 'out' }) %> <%= s.out ? s.out.name : '' %> · <%= s.minute || '' %></p>
+        </div>
+        <% } %>
+      </li>
+      <% }); %>
+    </ul>
+    <ul class="mc-subs is-away">
+      <% awaySubs.forEach(function (s) { %>
+      <li>
+        <% if (s.in) { %>
+        <div class="mc-subs__meta">
+          <p class="mc-subs__name"><% if (s.in.rating) { %><em class="mc-rate mc-rate--sm <%= rateClass(s.in.rating) %>"><%= s.in.rating %></em> <% } %><%= s.in.name %></p>
+          <p class="mc-subs__out"><%= s.minute || '' %> · <%= s.out ? s.out.name : '' %> <%- include('mc-ico', { kind: 'out' }) %></p>
+        </div>
+        <img src="<%= s.in.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
+        <% } %>
+      </li>
+      <% }); %>
+    </ul>
+  </div>
+</section>
+<% } %>
+
+<section class="mc-sheet">
+  <h2 class="mc-sheet__title">Základní sestavy</h2>
+  <div class="mc-sheet__cols">
+    <ol class="mc-xi">
+      <% ((home && home.starters) || []).forEach(function (p) { %>
+      <li>
+        <img src="<%= p.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
+        <span class="mc-xi__num"><%= p.number || '' %></span>
+        <span class="mc-xi__name"><%= playerLabel(p) %></span>
+        <% if (p.rating) { %><em class="mc-rate mc-rate--sm <%= rateClass(p.rating) %>"><%= p.rating %></em><% } %>
+      </li>
+      <% }); %>
+    </ol>
+    <ol class="mc-xi is-away">
+      <% ((away && away.starters) || []).forEach(function (p) { %>
+      <li>
+        <% if (p.rating) { %><em class="mc-rate mc-rate--sm <%= rateClass(p.rating) %>"><%= p.rating %></em><% } %>
+        <span class="mc-xi__name"><%= playerLabel(p) %></span>
+        <span class="mc-xi__num"><%= p.number || '' %></span>
+        <img src="<%= p.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
+      </li>
+      <% }); %>
+    </ol>
+  </div>
+  <% if ((home && home.coach) || (away && away.coach)) { %>
+  <div class="mc-sheet__cols mc-sheet__coaches">
+    <p><% if (home && home.coach) { %>Trenér <%= home.coach %><% } %></p>
+    <p class="is-away"><% if (away && away.coach) { %>Trenér <%= away.coach %><% } %></p>
+  </div>
+  <% } %>
+</section>

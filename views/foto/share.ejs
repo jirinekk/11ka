@@ -1,0 +1,7 @@
+<% var shareView = true; %>
+<%- include('layout-start') %>
+<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl"><%= share.player_name %></h1>
+<p class="mt-1 text-sm text-11muted">Sdílené fotky</p>
+<div id="foto-gallery" class="mt-6" data-photos="<%= encodeURIComponent(photosJson) %>" data-edit=""></div>
+<script src="/js/foto-gallery.js?v=<%= encodeURIComponent(assetVersion + '-tag1') %>" defer></script>
+<%- include('layout-end') %>

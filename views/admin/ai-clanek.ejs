@@ -36,11 +36,13 @@
     <form method="post" action="/administrace/ai-clanky/<%= item.id %>" class="space-y-4">
       <div>
         <label class="text-xs text-11muted" for="title">Titulek</label>
-        <input id="title" name="title" required value="<%= item.title || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        <input id="title" name="title" required maxlength="100" value="<%= item.title || '' %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+        <p id="title-counter" class="mt-1 text-xs text-11muted">0 / 100</p>
       </div>
       <div>
         <label class="text-xs text-11muted" for="excerpt">Perex</label>
-        <textarea id="excerpt" name="excerpt" rows="4" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"><%= item.excerpt || '' %></textarea>
+        <textarea id="excerpt" name="excerpt" rows="4" maxlength="250" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"><%= item.excerpt || '' %></textarea>
+        <p id="excerpt-counter" class="mt-1 text-xs text-11muted">0 / 250</p>
       </div>
       <div>
         <label class="text-xs text-11muted" for="body">Text (HTML nebo odstavce)</label>
@@ -92,5 +94,24 @@
     <% } %>
   </section>
 </div>
+
+<script>
+(function () {
+  function bindCounter(inputId, counterId) {
+    var input = document.getElementById(inputId);
+    var counter = document.getElementById(counterId);
+    if (!input || !counter) return;
+    function refresh() {
+      var max = Number(input.getAttribute('maxlength') || 0);
+      var length = String(input.value || '').length;
+      counter.textContent = length + ' / ' + max;
+    }
+    input.addEventListener('input', refresh);
+    refresh();
+  }
+  bindCounter('title', 'title-counter');
+  bindCounter('excerpt', 'excerpt-counter');
+})();
+</script>
 
 <%- include('../partials/admin-layout-end') %>

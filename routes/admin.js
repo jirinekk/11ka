@@ -18,6 +18,7 @@ const {
   hasRole,
   isStaffUser,
   isAkreditaceOnly,
+  isFotografOnly,
   isRedaktorWorkflow,
   requireAiDraftAccess,
   canAccessAiDrafts,
@@ -395,9 +396,14 @@ router.use((req, res, next) => {
   next();
 });
 
+router.get('/administrace/foto', (req, res) => res.redirect('/foto'));
+
 router.get('/administrace', (req, res) => {
   if (req.user && isAkreditaceOnly(req.user)) {
     return res.redirect('/administrace/akreditace');
+  }
+  if (req.user && isFotografOnly(req.user)) {
+    return res.redirect('/foto');
   }
   res.render('admin/dashboard', {
     title: 'Administrace - 11ka',
@@ -656,6 +662,8 @@ async function renderArticleEdit(res, locals, statusCode) {
       selectedRelatedIds,
       40
     ),
+    titleMax: articlesService.TITLE_MAX,
+    excerptMax: articlesService.EXCERPT_MAX,
   };
   if (statusCode) return res.status(statusCode).render('admin/article-edit', payload);
   return res.render('admin/article-edit', payload);
@@ -1228,6 +1236,7 @@ router.get('/administrace/akreditace', requireAkreditaceAccess, (req, res) => {
       : req.query.mail === 'fail'
         ? 'fail'
         : null;
+  const dateFilter = akreditaceDateFromReq(req.query);
 
   const visibleCount = accreditationService.countByWebVisibility(false);
   const hiddenCount = accreditationService.countByWebVisibility(true);
@@ -1263,6 +1272,8 @@ router.get('/administrace/akreditace', requireAkreditaceAccess, (req, res) => {
       personStats,
       spisSearch,
       tab,
+      dateFrom: dateFilter.od,
+      dateTo: dateFilter.do,
       tabCounts: {
         viditelne: visibleCount,
         skryte: hiddenCount,
@@ -1284,11 +1295,12 @@ router.get('/administrace/akreditace', requireAkreditaceAccess, (req, res) => {
   const perPage = 7;
   const rawPage = parseInt(req.query.page, 10);
   const requestedPage = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
-  const totalItems = showHidden ? hiddenCount : visibleCount;
-  const totalPages = Math.max(1, Math.ceil(totalItems / perPage));
+  const dateOpts = { dateFrom: dateFilter.od, dateTo: dateFilter.do };
+  const totalItems = accreditationService.countByWebVisibility(showHidden, dateOpts);
+  const totalPages = Math.max(1, Math.ceil(totalItems / perPage) || 1);
   const page = Math.min(requestedPage, totalPages);
   const offset = (page - 1) * perPage;
-  const requests = accreditationService.listPagedByWebVisibility(showHidden, perPage, offset);
+  const requests = accreditationService.listPagedByWebVisibility(showHidden, perPage, offset, dateOpts);
 
   res.render('admin/akreditace', {
     title: 'Akreditace - administrace',
@@ -1299,6 +1311,8 @@ router.get('/administrace/akreditace', requireAkreditaceAccess, (req, res) => {
     personStats: null,
     spisSearch: '',
     tab,
+    dateFrom: dateFilter.od,
+    dateTo: dateFilter.do,
     tabCounts: {
       viditelne: visibleCount,
       skryte: hiddenCount,
@@ -1327,6 +1341,7 @@ router.get('/administrace/akreditace/:id', requireAkreditaceAccess, (req, res) =
   const tabRaw = String(req.query.tab || '').trim().toLowerCase();
   const backTab = tabRaw === 'skryte' ? 'skryte' : tabRaw === 'spis' ? 'spis' : 'viditelne';
   const backEmail = String(req.query.email || '').trim() || null;
+  const dateFilter = akreditaceDateFromReq(req.query);
   const flash =
     req.query.status === 'approved'
       ? 'approved'
@@ -1349,6 +1364,8 @@ router.get('/administrace/akreditace/:id', requireAkreditaceAccess, (req, res) =
     backPage,
     backTab,
     backEmail,
+    backDateFrom: dateFilter.od,
+    backDateTo: dateFilter.do,
     flash,
   });
 });
@@ -1362,7 +1379,7 @@ router.post(
     const row = Number.isFinite(id) ? accreditationService.getById(id) : null;
     const rawPage = parseInt(req.body.page, 10);
     const pageQ = Number.isFinite(rawPage) && rawPage > 1 ? `&page=${rawPage}` : '';
-    const tabQRaw = akreditaceTabQuery(akreditaceTabFromBody(req), req.body.email);
+    const tabQRaw = akreditaceTabQuery(akreditaceTabFromBody(req), req.body.email, req.body);
     const tabQ = tabQRaw ? `&${tabQRaw}` : '';
     const detailBase = `/administrace/akreditace/${id}`;
     if (!row) {
@@ -1397,13 +1414,36 @@ function akreditaceTabFromBody(req) {
   return 'viditelne';
 }
 
-function akreditaceTabQuery(tab, email) {
+function akreditaceDateFromReq(src) {
+  const raw = src || {};
+  const exact = accreditationService.isValidMatchDate(raw.datum) ? String(raw.datum).trim() : '';
+  let od = accreditationService.isValidMatchDate(raw.od) ? String(raw.od).trim() : '';
+  let dateTo = accreditationService.isValidMatchDate(raw.do) ? String(raw.do).trim() : '';
+  if (exact && !od && !dateTo) {
+    od = exact;
+    dateTo = exact;
+  }
+  return { od, do: dateTo };
+}
+
+function akreditaceDateQuery(od, dateTo) {
+  const parts = [];
+  if (od) parts.push(`od=${encodeURIComponent(od)}`);
+  if (dateTo) parts.push(`do=${encodeURIComponent(dateTo)}`);
+  return parts.join('&');
+}
+
+function akreditaceTabQuery(tab, email, dateSrc) {
   const parts = [];
   if (tab === 'skryte') parts.push('tab=skryte');
   if (tab === 'spis') {
     parts.push('tab=spis');
     const em = String(email || '').trim();
     if (em) parts.push(`email=${encodeURIComponent(em)}`);
+  } else if (dateSrc) {
+    const dates = akreditaceDateFromReq(dateSrc);
+    const dateQ = akreditaceDateQuery(dates.od, dates.do);
+    if (dateQ) parts.push(dateQ);
   }
   return parts.join('&');
 }
@@ -1416,7 +1456,7 @@ router.post(
     const id = parseInt(req.params.id, 10);
     const rawPage = parseInt(req.body.page, 10);
     const pageQ = Number.isFinite(rawPage) && rawPage > 1 ? `page=${rawPage}` : '';
-    const tabQ = akreditaceTabQuery(akreditaceTabFromBody(req), req.body.email);
+    const tabQ = akreditaceTabQuery(akreditaceTabFromBody(req), req.body.email, req.body);
     if (Number.isFinite(id)) {
       accreditationService.setStatus(id, 'requested');
     }
@@ -1432,7 +1472,7 @@ router.post(
     const id = parseInt(req.params.id, 10);
     const rawPage = parseInt(req.body.page, 10);
     const pageQ = Number.isFinite(rawPage) && rawPage > 1 ? `page=${rawPage}` : '';
-    const tabQ = akreditaceTabQuery(akreditaceTabFromBody(req), req.body.email);
+    const tabQ = akreditaceTabQuery(akreditaceTabFromBody(req), req.body.email, req.body);
     if (Number.isFinite(id)) {
       accreditationService.setStatus(id, 'approved');
     }
@@ -1448,7 +1488,7 @@ router.post(
     const id = parseInt(req.params.id, 10);
     const rawPage = parseInt(req.body.page, 10);
     const pageQ = Number.isFinite(rawPage) && rawPage > 1 ? `page=${rawPage}` : '';
-    const tabQ = akreditaceTabQuery(akreditaceTabFromBody(req), req.body.email);
+    const tabQ = akreditaceTabQuery(akreditaceTabFromBody(req), req.body.email, req.body);
     if (Number.isFinite(id)) {
       accreditationService.setStatus(id, 'rejected');
     }
@@ -1464,10 +1504,11 @@ router.post(
     const id = parseInt(req.params.id, 10);
     const rawPage = parseInt(req.body.page, 10);
     const pageQ = Number.isFinite(rawPage) && rawPage > 1 ? `page=${rawPage}` : '';
+    const dateQ = akreditaceTabQuery('skryte', '', req.body);
     if (Number.isFinite(id)) {
       accreditationService.setHiddenFromWeb(id, true);
     }
-    return res.redirect(302, redirectAkreditaceDetail(id, [pageQ, 'tab=skryte', 'web=hidden']));
+    return res.redirect(302, redirectAkreditaceDetail(id, [pageQ, dateQ, 'web=hidden']));
   }
 );
 
@@ -1479,10 +1520,11 @@ router.post(
     const id = parseInt(req.params.id, 10);
     const rawPage = parseInt(req.body.page, 10);
     const pageQ = Number.isFinite(rawPage) && rawPage > 1 ? `page=${rawPage}` : '';
+    const dateQ = akreditaceTabQuery('viditelne', '', req.body);
     if (Number.isFinite(id)) {
       accreditationService.setHiddenFromWeb(id, false);
     }
-    return res.redirect(302, redirectAkreditaceDetail(id, [pageQ, 'web=shown']));
+    return res.redirect(302, redirectAkreditaceDetail(id, [pageQ, dateQ, 'web=shown']));
   }
 );
 
@@ -1495,7 +1537,7 @@ router.post(
     const rawPage = parseInt(req.body.page, 10);
     const tab = akreditaceTabFromBody(req);
     const parts = [];
-    const tabQ = akreditaceTabQuery(tab, req.body.email);
+    const tabQ = akreditaceTabQuery(tab, req.body.email, req.body);
     if (tabQ) parts.push(tabQ);
     if (Number.isFinite(rawPage) && rawPage > 1) parts.push(`page=${rawPage}`);
     parts.push('deleted=ok');
@@ -1533,8 +1575,8 @@ function persistAiForm(req, item) {
   const authorOk = authors.some((a) => a.id === authorId);
   const body = aiBodyFromForm(req.body.body);
   return aiIngest.saveDraftFields(item.id, {
-    title: String(req.body.title || item.title || '').trim(),
-    excerpt: String(req.body.excerpt || '').trim(),
+    title: articlesService.clipTitle(req.body.title || item.title || ''),
+    excerpt: articlesService.clipExcerpt(req.body.excerpt) || '',
     body_html: body.html,
     body_blocks_json: body.blocks,
     category: CATEGORY_OPTIONS.includes(String(req.body.category || ''))
@@ -2459,8 +2501,7 @@ router.post(
     const bodyHtmlFinal = hasBlocks ? blocksHtml : body_html || '';
     const blocksJson = hasBlocks ? JSON.stringify(blocks) : null;
     const excerptNorm = normalizeExcerpt(excerpt);
-    let error = null;
-    if (!title || !title.trim()) error = 'Nadpis je povinný.';
+    let error = articlesService.articleCopyError(title, excerptNorm);
     const heroPath = req.file ? '/uploads/articles/' + req.file.filename : null;
     if (heroPath && (!hero_credit || !String(hero_credit).trim())) {
       error = 'U titulního obrázku je povinný credit.';
@@ -2655,8 +2696,7 @@ router.post(
       }
     }
 
-    let error = null;
-    if (!title || !title.trim()) error = 'Nadpis je povinný.';
+    let error = articlesService.articleCopyError(title, excerptNorm);
     if (hero_image_path && (!hero_credit || !String(hero_credit).trim())) {
       error = 'U titulního obrázku je povinný credit.';
     }

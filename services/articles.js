@@ -6,6 +6,29 @@ const { uniqueSlug } = require('../lib/slug');
 const chanceLigaLogos = require('./chance-liga-logos');
 const { getRubric } = require('../config/rubrics');
 
+const TITLE_MAX = 100;
+const EXCERPT_MAX = 250;
+
+function clipTitle(value) {
+  return String(value || '').trim().slice(0, TITLE_MAX);
+}
+
+function clipExcerpt(value) {
+  if (value == null || value === '') return null;
+  const t = String(value).trim();
+  if (!t) return null;
+  return t.slice(0, EXCERPT_MAX);
+}
+
+function articleCopyError(title, excerpt) {
+  const t = String(title || '').trim();
+  if (!t) return 'Nadpis je povinný.';
+  if (t.length > TITLE_MAX) return `Nadpis může mít maximálně ${TITLE_MAX} znaků.`;
+  const e = excerpt == null || excerpt === '' ? '' : String(excerpt).trim();
+  if (e.length > EXCERPT_MAX) return `Perex může mít maximálně ${EXCERPT_MAX} znaků.`;
+  return null;
+}
+
 let _hasTagColumnCache = null;
 let _hasBlocksColumnCache = null;
 let _hasHeroPositionColumnCache = null;
@@ -1395,6 +1418,8 @@ function createArticle({
   matchKey,
 }) {
   const now = new Date().toISOString();
+  title = clipTitle(title);
+  excerpt = clipExcerpt(excerpt);
   const body = sanitizeArticleBody(body_html);
   const canBlocks = hasArticlesBlocksColumn();
   const canHeroPosition = hasArticlesHeroPositionColumn();
@@ -1566,13 +1591,13 @@ function updateArticle(id, patch) {
   const cur = getById(id);
   if (!cur) return null;
   const now = new Date().toISOString();
-  const title = patch.title != null ? patch.title.trim() : cur.title;
+  const title = patch.title != null ? clipTitle(patch.title) : cur.title;
   let slug = cur.slug;
   if (patch.slug != null && patch.slug.trim()) {
     const candidate = uniqueSlug(patch.slug, (s) => slugExists(s, id));
     slug = candidate;
   }
-  const excerpt = patch.excerpt !== undefined ? (patch.excerpt ? String(patch.excerpt).trim() : null) : cur.excerpt;
+  const excerpt = patch.excerpt !== undefined ? clipExcerpt(patch.excerpt) : cur.excerpt;
   const body_html =
     patch.body_html !== undefined ? sanitizeArticleBody(patch.body_html) : cur.body_html;
   const hero_image_path =
@@ -2144,6 +2169,11 @@ function seedDemoIfEmpty() {
 }
 
 module.exports = {
+  TITLE_MAX,
+  EXCERPT_MAX,
+  clipTitle,
+  clipExcerpt,
+  articleCopyError,
   normalizeHeroPosition,
   resolveStoredHeroPosition,
   getById,

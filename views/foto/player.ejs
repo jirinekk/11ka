@@ -1,0 +1,22 @@
+<%- include('layout-start') %>
+<div class="flex items-center gap-4">
+  <% if (player.photo) { %>
+  <img src="<%= player.photo %>" alt="" width="72" height="72" class="h-[72px] w-[72px] rounded-full object-cover" style="object-position: 50% 22%" />
+  <% } %>
+  <div>
+    <p class="text-xs font-semibold uppercase tracking-wider text-11accent"><%= player.team_name || (player.role === 'REFEREE' ? 'Rozhodčí' : 'Hráč') %></p>
+    <h1 class="mt-1 text-2xl font-bold tracking-tight text-white md:text-3xl"><%= player.number != null ? '#' + player.number + ' ' : '' %><%= player.name %></h1>
+  </div>
+</div>
+<% if ((photos || []).length) { %>
+<div class="photo-grid mt-8">
+  <% (photos || []).forEach(function (p) { %>
+  <a class="photo-tile" href="/foto/alba/<%= p.album_id %>">
+    <img src="<%= p.thumbSrc %>" alt="" loading="lazy" onerror="this.parentNode.classList.add('is-missing')" />
+  </a>
+  <% }); %>
+</div>
+<% } else { %>
+<p class="mt-16 text-center text-sm text-11muted">Zatím bez oštítkovaných fotek.</p>
+<% } %>
+<%- include('layout-end') %>

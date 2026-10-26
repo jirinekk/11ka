@@ -2,7 +2,7 @@ const { UA } = require('./ai-rss');
 const aiQueue = require('./ai-queue');
 
 function baseUrl() {
-  return String(process.env.FOTO_11KA_URL || 'https://foto.11ka.cz').replace(/\/$/, '');
+  return String(process.env.FOTO_11KA_URL || 'https://fotak-11ka.vercel.app').replace(/\/$/, '');
 }
 
 function apiKey() {

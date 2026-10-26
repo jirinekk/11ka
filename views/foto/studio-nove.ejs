@@ -1,0 +1,48 @@
+<%- include('layout-start') %>
+<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Nové album</h1>
+<p class="mt-1 text-sm text-11muted">Nejdřív zápas a datum. Fotky nahraješ hned potom.</p>
+<% if (error) { %>
+<p class="mt-6 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+  <%= error === 'teams' ? 'Domácí a hosté musí být jiný klub.' : 'Zkontroluj formulář.' %>
+</p>
+<% } %>
+<form class="card-11 mt-8 max-w-2xl space-y-4 p-6" method="post" action="/foto/studio/alba/nove">
+  <div class="grid gap-4 sm:grid-cols-2">
+    <label class="text-xs font-semibold uppercase tracking-wider text-11muted">Domácí
+      <select name="homeTeamId" class="input-11 mt-2" required>
+        <option value="">— klub —</option>
+        <% teams.forEach(function (t) { %><option value="<%= t.id %>"><%= t.name %></option><% }); %>
+      </select>
+    </label>
+    <label class="text-xs font-semibold uppercase tracking-wider text-11muted">Hosté
+      <select name="awayTeamId" class="input-11 mt-2" required>
+        <option value="">— klub —</option>
+        <% teams.forEach(function (t) { %><option value="<%= t.id %>"><%= t.name %></option><% }); %>
+      </select>
+    </label>
+  </div>
+  <label class="block text-xs font-semibold uppercase tracking-wider text-11muted">Datum zápasu
+    <input name="matchDate" type="date" required class="input-11 mt-2" />
+  </label>
+  <label class="block text-xs font-semibold uppercase tracking-wider text-11muted">Soutěž
+    <select name="competition" class="input-11 mt-2">
+      <% competitions.forEach(function (c) { %><option><%= c %></option><% }); %>
+    </select>
+  </label>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <label class="text-xs font-semibold uppercase tracking-wider text-11muted">Góly domácích
+      <input name="homeScore" type="number" min="0" class="input-11 mt-2" />
+    </label>
+    <label class="text-xs font-semibold uppercase tracking-wider text-11muted">Góly hostů
+      <input name="awayScore" type="number" min="0" class="input-11 mt-2" />
+    </label>
+  </div>
+  <label class="block text-xs font-semibold uppercase tracking-wider text-11muted">Stadion
+    <input name="venue" class="input-11 mt-2" />
+  </label>
+  <label class="block text-xs font-semibold uppercase tracking-wider text-11muted">Název alba (volitelné)
+    <input name="title" class="input-11 mt-2" />
+  </label>
+  <button class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg" type="submit">Vytvořit a nahrát fotky</button>
+</form>
+<%- include('layout-end') %>

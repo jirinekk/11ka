@@ -1,0 +1,28 @@
+<% var fNav = typeof fotoNav !== 'undefined' ? fotoNav : 'alba'; %>
+<% var shareView = typeof shareView !== 'undefined' && shareView; %>
+<% if (shareView) { %>
+<%- include('../partials/head') %>
+<body class="site-v2 flex min-h-screen flex-col bg-11bg font-sans text-slate-200 antialiased">
+  <header class="admin-bar--liquid sticky top-0 z-[55] shrink-0">
+    <div class="flex min-h-14 items-center gap-3 px-4 py-2 lg:px-6">
+      <a href="/" class="inline-flex shrink-0 items-center" aria-label="11ka">
+        <img src="/logo.png" alt="11ka" width="88" height="28" class="h-7 w-auto max-h-8" />
+      </a>
+      <span class="text-sm font-medium text-11muted">Sdílené fotky</span>
+    </div>
+  </header>
+  <main class="min-w-0 flex-1">
+    <div class="mx-auto w-full max-w-6xl px-4 py-8 lg:px-6">
+<% } else { %>
+<%- include('../partials/admin-layout-start') %>
+<nav class="fotak-tabs mb-8" aria-label="Foták">
+  <div class="fotak-tabs__links">
+    <a href="/foto" class="fotak-tab<%= fNav === 'alba' ? ' is-on' : '' %>">Alba</a>
+    <a href="/foto/rozpis" class="fotak-tab<%= fNav === 'rozpis' ? ' is-on' : '' %>">Rozpis</a>
+    <a href="/foto/hledat" class="fotak-tab<%= fNav === 'hledat' ? ' is-on' : '' %>">Hledat</a>
+    <a href="/foto/tymy" class="fotak-tab<%= fNav === 'tymy' ? ' is-on' : '' %>">Týmy</a>
+    <a href="/foto/fotografi" class="fotak-tab<%= fNav === 'fotografi' ? ' is-on' : '' %>">Fotografové</a>
+  </div>
+  <a href="/foto/studio/alba/nove" class="fotak-tabs__new<%= fNav === 'studio' ? ' is-on' : '' %>">Nové album</a>
+</nav>
+<% } %>

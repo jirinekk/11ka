@@ -8,6 +8,7 @@ const mostReadService = require('../services/most-read');
 const usersService = require('../services/users');
 const homeFallback = require('../data/home');
 const { formatCzDate, relativeTime } = require('../lib/format');
+const { slugify } = require('../lib/slug');
 const { parseBlocksInput, renderBlocksToHtml } = require('../lib/article-blocks');
 const { prepareLineupForView } = require('../lib/lineup');
 const { sendAccreditationRequest } = require('../services/mail');
@@ -31,10 +32,13 @@ const matchFixturesService = require('../services/match-fixtures');
 const matchTeamsService = require('../services/match-teams');
 const liveScoresService = require('../services/live-scores');
 const livesportChance = require('../services/livesport-chance');
+const fotoService = require('../services/foto');
 const chanceLigaLogos = require('../services/chance-liga-logos');
 const penaltyGameService = require('../services/penalty-game');
 const penaltyLeaderboardService = require('../services/penalty-leaderboard');
 const articleTts = require('../services/article-tts');
+const { isEditorialStaff, hasRole } = require('../lib/roles');
+const { requireLogin } = require('../middleware/auth');
 
 function foldTeamName(name) {
   return String(name || '')
@@ -354,13 +358,210 @@ function isValidAkreditacePayload(data) {
   return true;
 }
 
-function renderAkreditacePage(req, res, opts = {}) {
+const ACC_ROZPIS_LEAGUES = [
+  { id: '', label: 'Vše' },
+  { id: 'chance-liga', label: 'Chance Liga', keys: ['Chance Liga'] },
+  { id: 'chance-narodni', label: 'Chance Národní liga', keys: ['Chance Národní Liga', 'Chance Národní liga'] },
+  { id: 'fortuna-zeny', label: 'Fortuna Ženská liga', keys: ['Fortuna liga žen'] },
+  { id: 'mol-cup', label: 'MOL Cup', keys: ['MOL Cup'] },
+  { id: 'reprezentace', label: 'Česká reprezentace', keys: ['Reprezentace', 'Česká reprezentace', 'Liga národů UEFA', 'ME do 21 let'], czechOnly: true },
+  { id: 'liga-mistru', label: 'Liga mistrů', keys: ['Liga mistrů'] },
+  { id: 'evropska-liga', label: 'Evropská liga', keys: ['Evropská liga'] },
+  { id: 'konferencni-liga', label: 'Konferenční liga', keys: ['Konferenční liga'] },
+];
+
+const ACC_CZECH_ONLY_LEAGUES = new Set(['Reprezentace', 'Česká reprezentace', 'Liga národů UEFA', 'ME do 21 let']);
+
+function isCzechNationalSide(name) {
+  const n = String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  return /\bcesko\b|\bceska republika\b|\bczechia\b|\bczech republic\b/.test(n);
+}
+
+function accFixtureName(f) {
+  const home = f.homeName || f.home || '';
+  const away = f.awayName || f.away || '';
+  return `${home} – ${away}`.replace(/\s+/g, ' ').trim();
+}
+
+function accFixtureDate(f) {
+  return f.date_key || livesportChance.pragueDayKey(f.kickoff || f.date) || '';
+}
+
+function accTeamKey(name, slug) {
+  const s = String(slug || '').trim();
+  if (s) return s;
+  const n = String(name || '').trim();
+  if (!n) return '';
+  const key = slugify(n);
+  return !key || key === 'clanek' ? '' : key;
+}
+
+function accFixtureTeamKeys(f) {
+  return [
+    accTeamKey(f.homeName || f.home, f.homeSlug),
+    accTeamKey(f.awayName || f.away, f.awaySlug),
+  ].filter(Boolean);
+}
+
+function collectAccTeams(fixtures) {
+  const map = new Map();
+  for (const f of fixtures || []) {
+    const sides = [
+      { name: f.homeName || f.home || '', slug: f.homeSlug, logo: f.homeLogo || '' },
+      { name: f.awayName || f.away || '', slug: f.awaySlug, logo: f.awayLogo || '' },
+    ];
+    for (const side of sides) {
+      const slug = accTeamKey(side.name, side.slug);
+      if (!slug) continue;
+      const prev = map.get(slug);
+      if (!prev) {
+        map.set(slug, { slug, name: side.name, logo: side.logo });
+      } else if (!prev.logo && side.logo) {
+        prev.logo = side.logo;
+      }
+    }
+  }
+  return [...map.values()].sort((a, b) =>
+    String(a.name).localeCompare(String(b.name), 'cs', { sensitivity: 'base' })
+  );
+}
+
+function groupAccFixtures(fixtures) {
+  const live = [];
+  const today = [];
+  const groups = [];
+  for (const f of fixtures) {
+    const item = {
+      ...f,
+      matchName: accFixtureName(f),
+      matchDate: accFixtureDate(f),
+    };
+    if (item.isLive) live.push(item);
+    else if (item.isToday) today.push(item);
+    else {
+      const last = groups[groups.length - 1];
+      if (!last || last.date_key !== item.date_key) {
+        groups.push({ date_key: item.date_key, date_label: item.date_label, items: [item] });
+      } else {
+        last.items.push(item);
+      }
+    }
+  }
+  return { live, today, groups };
+}
+
+async function loadAkreditaceRozpis(ligaId, teamSlug) {
+  const selected = ACC_ROZPIS_LEAGUES.find((l) => l.id === ligaId) || ACC_ROZPIS_LEAGUES[0];
+  const allowedKeys = new Set(
+    (selected.keys && selected.keys.length
+      ? selected.keys
+      : ACC_ROZPIS_LEAGUES.flatMap((l) => l.keys || [])).map((k) => String(k))
+  );
+  let fixtures = [];
+  try {
+    fixtures = fotoService.listFixtures().filter((f) => allowedKeys.has(f.league));
+  } catch {
+    fixtures = [];
+  }
+  fixtures = fixtures.filter((f) => {
+    if (!ACC_CZECH_ONLY_LEAGUES.has(f.league)) return true;
+    return isCzechNationalSide(f.homeName) || isCzechNationalSide(f.awayName);
+  });
+
+  const wantRepre = !selected.id || selected.id === 'reprezentace';
+  if (wantRepre) {
+    try {
+      const repre = await livesportChance.listCzechNational();
+      const today = livesportChance.pragueDayKey(new Date().toISOString());
+      const seen = new Set(fixtures.map((f) => `${accFixtureDate(f)}|${accFixtureName(f).toLowerCase()}`));
+      for (const m of repre || []) {
+        const dateKey = livesportChance.pragueDayKey(m.kickoff || m.date);
+        if (!dateKey || dateKey < today) continue;
+        if (m.isDone || m.state === 'post') continue;
+        const row = {
+          id: m.id || m.matchKey,
+          league: 'Česká reprezentace',
+          kickoff: m.kickoff || m.date,
+          homeName: m.home,
+          awayName: m.away,
+          homeLogo: m.homeLogo || '',
+          awayLogo: m.awayLogo || '',
+          date_key: dateKey,
+          date_label: m.date
+            ? new Date(m.date).toLocaleDateString('cs-CZ', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                timeZone: 'Europe/Prague',
+              })
+            : dateKey,
+          time_label: m.isLive ? 'Živě' : m.time || m.statusLabel || '',
+          isLive: Boolean(m.isLive),
+          isToday: dateKey === today,
+        };
+        const key = `${row.date_key}|${accFixtureName(row).toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        fixtures.push(row);
+      }
+    } catch {
+      /* ignore live NT feed */
+    }
+  }
+
+  fixtures.sort((a, b) => {
+    if (Boolean(a.isLive) !== Boolean(b.isLive)) return a.isLive ? -1 : 1;
+    return String(a.kickoff || a.date || '').localeCompare(String(b.kickoff || b.date || ''));
+  });
+
+  const teams = collectAccTeams(fixtures);
+  const tym = String(teamSlug || '').trim();
+  const teamOk = tym && teams.some((t) => t.slug === tym) ? tym : '';
+  const filtered = teamOk
+    ? fixtures.filter((f) => accFixtureTeamKeys(f).includes(teamOk))
+    : fixtures;
+
+  return {
+    liga: selected.id,
+    tym: teamOk,
+    leagues: ACC_ROZPIS_LEAGUES,
+    teams,
+    ...groupAccFixtures(filtered),
+  };
+}
+
+function photographerPrefillUser(req) {
+  const sessionUser = req.user;
+  if (!sessionUser || !sessionUser.id || !hasRole(sessionUser, 'fotograf')) return null;
+  try {
+    return usersService.getById(sessionUser.id) || sessionUser;
+  } catch {
+    return sessionUser;
+  }
+}
+
+function savePhotographerPrefill(req, payload) {
+  const user = photographerPrefillUser(req);
+  if (!user || !user.id) return null;
+  try {
+    return usersService.updateAccPrefill(user.id, payload);
+  } catch (err) {
+    console.error('[11ka] acc prefill save:', err && err.message);
+    return null;
+  }
+}
+
+async function renderAkreditacePage(req, res, opts = {}) {
   const adMap = adsService.getActiveMap();
   const nl = req.query.newsletter;
   const newsletterStatus =
     nl === 'ok' || nl === 'dupe' || nl === 'bad' ? nl : null;
   const formStatus =
-    req.query.submitted === 'ok' || req.query.submitted === 'bad' ? req.query.submitted : null;
+    opts.formStatus ||
+    (req.query.submitted === 'ok' || req.query.submitted === 'bad' ? req.query.submitted : null);
 
   const totalItems = accreditationService.countPublic();
 
@@ -372,11 +573,37 @@ function renderAkreditacePage(req, res, opts = {}) {
   const offsetDesktop = (page - 1) * perPageDesktop;
   const accreditationRequests = accreditationService.listPublicPaged(perPageDesktop, offsetDesktop);
 
+  const fotoUser = photographerPrefillUser(req);
+  const canAccPrefill = Boolean(fotoUser);
+  const accPrefill = canAccPrefill ? usersService.accPrefillForUser(fotoUser) : null;
+  let formValues = opts.formValues ? { ...opts.formValues } : {};
+  if (accPrefill && accPrefill.enabled) {
+    formValues = { ...usersService.accPrefillFormValues(fotoUser), ...formValues };
+  }
+  const qMatch = String(req.query.zapas || '').trim();
+  const qDate = String(req.query.datum || '').trim();
+  if (qMatch) formValues.match = qMatch;
+  if (accreditationService.isValidMatchDate(qDate)) formValues.match_date = qDate;
+  if (!Object.keys(formValues).length) formValues = null;
+
+  const liga = String(req.query.liga || '').trim();
+  const tym = String(req.query.tym || '').trim();
+  let rozpis = { liga: '', tym: '', leagues: ACC_ROZPIS_LEAGUES, teams: [], live: [], today: [], groups: [] };
+  try {
+    rozpis = await loadAkreditaceRozpis(liga, tym);
+  } catch (err) {
+    console.error('[11ka] akreditace rozpis:', err && err.message);
+  }
+
   res.render('akreditace', {
       title: 'Akreditace - 11ka',
       activeNav: 'home',
-      formStatus: opts.formStatus || formStatus,
-      formValues: opts.formValues || null,
+      formStatus,
+      formValues,
+      canAccPrefill,
+      accPrefill,
+      prefillSaved: opts.prefillSaved || req.query.prefill === '1',
+      rozpis,
       accreditationRequests,
       pagination: {
         page,
@@ -462,6 +689,8 @@ router.get('/robots.txt', (req, res) => {
   const body = [
     'User-agent: *',
     'Allow: /',
+    'Disallow: /foto',
+    'Disallow: /foto/',
     `Sitemap: ${absoluteUrl('/sitemap.xml')}`,
     '',
   ].join('\n');
@@ -818,19 +1047,25 @@ function normalizeAgendaMatch(m) {
 
 function groupAgendaDays(leagues, fromDay) {
   const map = new Map();
+  function ensure(key) {
+    if (!map.has(key)) {
+      map.set(key, {
+        day: key,
+        dayLabel: livesportChance.formatDayNavLabel(key),
+        leagues: [],
+      });
+    }
+    return map.get(key);
+  }
+  if (fromDay) ensure(fromDay);
   (leagues || []).forEach((league) => {
     (league.matches || []).forEach((m) => {
-      const key = m.dayKey || '';
+      const rawKey = m.dayKey || '';
+      if (!rawKey && !m.isLive) return;
+      if (fromDay && rawKey && rawKey < fromDay && !m.isLive) return;
+      const key = m.isLive && fromDay ? fromDay : rawKey || fromDay;
       if (!key) return;
-      if (fromDay && key < fromDay) return;
-      if (!map.has(key)) {
-        map.set(key, {
-          day: key,
-          dayLabel: livesportChance.formatDayNavLabel(key),
-          leagues: [],
-        });
-      }
-      const bucket = map.get(key);
+      const bucket = ensure(key);
       let group = bucket.leagues.find((item) => item.id === league.id);
       if (!group) {
         group = { id: league.id, label: league.label, matches: [] };
@@ -892,11 +1127,39 @@ router.get('/zapasy/live', async (req, res) => {
     { id: 'chance-narodni', label: 'Chance Národní liga', matches: narodni },
     { id: 'ceska-reprezentace', label: 'Česká reprezentace', matches: repre },
   ];
-  if (liveOnly) {
-    leagues = leagues.map((league) => ({
+  try {
+    const seenIds = new Set();
+    leagues.forEach((league) => (league.matches || []).forEach((m) => m.id && seenIds.add(m.id)));
+    const extra = fotoService
+      .listFixtures()
+      .filter((f) => (f.isLive || f.isToday) && !seenIds.has(f.id))
+      .map((f) => fotoService.fixtureToMatchCard(f));
+    const byLeague = new Map();
+    extra.forEach((card) => {
+      const label = card.league || 'Další zápasy';
+      if (!byLeague.has(label)) byLeague.set(label, []);
+      byLeague.get(label).push(card);
+    });
+    byLeague.forEach((matches, label) => {
+      leagues.push({
+        id: `foto-${String(label).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        label,
+        matches,
+      });
+    });
+  } catch {
+    /* seed fixtures optional */
+  }
+  const liveBoard = leagues
+    .map((league) => ({
       ...league,
       matches: (league.matches || []).filter((m) => m.isLive),
-    }));
+    }))
+    .filter((league) => league.matches.length);
+  if (liveOnly) {
+    leagues = liveBoard.length
+      ? liveBoard
+      : leagues.map((league) => ({ ...league, matches: [] }));
   }
   if (ligaFilter) {
     leagues = leagues.filter((league) => league.id === ligaFilter);
@@ -917,7 +1180,8 @@ router.get('/zapasy/live', async (req, res) => {
     activeNav: 'zapasy',
     pageTitle: 'Zápasy',
     matchDays,
-    focusDay: /^\d{4}-\d{2}-\d{2}$/.test(focusDay) ? focusDay : (matchDays[0] && matchDays[0].day) || today,
+    liveBoard,
+    focusDay: /^\d{4}-\d{2}-\d{2}$/.test(focusDay) ? focusDay : today,
     liveCount,
     ligaFilter,
     liveOnly,
@@ -1610,14 +1874,29 @@ router.get('/spoluprace', (req, res) => {
   });
 });
 
-router.get('/akreditace', (req, res) => {
-  renderAkreditacePage(req, res);
+router.get('/akreditace', async (req, res) => {
+  await renderAkreditacePage(req, res);
+});
+
+router.post('/akreditace/prefill', requireLogin, (req, res) => {
+  const user = photographerPrefillUser(req);
+  if (!user) {
+    return res.redirect('/akreditace');
+  }
+  savePhotographerPrefill(req, {
+    enabled: req.body.acc_prefill_enabled === '1' || req.body.acc_prefill_enabled === 'on',
+    name: req.body.acc_prefill_name,
+    email: req.body.acc_prefill_email,
+    phone: req.body.acc_prefill_phone,
+    accreditation_type: req.body.acc_prefill_type,
+  });
+  return res.redirect(302, '/akreditace?prefill=1');
 });
 
 router.post('/akreditace', akreditaceLimiter, async (req, res) => {
   const data = parseAkreditaceBody(req.body);
   if (!isValidAkreditacePayload(data)) {
-    return renderAkreditacePage(req, res, {
+    return await renderAkreditacePage(req, res, {
       formStatus: 'invalid',
       formValues: data,
     });
@@ -1628,9 +1907,19 @@ router.post('/akreditace', akreditaceLimiter, async (req, res) => {
     requestId = accreditationService.create(data);
   } catch (e) {
     console.error('[11ka] Uložení žádosti o akreditaci:', e);
-    return renderAkreditacePage(req, res, {
+    return await renderAkreditacePage(req, res, {
       formStatus: 'bad',
       formValues: data,
+    });
+  }
+
+  if (req.body.save_prefill === '1' && photographerPrefillUser(req)) {
+    savePhotographerPrefill(req, {
+      enabled: true,
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      accreditation_type: data.accreditation_type,
     });
   }
 
@@ -1665,6 +1954,7 @@ router.get('/redakce', (req, res) => {
   const sefredaktori = members.filter((m) => m.role === 'sefredaktor');
   const redaktori = members.filter((m) => m.role === 'redaktor');
   const vedeni = members.filter((m) => m.role === 'vedeni' || m.role === 'majitel');
+  // Fotografové are staff for Foták, but never listed on /redakce.
 
   res.render('redakce', {
     title: 'Redakce - 11ka',
@@ -1837,7 +2127,7 @@ router.get('/redaktor/:id', (req, res) => {
   }
 
   const author = usersService.getById(authorId);
-  if (!author || !author.id) {
+  if (!author || !author.id || !isEditorialStaff(author)) {
     return res.status(404).render('404', { title: 'Nenalezeno - 11ka', activeNav: 'home' });
   }
 
@@ -1914,6 +2204,7 @@ router.get('/podminky-uziti', (req, res) => {
           ],
         },
         {
+          id: 'clanek-3',
           heading: '3. Autorská práva',
           paragraphs: [
             'Veškerý obsah na webu (texty, fotografie, grafika, loga, videa a další materiály) je chráněn autorským právem.',

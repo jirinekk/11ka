@@ -2,12 +2,14 @@
 <% var admNav = typeof adminNav !== 'undefined' ? adminNav : ''; %>
 <% var role = currentUser && currentUser.role; %>
 <% var akreditaceOnly = typeof isAkreditaceOnly === 'function' ? isAkreditaceOnly(currentUser) : role === 'spravce_akreditace'; %>
+<% var fotografOnly = typeof isFotografOnly === 'function' ? isFotografOnly(currentUser) : role === 'fotograf'; %>
 <% var canVedeni = typeof hasRole === 'function' ? hasRole(currentUser, 'vedeni') : role === 'vedeni'; %>
 <% var canSef = typeof hasAnyRole === 'function' ? hasAnyRole(currentUser, 'vedeni', 'sefredaktor') : (role === 'vedeni' || role === 'sefredaktor'); %>
 <% var canRedaktorFlow = typeof isRedaktorWorkflow === 'function' ? isRedaktorWorkflow(currentUser) : role === 'redaktor'; %>
 <% var canAkreditace = typeof hasAnyRole === 'function' ? hasAnyRole(currentUser, 'vedeni', 'spravce_akreditace') : (role === 'vedeni' || role === 'spravce_akreditace'); %>
 <% var canAiDrafts = typeof canAccessAiDrafts === 'function' ? canAccessAiDrafts(currentUser) : false; %>
-<% var adminHomeHref = akreditaceOnly ? '/administrace/akreditace' : '/administrace'; %>
+<% var canFoto = typeof canAccessFoto === 'function' ? canAccessFoto(currentUser) : !akreditaceOnly; %>
+<% var adminHomeHref = akreditaceOnly ? '/administrace/akreditace' : (fotografOnly ? '/foto' : '/administrace'); %>
 <% function admLink(k) { return admNav === k ? 'bg-11accent/10 text-11accent' : 'text-slate-300 hover:bg-white/5 hover:text-white'; } %>
 <body data-admin="1" class="site-v2 flex min-h-screen flex-col bg-11bg font-sans text-slate-200 antialiased">
   <header class="admin-bar--liquid sticky top-0 z-[55] shrink-0 overflow-visible">
@@ -17,6 +19,9 @@
           <img src="/logo.png" alt="11ka" class="h-7 w-auto md:h-8" />
           <span class="hidden text-sm font-semibold tracking-tight text-white sm:inline">Administrace</span>
         </a>
+        <% if (canFoto) { %>
+        <a href="/foto" class="inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-sm font-semibold text-11accent transition hover:bg-11accent/10">Foták</a>
+        <% } %>
       </div>
       <div class="flex items-center gap-2 md:hidden">
         <details class="nav-mobile-dd relative">
@@ -30,7 +35,10 @@
             </svg>
           </summary>
           <div class="absolute left-1/2 top-full z-[70] mt-2 w-[min(22rem,calc(100vw-1rem))] -translate-x-1/2 overflow-hidden rounded-xl bg-[#111827] py-1 shadow-xl shadow-black/50">
-            <% if (!akreditaceOnly) { %>
+            <% if (canFoto) { %>
+            <a href="/foto" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'foto' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Foták</a>
+            <% } %>
+            <% if (!akreditaceOnly && !fotografOnly) { %>
             <a href="/administrace" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'dashboard' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Přehled</a>
             <a href="/administrace/clanek/novy" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'editor' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Nový článek</a>
             <% if (canSef) { %>
@@ -80,7 +88,10 @@
   <div class="flex min-h-0 flex-1 flex-col md:flex-row">
     <aside class="hidden shrink-0 bg-11card/80 md:block md:w-56 md:bg-[#0d121c]">
       <nav class="hidden md:flex md:flex-col md:gap-0.5 md:p-4" aria-label="Navigace administrace">
-        <% if (!akreditaceOnly) { %>
+        <% if (canFoto) { %>
+        <a href="/foto" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('foto') %>">Foták</a>
+        <% } %>
+        <% if (!akreditaceOnly && !fotografOnly) { %>
         <a href="/administrace" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('dashboard') %>">Přehled</a>
         <a href="/administrace/clanek/novy" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('editor') %>">Nový článek</a>
         <% if (canSef) { %>

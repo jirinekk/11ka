@@ -7,6 +7,9 @@
   var personInfo = typeof personStats !== 'undefined' ? personStats : null;
   var selectedEmail = typeof personEmail !== 'undefined' && personEmail ? personEmail : '';
   var searchQ = typeof spisSearch !== 'undefined' ? spisSearch : '';
+  var filterFrom = typeof dateFrom !== 'undefined' ? dateFrom : '';
+  var filterTo = typeof dateTo !== 'undefined' ? dateTo : '';
+  var hasDateFilter = !!(filterFrom || filterTo);
 
   function tabHref(t, pageNum, extra) {
     var parts = [];
@@ -19,6 +22,12 @@
     if (extra && extra.email) parts.push('email=' + encodeURIComponent(extra.email));
     if (extra && extra.q != null) {
       // replace q handled by rebuilding - skip, use searchQ unless clear
+    }
+    if (t !== 'spis') {
+      var od = extra && Object.prototype.hasOwnProperty.call(extra, 'od') ? extra.od : filterFrom;
+      var ddo = extra && Object.prototype.hasOwnProperty.call(extra, 'do') ? extra.do : filterTo;
+      if (od) parts.push('od=' + encodeURIComponent(od));
+      if (ddo) parts.push('do=' + encodeURIComponent(ddo));
     }
     if (pageNum && pageNum > 1) parts.push('page=' + pageNum);
     return '/administrace/akreditace' + (parts.length ? ('?' + parts.join('&')) : '');
@@ -40,6 +49,9 @@
       parts.push('tab=spis');
       if (searchQ) parts.push('q=' + encodeURIComponent(searchQ));
       if (selectedEmail) parts.push('email=' + encodeURIComponent(selectedEmail));
+    } else {
+      if (filterFrom) parts.push('od=' + encodeURIComponent(filterFrom));
+      if (filterTo) parts.push('do=' + encodeURIComponent(filterTo));
     }
     return '/administrace/akreditace/' + id + (parts.length ? ('?' + parts.join('&')) : '');
   }
@@ -325,8 +337,36 @@
 
 <% } else { %>
 
+<form method="get" action="/administrace/akreditace" class="mt-6 flex flex-wrap items-end gap-3">
+  <% if (activeTab === 'skryte') { %><input type="hidden" name="tab" value="skryte" /><% } %>
+  <div>
+    <label class="text-xs text-11muted" for="acc-date-from">Datum zápasu od</label>
+    <input
+      id="acc-date-from"
+      name="od"
+      type="date"
+      value="<%= filterFrom %>"
+      class="input-11 mt-1 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+    />
+  </div>
+  <div>
+    <label class="text-xs text-11muted" for="acc-date-to">Datum zápasu do</label>
+    <input
+      id="acc-date-to"
+      name="do"
+      type="date"
+      value="<%= filterTo %>"
+      class="input-11 mt-1 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+    />
+  </div>
+  <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg">Filtrovat</button>
+  <% if (hasDateFilter) { %>
+  <a href="<%= tabHref(activeTab, 1, { od: '', do: '' }) %>" class="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-300 hover:text-white">Zrušit filtr</a>
+  <% } %>
+</form>
+
 <% if (!requests.length) { %>
-<p class="mt-8 text-11muted"><%= activeTab === 'skryte' ? 'Žádné skryté akreditace.' : 'Zatím žádné viditelné žádosti.' %></p>
+<p class="mt-8 text-11muted"><%= hasDateFilter ? 'V tomto období žádné žádosti.' : (activeTab === 'skryte' ? 'Žádné skryté akreditace.' : 'Zatím žádné viditelné žádosti.') %></p>
 <% } else { %>
 <div class="mt-8 space-y-3 akreditace-admin-mobile-only">
   <% requests.forEach(function (r) { %>

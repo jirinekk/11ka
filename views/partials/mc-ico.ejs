@@ -1,0 +1,22 @@
+<% var kind = typeof kind !== 'undefined' ? String(kind) : 'goal'; %>
+<% if (kind === 'goal' || kind === 'own') { %>
+<svg class="mc-svg mc-svg--ball<%= kind === 'own' ? ' is-own' : '' %>" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10.4" fill="#f7f7f7"/>
+  <circle cx="12" cy="12" r="10.4" fill="none" stroke="#10161d" stroke-width="1.35"/>
+  <path fill="#10161d" d="M12 7.15l2.42 1.76-.92 2.85h-3l-.92-2.85L12 7.15z"/>
+  <path fill="none" stroke="#10161d" stroke-width="1.15" stroke-linejoin="round" d="M9.58 4.55 12 7.15l2.42-2.6M7.05 12.05l2.53-.29M16.95 12.05l-2.53-.29M6.2 16.35 8.66 13.7M17.8 16.35 15.34 13.7M8.4 19.35c1.1.95 2.32 1.45 3.6 1.45s2.5-.5 3.6-1.45M5.05 10.2c.55-2.15 1.85-3.9 3.55-5.05M18.95 10.2c-.55-2.15-1.85-3.9-3.55-5.05"/>
+</svg>
+<% } else if (kind === 'yellow' || kind === 'red') { %>
+<span class="mc-card mc-card--<%= kind %>" aria-hidden="true"></span>
+<% } else if (kind === 'sub' || kind === 'swap') { %>
+<span class="mc-swap" aria-hidden="true">
+  <i class="mc-swap__in"></i>
+  <i class="mc-swap__out"></i>
+</span>
+<% } else if (kind === 'in') { %>
+<span class="mc-swap mc-swap--one" aria-hidden="true"><i class="mc-swap__in"></i></span>
+<% } else if (kind === 'out') { %>
+<span class="mc-swap mc-swap--one" aria-hidden="true"><i class="mc-swap__out"></i></span>
+<% } else if (kind === 'var') { %>
+<span class="mc-var" aria-hidden="true">VAR</span>
+<% } %>

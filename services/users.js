@@ -10,8 +10,10 @@ const {
   parseRoles,
   serializeRoles,
   hasAnyRole,
+  isEditorialStaff,
   isReservedStaffEmail,
   STAFF_ROLES: ALL_STAFF_ROLES,
+  EDITORIAL_ROLES,
 } = require('../lib/roles');
 
 const AUTHOR_BIO_MAX = 1500;
@@ -21,6 +23,7 @@ const USER_PUBLIC_COLUMNS_BASE =
   'id, email, role, display_name, avatar_path, author_bio, author_bio_pending, slug, public_bio, favorite_team_code, created_at, updated_at';
 
 let _hasRolesColumn = null;
+let _hasAccPrefillColumn = null;
 
 function hasRolesColumn() {
   if (_hasRolesColumn != null) return _hasRolesColumn;
@@ -33,13 +36,107 @@ function hasRolesColumn() {
   return _hasRolesColumn;
 }
 
+function hasAccPrefillColumn() {
+  if (_hasAccPrefillColumn != null) return _hasAccPrefillColumn;
+  try {
+    const cols = getDb().prepare(`PRAGMA table_info(users)`).all();
+    _hasAccPrefillColumn = cols.some((c) => c && c.name === 'acc_prefill');
+  } catch {
+    _hasAccPrefillColumn = false;
+  }
+  return _hasAccPrefillColumn;
+}
+
 function userSelectColumns(includePassword = false) {
   const rolesPart = hasRolesColumn() ? 'roles, ' : '';
-  const profilePart = 'slug, public_bio, favorite_team_code, ';
+  const accPart = hasAccPrefillColumn() ? 'acc_prefill, ' : '';
+  const profilePart = `slug, public_bio, favorite_team_code, ${accPart}`;
   if (includePassword) {
     return `id, email, password_hash, role, ${rolesPart}display_name, avatar_path, author_bio, author_bio_pending, ${profilePart}created_at, updated_at`;
   }
   return `id, email, role, ${rolesPart}display_name, avatar_path, author_bio, author_bio_pending, ${profilePart}created_at, updated_at`;
+}
+
+const EMPTY_ACC_PREFILL = {
+  enabled: false,
+  name: '',
+  email: '',
+  phone: '',
+  accreditation_type: 'photo',
+};
+
+function parseAccPrefill(raw) {
+  let data = raw;
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = null;
+    }
+  }
+  if (!data || typeof data !== 'object') {
+    return { ...EMPTY_ACC_PREFILL };
+  }
+  const type = String(data.accreditation_type || data.type || '').trim();
+  return {
+    enabled: Boolean(data.enabled),
+    name: String(data.name || '').trim(),
+    email: String(data.email || '').trim().toLowerCase(),
+    phone: String(data.phone || '').trim(),
+    accreditation_type: type === 'pisi' ? 'pisi' : 'photo',
+  };
+}
+
+function accPrefillForUser(user) {
+  const parsed = parseAccPrefill(user && user.acc_prefill);
+  return {
+    ...parsed,
+    name: parsed.name || String((user && user.display_name) || '').trim(),
+    email: parsed.email || String((user && user.email) || '').trim().toLowerCase(),
+  };
+}
+
+function accPrefillFormValues(user) {
+  const saved = accPrefillForUser(user);
+  if (!saved.enabled) return {};
+  return {
+    name: saved.name,
+    email: saved.email,
+    phone: saved.phone,
+    accreditation_type: saved.accreditation_type === 'pisi' ? 'pisi' : 'photo',
+  };
+}
+
+function normalizeAccPrefillPayload(input, user) {
+  const raw = input && typeof input === 'object' ? input : {};
+  const enabled = Boolean(
+    raw.enabled === true || raw.enabled === 1 || raw.enabled === '1' || raw.enabled === 'on'
+  );
+  const name = String(raw.name != null ? raw.name : '').trim();
+  let email = String(raw.email != null ? raw.email : '')
+    .trim()
+    .toLowerCase();
+  const phone = String(raw.phone != null ? raw.phone : '').trim();
+  const type = String(raw.accreditation_type != null ? raw.accreditation_type : raw.type || '').trim();
+  if (!email && user && user.email) email = String(user.email).trim().toLowerCase();
+  return {
+    enabled,
+    name: name || String((user && user.display_name) || '').trim(),
+    email,
+    phone,
+    accreditation_type: type === 'pisi' ? 'pisi' : 'photo',
+  };
+}
+
+function updateAccPrefill(userId, payload) {
+  if (!hasAccPrefillColumn()) return getById(userId);
+  const user = getById(userId);
+  if (!user) return null;
+  const next = normalizeAccPrefillPayload(payload, user);
+  getDb()
+    .prepare(`UPDATE users SET acc_prefill = ?, updated_at = datetime('now') WHERE id = ?`)
+    .run(JSON.stringify(next), userId);
+  return getById(userId);
 }
 
 function enrichUser(row) {
@@ -198,7 +295,7 @@ function listWithPendingBios() {
   return listAll().filter((u) => hasPendingAuthorBio(u));
 }
 
-const STAFF_ROLES = ['majitel', 'vedeni', 'sefredaktor', 'redaktor'];
+const STAFF_ROLES = EDITORIAL_ROLES;
 
 function listAuthorBiosForAdmin() {
   return listAll()
@@ -247,6 +344,7 @@ function listPublicStaff() {
       `SELECT id, email, role, ${hasRolesColumn() ? 'roles, ' : ''}display_name, avatar_path, author_bio
        FROM users
        WHERE role IN ('majitel', 'vedeni', 'sefredaktor', 'redaktor')
+         AND role != 'fotograf'
        ORDER BY
          CASE role
            WHEN 'sefredaktor' THEN 1
@@ -259,7 +357,7 @@ function listPublicStaff() {
     )
     .all()
     .map(enrichUser)
-    .filter((u) => hasAnyRole(u, ...STAFF_ROLES));
+    .filter((u) => isEditorialStaff(u));
 }
 
 function verifyPassword(plain, hash) {
@@ -696,7 +794,12 @@ module.exports = {
   countArticlesByUser,
   deleteUser,
   seedStaffUsers,
+  parseAccPrefill,
+  accPrefillForUser,
+  accPrefillFormValues,
+  updateAccPrefill,
   resetRolesColumnCache() {
     _hasRolesColumn = null;
+    _hasAccPrefillColumn = null;
   },
 };

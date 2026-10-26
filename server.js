@@ -44,6 +44,7 @@ const apiPenalty = require('./routes/api-penalty');
 const apiArticleTts = require('./routes/api-article-tts');
 const newsletterPublicRouter = require('./routes/newsletter-public');
 const { router: adminRouter, ensureUploadDirs } = require('./routes/admin');
+const fotoRouter = require('./routes/foto');
 const { attachUser } = require('./middleware/auth');
 const authCookie = require('./lib/auth-cookie');
 const {
@@ -51,6 +52,8 @@ const {
   hasAnyRole,
   isStaffUser,
   isAkreditaceOnly,
+  isFotografOnly,
+  canAccessFoto,
   isRedaktorWorkflow,
   formatRoles,
   ROLE_LABELS,
@@ -90,6 +93,7 @@ function getAssetVersion() {
         path.join(__dirname, 'public', 'js', 'sidebar-hiring-promo.js'),
         path.join(__dirname, 'public', 'js', 'article-audio.js'),
         path.join(__dirname, 'public', 'js', 'whats-new.js'),
+        path.join(__dirname, 'public', 'js', 'foto-gallery.js'),
     ];
     let newestMs = 0;
     for (const filePath of candidates) {
@@ -190,6 +194,8 @@ app.use((req, res, next) => {
     res.locals.isStaffUser = isStaffUser;
     res.locals.staffRoles = STAFF_ROLES;
     res.locals.isAkreditaceOnly = isAkreditaceOnly;
+    res.locals.isFotografOnly = isFotografOnly;
+    res.locals.canAccessFoto = canAccessFoto;
     res.locals.isRedaktorWorkflow = isRedaktorWorkflow;
     res.locals.formatRoles = formatRoles;
     res.locals.roleLabels = ROLE_LABELS;
@@ -254,6 +260,7 @@ app.use(newsletterPublicRouter);
 app.use(siteRouter);
 app.use(authRouter);
 app.use(ucetRouter);
+app.use('/foto', fotoRouter);
 app.use(adminRouter);
 
 app.use((req, res) => {

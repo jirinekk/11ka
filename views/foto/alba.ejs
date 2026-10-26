@@ -1,0 +1,48 @@
+<%- include('layout-start') %>
+<div class="flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Alba</h1>
+    <p class="mt-1 text-sm text-11muted"><%= albums.length %> zápasů v archivu</p>
+  </div>
+</div>
+
+<form class="fotak-filter mt-5" method="get" action="/foto">
+  <label class="fotak-filter__q">
+    <span class="sr-only">Hledat</span>
+    <svg class="fotak-filter__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/>
+    </svg>
+    <input
+      class="input-11 fotak-filter__input"
+      type="search"
+      name="q"
+      value="<%= q || '' %>"
+      placeholder="Klub, soutěž, fotograf…"
+    />
+  </label>
+  <select class="input-11 fotak-filter__liga" name="liga" aria-label="Soutěž">
+    <option value="">Všechny soutěže</option>
+    <% (leagues || []).forEach(function (name) { %>
+    <option value="<%= name %>" <%= liga === name ? 'selected' : '' %>><%= name %></option>
+    <% }); %>
+  </select>
+  <button type="submit" class="fotak-filter__go">Hledat</button>
+</form>
+
+<% if (tym) { %>
+<p class="mt-3 text-sm text-11muted">
+  Filtr klubu: <strong class="text-white"><%= tym %></strong>
+  · <a href="/foto" class="text-11accent hover:underline">zrušit</a>
+</p>
+<% } %>
+
+<% if (!albums.length) { %>
+<p class="mt-16 text-center text-sm text-11muted">Žádné album neodpovídá filtru.</p>
+<% } else { %>
+<div class="fotak-tile-grid mt-6">
+  <% albums.forEach(function (album) { %>
+  <%- include('_album-card', { album: album }) %>
+  <% }); %>
+</div>
+<% } %>
+<%- include('layout-end') %>

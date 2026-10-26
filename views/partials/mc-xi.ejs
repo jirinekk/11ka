@@ -1,0 +1,83 @@
+<%
+  var lu = typeof lineup !== 'undefined' && lineup ? lineup : null;
+  var side = typeof side !== 'undefined' ? side : 'home';
+  function rateClass(v) {
+    var n = parseFloat(String(v || '').replace(',', '.'));
+    if (!Number.isFinite(n)) return '';
+    if (n >= 8) return 'is-hot';
+    if (n >= 7) return 'is-good';
+    if (n >= 6) return 'is-ok';
+    return 'is-low';
+  }
+  function lastName(name) {
+    var parts = String(name || '').trim().split(/\s+/);
+    return parts.length ? parts[parts.length - 1] : '';
+  }
+%>
+<% if (lu) { %>
+<div class="mc-xi-card">
+  <header class="mc-xi-card__head">
+    <div>
+      <h3><%= lu.name %></h3>
+      <% if (lu.formation) { %><p class="mc-xi-card__form"><%= lu.formation %></p><% } %>
+    </div>
+    <% if (lu.rating) { %>
+    <span class="mc-rate <%= rateClass(lu.rating) %>"><%= lu.rating %></span>
+    <% } %>
+  </header>
+  <% var pitch = lu.pitch && lu.pitch.length ? lu.pitch : []; %>
+  <% if (pitch.length) { %>
+  <div class="mc-pitch" role="img" aria-label="Formace <%= lu.formation || '' %>">
+    <div class="mc-pitch__mark" aria-hidden="true"></div>
+    <% pitch.forEach(function (p) { %>
+    <div class="mc-dot<%= p.isBest ? ' is-best' : '' %>" style="left: <%= p.left %>%; top: <%= p.top %>%">
+      <span class="mc-dot__face">
+        <img src="<%= p.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
+        <% if (p.number) { %><b class="mc-dot__num"><%= p.number %></b><% } %>
+        <% if (p.rating) { %><em class="mc-rate mc-rate--dot <%= rateClass(p.rating) %>"><%= p.rating %></em><% } %>
+      </span>
+      <span class="mc-dot__name"><%= lastName(p.short || p.name) %></span>
+      <% if (p.badges && (p.badges.goals || p.badges.yellow || p.badges.red || p.badges.subIn || p.badges.subOut)) { %>
+      <span class="mc-dot__badges">
+        <% if (p.badges.goals) { %><i class="mc-ico mc-ico--goal" title="Gól"></i><% } %>
+        <% if (p.badges.yellow) { %><i class="mc-ico mc-ico--yellow" title="Žlutá"></i><% } %>
+        <% if (p.badges.red) { %><i class="mc-ico mc-ico--red" title="Červená"></i><% } %>
+        <% if (p.badges.subOut) { %><i class="mc-ico mc-ico--out" title="Střídání"></i><% } %>
+        <% if (p.badges.subIn) { %><i class="mc-ico mc-ico--in" title="Střídání"></i><% } %>
+      </span>
+      <% } %>
+    </div>
+    <% }); %>
+  </div>
+  <% } %>
+  <% if (lu.starters && lu.starters.length) { %>
+  <ol class="mc-xi-list">
+    <% lu.starters.forEach(function (p) { %>
+    <li>
+      <img src="<%= p.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
+      <span class="mc-xi-list__num"><%= p.number || '' %></span>
+      <span class="mc-xi-list__name"><%= p.name %><% if (p.role) { %> <small><%= p.role %></small><% } %></span>
+      <% if (p.rating) { %><span class="mc-rate <%= rateClass(p.rating) %>"><%= p.rating %></span><% } %>
+    </li>
+    <% }); %>
+  </ol>
+  <% } else { %>
+  <p class="mc-empty">Základní sestava zatím chybí.</p>
+  <% } %>
+  <% if (lu.bench && lu.bench.length) { %>
+  <p class="mc-xi-card__label">Náhradníci</p>
+  <ul class="mc-xi-bench">
+    <% lu.bench.forEach(function (p) { %>
+    <li>
+      <img src="<%= p.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
+      <span><% if (p.number) { %><b><%= p.number %></b> <% } %><%= p.name %></span>
+      <% if (p.rating) { %><span class="mc-rate mc-rate--sm <%= rateClass(p.rating) %>"><%= p.rating %></span><% } %>
+    </li>
+    <% }); %>
+  </ul>
+  <% } %>
+  <% if (lu.coach) { %>
+  <p class="mc-xi-card__coach">Trenér: <%= lu.coach %></p>
+  <% } %>
+</div>
+<% } %>

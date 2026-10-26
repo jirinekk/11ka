@@ -9,7 +9,36 @@
   var hasStats = m.stats && m.stats.some(function (s) {
     return String(s.home || '') !== '' && !/^0+(\.0+)?%?$/.test(String(s.home).replace(/\s/g,''));
   });
-  var events = (m.events || []).filter(function (e) { return e.kind === 'goal' || e.kind === 'yellow' || e.kind === 'red' || e.kind === 'sub'; });
+  var events = (m.events || []).filter(function (e) {
+    return e.kind === 'goal' || e.kind === 'own' || e.kind === 'yellow' || e.kind === 'red' || e.kind === 'sub' || e.kind === 'var';
+  });
+  function eventPeriodKey(e) {
+    var p = String(e.period || '').toLowerCase();
+    if (/prodl|et\b/.test(p)) return 'et';
+    if (/penalt/.test(p) && !/g[oó]l/.test(p)) return 'pen';
+    if (/2/.test(p) && /polo/.test(p)) return '2';
+    if (/1/.test(p) && /polo/.test(p)) return '1';
+    var min = parseInt(String(e.minute || ''), 10);
+    if (Number.isFinite(min) && min > 45) return '2';
+    return '1';
+  }
+  var periodLabels = { '1': '1. poločas', '2': '2. poločas', et: 'Prodloužení', pen: 'Penalty' };
+  var periodGroups = [];
+  var periodMap = {};
+  events.forEach(function (e) {
+    var key = eventPeriodKey(e);
+    if (!periodMap[key]) {
+      periodMap[key] = { key: key, label: periodLabels[key] || e.period || 'Poločas', events: [], score: '' };
+      periodGroups.push(periodMap[key]);
+    }
+    periodMap[key].events.push(e);
+    if (e.score) periodMap[key].score = String(e.score).replace(':', ' - ');
+  });
+  function fmtMin(raw) {
+    var min = raw || '';
+    if (min && !/['′’]$/.test(String(min))) min += "'";
+    return min;
+  }
   function kickoffLabel(iso) {
     if (!iso) return '';
     try {
@@ -69,13 +98,20 @@
           <div class="mc-hero__goals">
             <div class="mc-hero__goals-side">
               <% (m.scorers.home || []).forEach(function (g) { %>
-              <p><%= g.player %> <%= g.minute %><%= /['′’]$/.test(String(g.minute || '')) ? '' : "'" %></p>
+              <p>
+                <%- include('partials/mc-ico', { kind: /vl\.g/i.test(g.player) ? 'own' : 'goal' }) %>
+                <span><%= g.player %></span>
+                <time><%= g.minute %><%= /['′’]$/.test(String(g.minute || '')) ? '' : "'" %></time>
+              </p>
               <% }); %>
             </div>
-            <span class="mc-hero__goals-ball" aria-hidden="true"></span>
             <div class="mc-hero__goals-side mc-hero__goals-side--away">
               <% (m.scorers.away || []).forEach(function (g) { %>
-              <p><%= g.player %> <%= g.minute %><%= /['′’]$/.test(String(g.minute || '')) ? '' : "'" %></p>
+              <p>
+                <time><%= g.minute %><%= /['′’]$/.test(String(g.minute || '')) ? '' : "'" %></time>
+                <span><%= g.player %></span>
+                <%- include('partials/mc-ico', { kind: /vl\.g/i.test(g.player) ? 'own' : 'goal' }) %>
+              </p>
               <% }); %>
             </div>
           </div>
@@ -115,18 +151,51 @@
           </section>
           <% } %>
 
-          <% if (events.length) { %>
-          <section class="mc-facts mt-4">
+          <% if (periodGroups.length) { %>
+          <section class="mc-facts mc-facts--events mt-4">
             <h2 class="mc-facts__title">Události</h2>
-            <ol class="mc-timeline">
-              <% events.forEach(function (e) { %>
-              <li class="mc-timeline__item mc-timeline__item--<%= e.side %>">
-                <span class="mc-timeline__min"><%= e.minute %><%= /['′’]$/.test(String(e.minute || '')) ? '' : "'" %></span>
-                <span class="mc-timeline__kind"><%= e.label %></span>
-                <span class="mc-timeline__player"><%= e.player %></span>
-              </li>
-              <% }); %>
-            </ol>
+            <% periodGroups.forEach(function (group) { %>
+            <div class="mc-ev-half">
+              <div class="mc-ev-half__head">
+                <h3><%= group.label %></h3>
+                <% if (group.score) { %><span><%= group.score %></span><% } %>
+              </div>
+              <ol class="mc-ev">
+                <% group.events.forEach(function (e) { %>
+                <% var min = fmtMin(e.minute); %>
+                <% var who = e.kind === 'sub' ? (e.playerIn || e.player) : e.player; %>
+                <% var extra = e.kind === 'sub' ? (e.playerOut || '') : (e.assist ? '(' + e.assist + ')' : (e.kind === 'own' ? '(vl.g.)' : (e.reason ? '(' + e.reason + ')' : ''))); %>
+                <% var isGoal = e.kind === 'goal' || e.kind === 'own'; %>
+                <li class="mc-ev__row<%= isGoal ? ' is-goal' : '' %>">
+                  <div class="mc-ev__side is-home">
+                    <% if (e.side === 'home') { %>
+                    <span class="mc-ev__min"><%= min %></span>
+                    <span class="mc-ev__icons"><%- include('partials/mc-ico', { kind: e.kind === 'sub' ? 'swap' : e.kind }) %></span>
+                    <span class="mc-ev__copy">
+                      <% if (isGoal && e.score) { %><b class="mc-ev__score"><%= String(e.score).replace(':', '-') %></b><% } %>
+                      <% if (e.penalty) { %><em class="mc-ev__tag">Penalta</em><% } %>
+                      <span class="mc-ev__who"><%= who %></span>
+                      <% if (extra) { %><span class="mc-ev__assist"><%= extra %></span><% } %>
+                    </span>
+                    <% } %>
+                  </div>
+                  <div class="mc-ev__side is-away">
+                    <% if (e.side === 'away') { %>
+                    <span class="mc-ev__copy">
+                      <% if (e.penalty) { %><em class="mc-ev__tag">Penalta</em><% } %>
+                      <span class="mc-ev__who"><%= who %></span>
+                      <% if (extra) { %><span class="mc-ev__assist"><%= extra %></span><% } %>
+                      <% if (isGoal && e.score) { %><b class="mc-ev__score"><%= String(e.score).replace(':', '-') %></b><% } %>
+                    </span>
+                    <span class="mc-ev__icons"><%- include('partials/mc-ico', { kind: e.kind === 'sub' ? 'swap' : e.kind }) %></span>
+                    <span class="mc-ev__min"><%= min %></span>
+                    <% } %>
+                  </div>
+                </li>
+                <% }); %>
+              </ol>
+            </div>
+            <% }); %>
           </section>
           <% } %>
 
@@ -152,36 +221,14 @@
         </div>
 
         <div class="mc-tabs__pane mt-4" data-cl-pane="sestavy" role="tabpanel" hidden>
+          <% if (hasStarters || hasCoaches) { %>
+          <%- include('partials/mc-lineup-board', { homeLineup: homeLineup, awayLineup: awayLineup, homeLogo: m.homeLogo, awayLogo: m.awayLogo }) %>
+          <% } else { %>
           <section class="mc-facts">
-            <h2 class="mc-facts__title">Sestavy<% if (homeLineup && homeLineup.formation || awayLineup && awayLineup.formation) { %> <span class="mc-panel__sub"><%= (homeLineup && homeLineup.formation) || '' %><% if (homeLineup && homeLineup.formation && awayLineup && awayLineup.formation) { %> · <% } %><%= (awayLineup && awayLineup.formation) || '' %></span><% } %></h2>
-            <% if (hasStarters || hasCoaches) { %>
-            <div class="mc-lineups">
-              <% [homeLineup, awayLineup].forEach(function (lu) { if (!lu) return; %>
-              <div>
-                <h3 class="mc-scorers__side"><%= lu.name %></h3>
-                <% if (lu.starters && lu.starters.length) { %>
-                <ol class="mc-xi">
-                  <% lu.starters.forEach(function (p) { %>
-                  <li><% if (p.number) { %><span class="mc-xi__num"><%= p.number %></span><% } %> <%= p.name %><% if (p.role) { %> <span class="mc-xi__role"><%= p.role %></span><% } %></li>
-                  <% }); %>
-                </ol>
-                <% } else { %>
-                <p class="mc-empty">Základní sestava zatím chybí.</p>
-                <% } %>
-                <% if (lu.bench && lu.bench.length) { %>
-                <p class="mc-xi__label">Náhradníci</p>
-                <p class="mc-xi__bench"><%= lu.bench.map(function (p) { return (p.number ? p.number + ' ' : '') + p.name; }).join(', ') %></p>
-                <% } %>
-                <% if (lu.coach) { %>
-                <p class="mc-xi__coach">Trenér: <%= lu.coach %></p>
-                <% } %>
-              </div>
-              <% }); %>
-            </div>
-            <% } else { %>
+            <h2 class="mc-facts__title">Sestavy</h2>
             <p class="mc-empty">Sestavy zatím nejsou k dispozici.</p>
-            <% } %>
           </section>
+          <% } %>
         </div>
 
         <div class="mc-tabs__pane mt-4" data-cl-pane="tabulka" role="tabpanel" hidden>

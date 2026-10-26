@@ -5,11 +5,16 @@
     : (Number(request.hidden_from_web) === 1 ? 'skryte' : 'viditelne');
   var listPage = typeof backPage !== 'undefined' && backPage > 1 ? backPage : 1;
   var listEmail = typeof backEmail !== 'undefined' && backEmail ? String(backEmail) : '';
+  var listDateFrom = typeof backDateFrom !== 'undefined' && backDateFrom ? String(backDateFrom) : '';
+  var listDateTo = typeof backDateTo !== 'undefined' && backDateTo ? String(backDateTo) : '';
   var backParts = [];
   if (listTab === 'skryte') backParts.push('tab=skryte');
   if (listTab === 'spis') {
     backParts.push('tab=spis');
     if (listEmail) backParts.push('email=' + encodeURIComponent(listEmail));
+  } else {
+    if (listDateFrom) backParts.push('od=' + encodeURIComponent(listDateFrom));
+    if (listDateTo) backParts.push('do=' + encodeURIComponent(listDateTo));
   }
   if (listPage > 1) backParts.push('page=' + listPage);
   var backHref = '/administrace/akreditace' + (backParts.length ? ('?' + backParts.join('&')) : '');
@@ -120,6 +125,8 @@
       <input type="hidden" name="page" value="<%= listPage %>" />
       <input type="hidden" name="tab" value="<%= listTab %>" />
       <% if (listEmail) { %><input type="hidden" name="email" value="<%= listEmail %>" /><% } %>
+      <% if (listDateFrom) { %><input type="hidden" name="od" value="<%= listDateFrom %>" /><% } %>
+      <% if (listDateTo) { %><input type="hidden" name="do" value="<%= listDateTo %>" /><% } %>
       <button type="submit" class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg transition hover:brightness-110">
         Odeslat e-mail
       </button>
@@ -135,6 +142,8 @@
       <input type="hidden" name="page" value="<%= listPage %>" />
       <input type="hidden" name="tab" value="<%= listTab %>" />
       <% if (listEmail) { %><input type="hidden" name="email" value="<%= listEmail %>" /><% } %>
+      <% if (listDateFrom) { %><input type="hidden" name="od" value="<%= listDateFrom %>" /><% } %>
+      <% if (listDateTo) { %><input type="hidden" name="do" value="<%= listDateTo %>" /><% } %>
       <button
         type="submit"
         class="rounded-xl border border-sky-500/50 bg-sky-500/15 px-4 py-2 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/25<%= st === 'requested' ? ' ring-2 ring-sky-300/80' : '' %>"
@@ -146,6 +155,8 @@
       <input type="hidden" name="page" value="<%= listPage %>" />
       <input type="hidden" name="tab" value="<%= listTab %>" />
       <% if (listEmail) { %><input type="hidden" name="email" value="<%= listEmail %>" /><% } %>
+      <% if (listDateFrom) { %><input type="hidden" name="od" value="<%= listDateFrom %>" /><% } %>
+      <% if (listDateTo) { %><input type="hidden" name="do" value="<%= listDateTo %>" /><% } %>
       <button
         type="submit"
         class="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400<%= st === 'approved' ? ' ring-2 ring-emerald-300/80' : '' %>"
@@ -157,6 +168,8 @@
       <input type="hidden" name="page" value="<%= listPage %>" />
       <input type="hidden" name="tab" value="<%= listTab %>" />
       <% if (listEmail) { %><input type="hidden" name="email" value="<%= listEmail %>" /><% } %>
+      <% if (listDateFrom) { %><input type="hidden" name="od" value="<%= listDateFrom %>" /><% } %>
+      <% if (listDateTo) { %><input type="hidden" name="do" value="<%= listDateTo %>" /><% } %>
       <button
         type="submit"
         class="rounded-xl border border-red-500/50 bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-500/25<%= st === 'rejected' ? ' ring-1 ring-red-400/60' : '' %>"
@@ -169,6 +182,8 @@
       <input type="hidden" name="page" value="<%= listPage %>" />
       <input type="hidden" name="tab" value="<%= listTab %>" />
       <% if (listEmail) { %><input type="hidden" name="email" value="<%= listEmail %>" /><% } %>
+      <% if (listDateFrom) { %><input type="hidden" name="od" value="<%= listDateFrom %>" /><% } %>
+      <% if (listDateTo) { %><input type="hidden" name="do" value="<%= listDateTo %>" /><% } %>
       <button
         type="submit"
         class="rounded-xl border border-amber-500/50 bg-amber-500/15 px-4 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/25"
@@ -186,6 +201,8 @@
       <input type="hidden" name="page" value="<%= listPage %>" />
       <input type="hidden" name="tab" value="<%= listTab %>" />
       <% if (listEmail) { %><input type="hidden" name="email" value="<%= listEmail %>" /><% } %>
+      <% if (listDateFrom) { %><input type="hidden" name="od" value="<%= listDateFrom %>" /><% } %>
+      <% if (listDateTo) { %><input type="hidden" name="do" value="<%= listDateTo %>" /><% } %>
       <button
         type="submit"
         class="rounded-xl border border-amber-500/50 bg-amber-500/15 px-4 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/25"
@@ -203,6 +220,8 @@
       <input type="hidden" name="page" value="<%= listPage %>" />
       <input type="hidden" name="tab" value="<%= listTab %>" />
       <% if (listEmail) { %><input type="hidden" name="email" value="<%= listEmail %>" /><% } %>
+      <% if (listDateFrom) { %><input type="hidden" name="od" value="<%= listDateFrom %>" /><% } %>
+      <% if (listDateTo) { %><input type="hidden" name="do" value="<%= listDateTo %>" /><% } %>
       <button
         type="submit"
         class="rounded-xl border border-red-500/40 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/10"

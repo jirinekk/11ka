@@ -49,8 +49,10 @@
 <form id="article-form" class="mt-8 space-y-6" method="post" action="<%= isNew ? '/administrace/clanek/novy' : '/administrace/clanek/' + a.id + '/edit' %>" enctype="multipart/form-data">
   <div class="card-11 space-y-4 p-4 sm:p-6">
     <div>
+      <% var titleMax = typeof titleMax !== 'undefined' ? titleMax : 100; %>
       <label class="text-xs text-11muted" for="title">Nadpis</label>
-      <input id="title" name="title" type="text" required value="<%= val('title') %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+      <input id="title" name="title" type="text" required maxlength="<%= titleMax %>" value="<%= val('title') %>" class="input-11 mt-1 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white" />
+      <p id="title-counter" class="mt-1 text-xs text-11muted">0 / <%= titleMax %></p>
     </div>
     <div>
       <label class="text-xs text-11muted" for="slug">Slug (URL, volitelné)</label>
@@ -91,10 +93,12 @@
       </select>
     </div>
     <div>
+      <% var excerptMax = typeof excerptMax !== 'undefined' ? excerptMax : 250; %>
       <label class="text-xs text-11muted" for="excerpt">Perex (krátký úvod)</label>
       <div class="relative mt-1">
-        <textarea id="excerpt" name="excerpt" rows="3" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"><%= val('excerpt') %></textarea>
+        <textarea id="excerpt" name="excerpt" rows="3" maxlength="<%= excerptMax %>" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"><%= val('excerpt') %></textarea>
       </div>
+      <p id="excerpt-counter" class="mt-1 text-xs text-11muted">0 / <%= excerptMax %></p>
     </div>
     <%
       var canPickAuthor = typeof hasRole === 'function'
@@ -898,6 +902,25 @@
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6/tinymce.min.js"></script>
+<script>
+(function () {
+  function bindCounter(inputId, counterId) {
+    var input = document.getElementById(inputId);
+    var counter = document.getElementById(counterId);
+    if (!input || !counter) return;
+    function refresh() {
+      var max = Number(input.getAttribute('maxlength') || 0);
+      var length = String(input.value || '').length;
+      counter.textContent = length + ' / ' + max;
+      counter.classList.toggle('text-amber-300', max > 0 && length > max);
+    }
+    input.addEventListener('input', refresh);
+    refresh();
+  }
+  bindCounter('title', 'title-counter');
+  bindCounter('excerpt', 'excerpt-counter');
+})();
+</script>
 <script>
 (function () {
   var form = document.getElementById('article-form');

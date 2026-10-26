@@ -64,6 +64,13 @@
         </div>
 
         <div class="fm-feed">
+          <% var liveBoard = typeof liveBoard !== 'undefined' && liveBoard ? liveBoard : []; %>
+          <% if (!liveOnly && liveBoard.length) { %>
+          <section class="fm-day fm-day--live" id="den-live">
+            <h2 class="fm-day__title">Živě</h2>
+            <%- include('partials/fotmob-match-list', { matchLeagues: liveBoard }) %>
+          </section>
+          <% } %>
           <% if (!days.length) { %>
           <div class="fm-empty">Pro tento výběr zatím nejsou žádné zápasy.</div>
           <% } else { %>

@@ -4,8 +4,8 @@
 <% var hasPosts = postsHtml.some(function (h) { return h && String(h).trim(); }); %>
 <% var showElfsight = ig.enabled && ig.appClass; %>
 <% var hasFeed = showElfsight || hasPosts; %>
-<div class="card-11 p-4 sidebar-social">
-  <h2 class="sidebar-social__heading mb-3 text-lg font-bold text-11accent">Sleduj nás</h2>
+<div class="card-11 sidebar-social">
+  <h2 class="sidebar-social__heading">Sleduj nás</h2>
 
   <% if (hasFeed) { %>
   <div class="sidebar-social__feed mb-3" data-sidebar-ig-feed>
@@ -25,25 +25,28 @@
   </div>
   <% } %>
 
-  <div class="sidebar-social__links flex flex-wrap gap-2">
+  <nav class="sidebar-social__links" aria-label="Sociální sítě">
     <% if (ig.links && ig.links.facebook) { %>
-    <a href="<%= ig.links.facebook %>" target="_blank" rel="noopener noreferrer" class="social-btn" aria-label="Facebook">
-      <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg>
+    <a href="<%= ig.links.facebook %>" target="_blank" rel="noopener noreferrer" class="sidebar-social__link">
+      <svg fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg>
+      <span>Facebook</span>
     </a>
     <% } %>
     <% if (ig.links && ig.links.x) { %>
-    <a href="<%= ig.links.x %>" target="_blank" rel="noopener noreferrer" class="social-btn" aria-label="X">
-      <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+    <a href="<%= ig.links.x %>" target="_blank" rel="noopener noreferrer" class="sidebar-social__link">
+      <svg fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      <span>X</span>
     </a>
     <% } %>
     <% if (ig.links && ig.links.instagram) { %>
-    <a href="<%= ig.links.instagram %>" target="_blank" rel="noopener noreferrer" class="social-btn" aria-label="Instagram">
-      <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.75 2h8.5A5.75 5.75 0 0122 7.75v8.5A5.75 5.75 0 0116.25 22h-8.5A5.75 5.75 0 012 16.25v-8.5A5.75 5.75 0 017.75 2zm0 1.5A4.25 4.25 0 003.5 7.75v8.5A4.25 4.25 0 007.75 20.5h8.5a4.25 4.25 0 004.25-4.25v-8.5A4.25 4.25 0 0016.25 3.5h-8.5zM12 7a5 5 0 100 10 5 5 0 000-10zm0 1.5a3.5 3.5 0 110 7 3.5 3.5 0 010-7zm5.25-3.75a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5z"/></svg>
+    <a href="<%= ig.links.instagram %>" target="_blank" rel="noopener noreferrer" class="sidebar-social__link">
+      <svg fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.75 2h8.5A5.75 5.75 0 0122 7.75v8.5A5.75 5.75 0 0116.25 22h-8.5A5.75 5.75 0 012 16.25v-8.5A5.75 5.75 0 017.75 2zm0 1.5A4.25 4.25 0 003.5 7.75v8.5A4.25 4.25 0 007.75 20.5h8.5a4.25 4.25 0 004.25-4.25v-8.5A4.25 4.25 0 0016.25 3.5h-8.5zM12 7a5 5 0 100 10 5 5 0 000-10zm0 1.5a3.5 3.5 0 110 7 3.5 3.5 0 010-7zm5.25-3.75a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5z"/></svg>
+      <span>Instagram</span>
     </a>
     <% } %>
     <% if (ig.links && ig.links.medium) { %>
-    <a href="<%= ig.links.medium %>" target="_blank" rel="noopener noreferrer" class="social-btn" aria-label="Médium.cz">
-      <svg class="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+    <a href="<%= ig.links.medium %>" target="_blank" rel="noopener noreferrer" class="sidebar-social__link">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
         <text
           fill="currentColor"
           font-family="Arial, Helvetica, sans-serif"
@@ -55,12 +58,14 @@
           text-anchor="middle"
         >m</text>
       </svg>
+      <span>Médium.cz</span>
     </a>
     <% } %>
-    <a href="https://www.tiktok.com/@11kaczsk" target="_blank" rel="noopener noreferrer" class="social-btn" aria-label="TikTok">
-      <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.52V6.74a4.85 4.85 0 01-1.01-.05z"/></svg>
+    <a href="https://www.tiktok.com/@11kaczsk" target="_blank" rel="noopener noreferrer" class="sidebar-social__link">
+      <svg fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.52V6.74a4.85 4.85 0 01-1.01-.05z"/></svg>
+      <span>TikTok</span>
     </a>
-  </div>
+  </nav>
 </div>
 <% if (showElfsight) { %>
 <script src="/js/sidebar-instagram.js?v=<%= encodeURIComponent(typeof assetVersion !== 'undefined' ? assetVersion : '1') %>" defer></script>

@@ -200,8 +200,8 @@ function draftFromSource(item) {
     paragraphs.push(cleanTitle(item.source_title) || 'Článek z RSS.');
   }
   return {
-    title: cleanTitle(item.source_title) || 'Článek z RSS',
-    excerpt: String(item.source_perex || paragraphs[0] || '').slice(0, 280),
+    title: String(cleanTitle(item.source_title) || 'Článek z RSS').slice(0, 100),
+    excerpt: String(item.source_perex || paragraphs[0] || '').slice(0, 250),
     paragraphs,
   };
 }

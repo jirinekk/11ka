@@ -1,0 +1,36 @@
+<%- include('layout-start') %>
+<div class="card-11 p-5 sm:p-6">
+  <p class="text-xs font-semibold uppercase tracking-wider text-11accent"><%= album.competition %></p>
+  <div class="fotak-match__row mt-4">
+    <a href="/foto/tymy/<%= album.home_slug %>" class="fotak-match__side">
+      <% if (album.home_logo) { %><img src="<%= album.home_logo %>" alt="" width="36" height="36" /><% } %>
+      <span class="truncate text-lg font-semibold sm:text-xl"><%= album.home_name || album.home_short %></span>
+    </a>
+    <span class="fotak-match__score text-xl sm:text-2xl"><%= album.score %></span>
+    <a href="/foto/tymy/<%= album.away_slug %>" class="fotak-match__side fotak-match__side--away">
+      <span class="truncate text-lg font-semibold sm:text-xl"><%= album.away_name || album.away_short %></span>
+      <% if (album.away_logo) { %><img src="<%= album.away_logo %>" alt="" width="36" height="36" /><% } %>
+    </a>
+  </div>
+  <p class="mt-4 text-sm text-11muted">
+    <%= album.date_label %><%= album.venue ? ' · ' + album.venue : '' %> · <%= album.photo_count %> fotek
+    <% if (album.photographer_name) { %>
+    · <a href="/foto/fotografi/<%= album.photographer_slug %>" class="text-slate-300 hover:text-11accent"><%= album.photographer_name %></a>
+    <% } %>
+  </p>
+  <div class="mt-4">
+    <a href="/foto/studio/alba/<%= album.id %>" class="inline-flex rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/15">Upravit album</a>
+  </div>
+</div>
+<div
+  id="foto-gallery"
+  class="mt-6"
+  data-photos="<%= encodeURIComponent(photosJson) %>"
+  data-squads="<%= encodeURIComponent(typeof squadsJson !== 'undefined' ? squadsJson : '{}') %>"
+  data-edit="<%= canEdit ? '1' : '' %>"
+  data-album="<%= album.id %>"
+  data-home="<%= album.home_team_id || '' %>"
+  data-away="<%= album.away_team_id || '' %>"
+></div>
+<script src="/js/foto-gallery.js?v=<%= encodeURIComponent(assetVersion + '-tag3') %>" defer></script>
+<%- include('layout-end') %>

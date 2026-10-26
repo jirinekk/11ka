@@ -1,5 +1,6 @@
 const { slugify } = require('../lib/slug');
 const chanceLigaLogos = require('./chance-liga-logos');
+const { chancePlayerPhoto } = require('../lib/player-photos');
 
 const LISTING_URL = 'https://www.livesport.cz/fotbal/cesko/chance-liga/';
 const NARODNI_URL = 'https://www.livesport.cz/fotbal/cesko/chance-narodni-liga/';
@@ -75,17 +76,18 @@ function detailPath(row) {
   return `/zapasy/chance/${matchSlug(row)}`;
 }
 
+const LIVE_AB = new Set(['2', '6', '7', '12', '13', '14', '15', '16']);
+const POST_AB = new Set(['3', '4', '5', '9', '36', '37', '43', '54']);
+
 function statusFromAb(ab, kickoffIso) {
-  const code = String(ab || '');
-  if (code === '2') return 'in';
-  if (code === '3' || code === '10' || code === '11') return 'post';
-  if (code === '4' || code === '5' || code === '9' || code === '36' || code === '37' || code === '43' || code === '54') {
-    return 'post';
-  }
+  const code = String(ab || '').trim();
+  if (LIVE_AB.has(code)) return 'in';
+  if (POST_AB.has(code)) return 'post';
   const ts = kickoffIso ? Date.parse(kickoffIso) : NaN;
-  if (Number.isFinite(ts) && Date.now() >= ts && Date.now() - ts < 2.5 * 60 * 60 * 1000) {
-    return 'in';
-  }
+  if (!Number.isFinite(ts)) return 'pre';
+  const age = Date.now() - ts;
+  if (age >= 0 && age < 3.25 * 60 * 60 * 1000) return 'in';
+  if (age >= 3.25 * 60 * 60 * 1000) return 'post';
   return 'pre';
 }
 
@@ -387,13 +389,14 @@ async function getMatchesAgenda() {
   const today = todayKey();
   const keys = Array.from(new Set(all.map((m) => m.dayKey).filter(Boolean))).sort();
   let keep = keys.filter((d) => d >= today);
+  if (!keep.includes(today)) keep = [today, ...keep];
   if (!keep.length) keep = keys.slice(-4);
   if (keep.length > 12) keep = keep.slice(0, 12);
   const keepSet = new Set(keep);
   return {
     today,
     liveCount: all.filter((m) => m.isLive).length,
-    matches: all.filter((m) => keepSet.has(m.dayKey)),
+    matches: all.filter((m) => m.isLive || keepSet.has(m.dayKey)),
   };
 }
 
@@ -653,25 +656,74 @@ function parseIncidents(feed) {
     const players = fieldList(rec, 'IF');
     const score =
       f.INX != null && f.IOX != null && f.INX !== '' && f.IOX !== '' ? `${f.INX}:${f.IOX}` : '';
-    const goalIdx = labels.findIndex((l) => /g[oó]l/i.test(l));
+    const blob = labels.join(' ');
+    const goalIdx = labels.findIndex((l) => /g[oó]l/i.test(l) && !/neuzn/i.test(l));
     if (goalIdx >= 0) {
       const player = (players[goalIdx] || players[0] || '').trim();
-      const item = { side, kind: 'goal', label: 'Gól', minute, player, period, score };
+      const assistIdx = labels.findIndex((l) => /asist/i.test(l));
+      const item = {
+        side,
+        kind: /vlastní/i.test(blob) ? 'own' : 'goal',
+        label: /penalt/i.test(blob) ? 'Penalta' : /vlastní/i.test(blob) ? 'Vlastní gól' : 'Gól',
+        minute,
+        player,
+        period,
+        score,
+        penalty: /penalt/i.test(blob),
+        assist: assistIdx >= 0 ? String(players[assistIdx] || '').trim() : '',
+      };
       events.push(item);
-      if (player) scorers[side].push({ player, minute, score });
+      if (player && item.kind === 'goal') scorers[side].push({ player, minute, score });
+      if (player && item.kind === 'own') scorers[side].push({ player: `${player} (vl.g.)`, minute, score });
       continue;
     }
     const label = String(labels[0] || f.IK || '').trim();
     const player = String(players[0] || f.IF || '').trim();
-    const kind = /červen/i.test(label)
-      ? 'red'
-      : /žlut/i.test(label)
-        ? 'yellow'
-        : /stříd/i.test(label)
-          ? 'sub'
-          : 'other';
-    if (kind === 'other' || /asist/i.test(label)) continue;
-    events.push({ side, kind, label: label || 'Událost', minute, player, period, score });
+    const kind = /var/i.test(blob)
+      ? 'var'
+      : /červen/i.test(label)
+        ? 'red'
+        : /žlut/i.test(label)
+          ? 'yellow'
+          : /stříd/i.test(blob)
+            ? 'sub'
+            : /asist/i.test(label)
+              ? 'assist'
+              : 'other';
+    if (kind === 'other') continue;
+    if (kind === 'assist' && events.length) {
+      const prev = events[events.length - 1];
+      if ((prev.kind === 'goal' || prev.kind === 'own') && prev.side === side) {
+        prev.assist = player;
+        continue;
+      }
+    }
+    if (kind === 'sub') {
+      const outName = String(players[0] || '').trim();
+      const inName = String(players[1] || '').trim();
+      events.push({
+        side,
+        kind: 'sub',
+        label: 'Střídání',
+        minute,
+        player: inName || outName,
+        playerIn: inName,
+        playerOut: outName,
+        period,
+        score,
+      });
+      continue;
+    }
+    events.push({
+      side,
+      kind,
+      label: label || 'Událost',
+      minute,
+      player,
+      period,
+      score,
+      reason: String(f.IL || f.IJ || labels.slice(1).filter(Boolean).join(', ')).trim(),
+    });
   }
   return { events, scorers };
 }
@@ -712,6 +764,75 @@ function parseTopStats(feed) {
   return stats;
 }
 
+function lsImage(images) {
+  const list = Array.isArray(images) ? images : [];
+  const hit = list.find((img) => img && img.path) || null;
+  const path = hit && hit.path ? String(hit.path) : '';
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  return LOGO_BASE + path.replace(/^\//, '');
+}
+
+function playerBadges(incidents) {
+  const badges = { goals: 0, yellow: 0, red: 0, assist: 0, subIn: false, subOut: false };
+  for (const inc of incidents || []) {
+    const t = String(inc && inc.__typename ? inc.__typename : '');
+    if (/Yellow/i.test(t)) badges.yellow += 1;
+    else if (/Red/i.test(t)) badges.red += 1;
+    else if (/OwnGoal/i.test(t)) badges.goals += 1;
+    else if (/Goal/i.test(t) && !/Assist/i.test(t)) badges.goals += 1;
+    else if (/Assist/i.test(t)) badges.assist += 1;
+    else if (/SubstitutionIn|SubIn/i.test(t)) badges.subIn = true;
+    else if (/SubstitutionOut|SubOut|Substitution/i.test(t)) badges.subOut = true;
+  }
+  return badges;
+}
+
+function mapLineupPlayer(pl, teamName) {
+  if (!pl) return null;
+  const ratingVal = pl.rating && pl.rating.value != null ? String(pl.rating.value) : '';
+  const ratingNum = parseFloat(ratingVal);
+  const role = (pl.playerRoles && pl.playerRoles[0]) || {};
+  const name = pl.listName || pl.fieldName || '';
+  return {
+    id: pl.id,
+    name,
+    short: pl.fieldName || (pl.listName || '').split(' ')[0] || '',
+    number: pl.number || '',
+    role: role.title || '',
+    suffix: role.suffix || '',
+    isCaptain: /kapitán|\(C\)/i.test(`${role.title || ''} ${role.suffix || ''}`),
+    photo:
+      chancePlayerPhoto(pl.id, name, teamName) ||
+      lsImage(pl.images) ||
+      `/players/${encodeURIComponent(pl.id)}.png`,
+    rating: Number.isFinite(ratingNum) ? ratingVal : '',
+    isBest: Boolean(pl.rating && pl.rating.isBest),
+    badges: playerBadges(pl.incidents),
+  };
+}
+
+function pitchPlayers(formation, byId, side) {
+  const rows = (formation && formation.lines && formation.lines[0] && formation.lines[0].rows) || [];
+  const ordered = rows.slice().sort((a, b) => (a.sortKey || 0) - (b.sortKey || 0));
+  if (!ordered.length) return [];
+  const n = ordered.length;
+  const home = side !== 'away';
+  const out = [];
+  ordered.forEach((row, ri) => {
+    const ids = row.playerIds || [];
+    const t = ri / Math.max(n - 1, 1);
+    const left = home ? 7 + t * 38 : 93 - t * 38;
+    ids.forEach((id, pi) => {
+      const p = byId.get(id);
+      if (!p) return;
+      const top = ids.length === 1 ? 50 : 13 + (pi / Math.max(ids.length - 1, 1)) * 74;
+      out.push({ ...p, left, top, side });
+    });
+  });
+  return out;
+}
+
 function parseLineups(payload) {
   const participants = payload?.data?.findEventById?.eventParticipants;
   if (!Array.isArray(participants)) return { home: null, away: null };
@@ -720,30 +841,47 @@ function parseLineups(payload) {
     const side = String(p?.type?.side || '').toLowerCase() === 'away' ? 'away' : 'home';
     const lu = p?.lineup;
     if (!lu) {
-      result[side] = { name: p?.name || '', formation: '', starters: [], bench: [], coach: '' };
+      result[side] = {
+        name: p?.name || '',
+        formation: '',
+        rating: '',
+        starters: [],
+        bench: [],
+        pitch: [],
+        substitutions: [],
+        coach: '',
+      };
       continue;
     }
-    const byId = new Map((lu.players || []).map((pl) => [pl.id, pl]));
+    const mapped = new Map((lu.players || []).map((pl) => [pl.id, mapLineupPlayer(pl, p?.name)]));
     const groups = Array.isArray(lu.groups) ? lu.groups : [];
     const starterIds = groups.find((g) => g.groupType === 'STARTERS')?.playerIds || [];
     const benchIds =
       groups.find((g) => g.groupType === 'SUBSTITUTES' || g.groupType === 'BENCH')?.playerIds || [];
-    const mapPlayer = (id) => {
-      const pl = byId.get(id);
-      if (!pl) return null;
-      return {
-        id,
-        name: pl.listName || pl.fieldName || '',
-        number: pl.number || '',
-        role: (pl.playerRoles && pl.playerRoles[0] && pl.playerRoles[0].title) || '',
-      };
-    };
     const coach = lu.coaches?.players?.[0]?.listName || lu.coaches?.players?.[0]?.name || '';
+    const avg = p.averageRating != null ? String(p.averageRating) : '';
+    const substitutions = (lu.usedSubstitutions || [])
+      .map((s) => {
+        const inn = mapped.get(s.playerId);
+        const out = mapped.get(s.playerOutId);
+        if (!inn && !out) return null;
+        if (inn && inn.badges) inn.badges.subIn = true;
+        if (out && out.badges) out.badges.subOut = true;
+        return {
+          minute: s.minute || '',
+          in: inn || null,
+          out: out || null,
+        };
+      })
+      .filter(Boolean);
     result[side] = {
       name: p?.name || '',
       formation: lu.formation?.name || '',
-      starters: starterIds.map(mapPlayer).filter(Boolean),
-      bench: benchIds.map(mapPlayer).filter(Boolean),
+      rating: avg,
+      starters: starterIds.map((id) => mapped.get(id)).filter(Boolean),
+      bench: benchIds.map((id) => mapped.get(id)).filter(Boolean),
+      pitch: pitchPlayers(lu.formation, mapped, side),
+      substitutions,
       coach,
     };
   }
@@ -813,7 +951,7 @@ async function getMatchDetail(slugOrId) {
     away: awayName,
     homeLogo: listed?.homeLogo || '',
     awayLogo: listed?.awayLogo || '',
-    league: 'Chance Liga',
+    league: listed?.league || 'Chance Liga',
     round: listed?.round || '',
     date: iso,
     kickoff: iso,

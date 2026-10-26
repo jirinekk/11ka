@@ -1,10 +1,37 @@
 <%- include('partials/header') %>
+<%
+  var fv = typeof formValues !== 'undefined' && formValues ? formValues : {};
+  var showPrefill = typeof canAccPrefill !== 'undefined' && canAccPrefill;
+  var prefill = typeof accPrefill !== 'undefined' && accPrefill ? accPrefill : { enabled: false, name: '', email: '', phone: '', accreditation_type: 'photo' };
+  var prefillType = prefill.accreditation_type === 'pisi' ? 'pisi' : 'photo';
+  var rp = typeof rozpis !== 'undefined' && rozpis ? rozpis : { liga: '', leagues: [], live: [], today: [], groups: [] };
+  var liveItems = rp.live || [];
+  var todayItems = rp.today || [];
+  var rozpisGroups = rp.groups || [];
+  function accHref(extra) {
+    var params = [];
+    var liga = extra && Object.prototype.hasOwnProperty.call(extra, 'liga') ? extra.liga : rp.liga;
+    var tym = extra && Object.prototype.hasOwnProperty.call(extra, 'tym') ? extra.tym : rp.tym;
+    var page = extra && extra.page;
+    var zapas = extra && extra.zapas;
+    var datum = extra && extra.datum;
+    if (liga) params.push('liga=' + encodeURIComponent(liga));
+    if (tym) params.push('tym=' + encodeURIComponent(tym));
+    if (page) params.push('page=' + encodeURIComponent(page));
+    if (zapas) params.push('zapas=' + encodeURIComponent(zapas));
+    if (datum) params.push('datum=' + encodeURIComponent(datum));
+    return '/akreditace' + (params.length ? ('?' + params.join('&')) : '') + (extra && extra.hash ? extra.hash : '');
+  }
+  function accAskHref(f) {
+    return accHref({ zapas: f.matchName, datum: f.matchDate, hash: '#akreditace-form' });
+  }
+%>
 
 <main id="main-content" class="flex-1" tabindex="-1">
   <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
     <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
       <div class="min-w-0 space-y-6">
-        <article class="card-11 p-6 sm:p-8">
+        <article class="card-11 p-6 sm:p-8" id="akreditace-form">
           <header class="mb-6">
             <h1 class="text-2xl font-bold leading-tight text-white sm:text-3xl">Akreditace</h1>
           </header>
@@ -51,6 +78,39 @@
             </p>
           </div>
           <% } %>
+          <% if (typeof prefillSaved !== 'undefined' && prefillSaved) { %>
+          <div class="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] px-4 py-3.5 text-sm text-emerald-100" role="status">
+            Údaje pro předvyplnění jsou uložené.
+          </div>
+          <% } %>
+
+          <% if (showPrefill) { %>
+          <form class="mb-6 rounded-xl border border-11accent/25 bg-11accent/[0.06] p-4" method="post" action="/akreditace/prefill">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p class="text-sm font-semibold text-white">Automatické předvyplnění</p>
+                <p class="mt-1 text-xs leading-relaxed text-11muted">Jako fotograf 11ky si můžete uložit jméno, e-mail, telefon a typ. Zápas vyberete tlačítkem Zažádat v rozpisu, nebo ho vyplníte ručně.</p>
+              </div>
+              <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+                <input type="checkbox" name="acc_prefill_enabled" value="1" class="h-4 w-4 border-white/20 bg-[#111827] text-11accent focus:ring-11accent/40" <%= prefill.enabled ? 'checked' : '' %> />
+                Zapnout
+              </label>
+            </div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+              <input class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white" name="acc_prefill_name" type="text" autocomplete="name" placeholder="Jméno" value="<%= prefill.name || '' %>" />
+              <input class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white" name="acc_prefill_email" type="email" autocomplete="email" placeholder="E-mail" value="<%= prefill.email || '' %>" />
+              <input class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white" name="acc_prefill_phone" type="tel" autocomplete="tel" placeholder="Telefon" value="<%= prefill.phone || '' %>" />
+              <select class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white" name="acc_prefill_type">
+                <option value="photo" <%= prefillType === 'photo' ? 'selected' : '' %>>Photo</option>
+                <option value="pisi" <%= prefillType === 'pisi' ? 'selected' : '' %>>Píšící</option>
+              </select>
+            </div>
+            <div class="mt-3 flex flex-wrap items-center gap-3">
+              <button type="submit" class="rounded-xl border border-11accent/40 px-4 py-2 text-sm font-semibold text-11accent transition hover:bg-11accent/10">Uložit údaje</button>
+              <a href="/ucet" class="text-xs text-11muted hover:text-11accent">Upravit i v účtu</a>
+            </div>
+          </form>
+          <% } %>
 
           <form class="space-y-5" method="post" action="/akreditace" novalidate>
             <div>
@@ -61,7 +121,7 @@
                 type="email"
                 required
                 autocomplete="email"
-                value="<%= formValues && formValues.email ? formValues.email : '' %>"
+                value="<%= fv.email || '' %>"
                 class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
               />
             </div>
@@ -74,7 +134,7 @@
                 type="tel"
                 required
                 autocomplete="tel"
-                value="<%= formValues && formValues.phone ? formValues.phone : '' %>"
+                value="<%= fv.phone || '' %>"
                 class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
               />
             </div>
@@ -87,7 +147,7 @@
                 type="text"
                 required
                 autocomplete="name"
-                value="<%= formValues && formValues.name ? formValues.name : '' %>"
+                value="<%= fv.name || '' %>"
                 class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
               />
             </div>
@@ -99,7 +159,7 @@
                 name="match"
                 type="text"
                 required
-                value="<%= formValues && formValues.match ? formValues.match : '' %>"
+                value="<%= fv.match || '' %>"
                 placeholder="např. Sparta Praha - Slavia Praha"
                 class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
               />
@@ -112,7 +172,7 @@
                 name="match_date"
                 type="date"
                 required
-                value="<%= formValues && formValues.match_date ? formValues.match_date : '' %>"
+                value="<%= fv.match_date || '' %>"
                 class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40 [color-scheme:dark]"
               />
             </div>
@@ -126,7 +186,7 @@
                     name="accreditation_type"
                     value="photo"
                     required
-                    <%= formValues && formValues.accreditation_type === 'photo' ? 'checked' : '' %>
+                    <%= fv.accreditation_type === 'photo' ? 'checked' : '' %>
                     class="h-4 w-4 border-white/20 bg-[#111827] text-11accent focus:ring-11accent/40"
                   />
                   Photo
@@ -137,13 +197,20 @@
                     name="accreditation_type"
                     value="pisi"
                     required
-                    <%= formValues && formValues.accreditation_type === 'pisi' ? 'checked' : '' %>
+                    <%= fv.accreditation_type === 'pisi' ? 'checked' : '' %>
                     class="h-4 w-4 border-white/20 bg-[#111827] text-11accent focus:ring-11accent/40"
                   />
                   Píšící
                 </label>
               </div>
             </fieldset>
+
+            <% if (showPrefill) { %>
+            <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+              <input type="checkbox" name="save_prefill" value="1" class="h-4 w-4 border-white/20 bg-[#111827] text-11accent focus:ring-11accent/40" <%= prefill.enabled ? 'checked' : '' %> />
+              Uložit jméno, e-mail, telefon a typ pro příště
+            </label>
+            <% } %>
 
             <button
               type="submit"
@@ -154,6 +221,95 @@
           </form>
           <% } %>
         </article>
+
+        <section class="card-11 p-6 sm:p-8" aria-labelledby="akreditace-rozpis-heading" data-acc-rozpis>
+          <h2 id="akreditace-rozpis-heading" class="text-xl font-bold text-white sm:text-2xl">Rozpis zápasů</h2>
+          <p class="mt-1 text-sm text-11muted">Vyberte zápas a tlačítkem Zažádat se vyplní název i datum ve formuláři.</p>
+          <div class="mt-5 flex flex-wrap gap-2">
+            <% (rp.leagues || []).forEach(function (l) { %>
+            <a href="<%= accHref({ liga: l.id, tym: '' }) %>#akreditace-rozpis-heading" class="fotak-tab<%= (rp.liga || '') === (l.id || '') ? ' is-on' : '' %>"><%= l.label %></a>
+            <% }); %>
+          </div>
+          <% if ((rp.teams || []).length) { %>
+          <form class="acc-team-filter" method="get" action="/akreditace" data-acc-team-filter>
+            <% if (rp.liga) { %><input type="hidden" name="liga" value="<%= rp.liga %>" /><% } %>
+            <label class="acc-team-filter__label" for="acc-team">Tým</label>
+            <select id="acc-team" name="tym" class="input-11 acc-team-filter__select">
+              <option value="">Všechny týmy</option>
+              <% rp.teams.forEach(function (t) { %>
+              <option value="<%= t.slug %>" <%= rp.tym === t.slug ? 'selected' : '' %>><%= t.name %></option>
+              <% }); %>
+            </select>
+          </form>
+          <% } %>
+
+          <% if (!liveItems.length && !todayItems.length && !rozpisGroups.length) { %>
+          <p class="mt-8 text-sm text-11muted">V tomhle filtru teď žádný nadcházející zápas není.</p>
+          <% } %>
+
+          <% if (liveItems.length) { %>
+          <h3 class="mt-8 text-xs font-semibold uppercase tracking-wider text-11accent">Živě</h3>
+          <ul class="mt-3 divide-y divide-white/10 rounded-xl border border-white/10 px-4">
+            <% liveItems.forEach(function (f) { %>
+            <li class="fotak-fx is-live">
+              <span class="fotak-fx__teams">
+                <% if (f.homeLogo) { %><img src="<%= f.homeLogo %>" alt="" width="22" height="22" /><% } %>
+                <span class="truncate font-medium text-white"><%= f.homeName || f.home %></span>
+                <span class="text-11muted">–</span>
+                <span class="truncate font-medium text-white"><%= f.awayName || f.away %></span>
+                <% if (f.awayLogo) { %><img src="<%= f.awayLogo %>" alt="" width="22" height="22" /><% } %>
+              </span>
+              <span class="fotak-fx__meta">
+                <span class="fotak-fx__time is-live">Živě</span>
+                <a class="fotak-fx__ask" href="<%= accAskHref(f) %>" data-match="<%= f.matchName %>" data-date="<%= f.matchDate %>">Zažádat</a>
+              </span>
+            </li>
+            <% }); %>
+          </ul>
+          <% } %>
+
+          <% if (todayItems.length) { %>
+          <h3 class="mt-8 text-xs font-semibold uppercase tracking-wider text-11muted">Dnes</h3>
+          <ul class="mt-3 divide-y divide-white/10 rounded-xl border border-white/10 px-4">
+            <% todayItems.forEach(function (f) { %>
+            <li class="fotak-fx<%= f.isLive ? ' is-live' : '' %>">
+              <span class="fotak-fx__teams">
+                <% if (f.homeLogo) { %><img src="<%= f.homeLogo %>" alt="" width="22" height="22" /><% } %>
+                <span class="truncate font-medium text-white"><%= f.homeName || f.home %></span>
+                <span class="text-11muted">–</span>
+                <span class="truncate font-medium text-white"><%= f.awayName || f.away %></span>
+                <% if (f.awayLogo) { %><img src="<%= f.awayLogo %>" alt="" width="22" height="22" /><% } %>
+              </span>
+              <span class="fotak-fx__meta">
+                <span class="fotak-fx__time<%= f.isLive ? ' is-live' : '' %>"><%= f.time_label %></span>
+                <a class="fotak-fx__ask" href="<%= accAskHref(f) %>" data-match="<%= f.matchName %>" data-date="<%= f.matchDate %>">Zažádat</a>
+              </span>
+            </li>
+            <% }); %>
+          </ul>
+          <% } %>
+
+          <% rozpisGroups.forEach(function (g) { %>
+          <h3 class="mt-8 text-xs font-semibold uppercase tracking-wider text-11muted"><%= g.date_label %></h3>
+          <ul class="mt-3 divide-y divide-white/10 rounded-xl border border-white/10 px-4">
+            <% g.items.forEach(function (f) { %>
+            <li class="fotak-fx">
+              <span class="fotak-fx__teams">
+                <% if (f.homeLogo) { %><img src="<%= f.homeLogo %>" alt="" width="22" height="22" /><% } %>
+                <span class="truncate font-medium text-white"><%= f.homeName || f.home %></span>
+                <span class="text-11muted">–</span>
+                <span class="truncate font-medium text-white"><%= f.awayName || f.away %></span>
+                <% if (f.awayLogo) { %><img src="<%= f.awayLogo %>" alt="" width="22" height="22" /><% } %>
+              </span>
+              <span class="fotak-fx__meta">
+                <span class="fotak-fx__time"><%= f.time_label %></span>
+                <a class="fotak-fx__ask" href="<%= accAskHref(f) %>" data-match="<%= f.matchName %>" data-date="<%= f.matchDate %>">Zažádat</a>
+              </span>
+            </li>
+            <% }); %>
+          </ul>
+          <% }); %>
+        </section>
 
         <section class="card-11 p-6 sm:p-8" aria-labelledby="akreditace-prehled-heading">
           <style>
@@ -193,7 +349,7 @@
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
                   <p class="text-base font-semibold text-white"><%= r.name %></p>
-                  <p class="mt-1 text-sm font-medium text-slate-200"><%= r.match_name %></p>
+                  <p class="mt-1 text-sm font-medium text-slate-200"><%= r.match_name || r.match %></p>
                   <p class="mt-0.5 text-xs text-11muted">Datum zápasu: <%= fmtMatchDate(r.match_date) %></p>
                 </div>
                 <%- include('partials/accreditation-status', { accStatus: r.status }) %>
@@ -231,7 +387,7 @@
                 <% requests.forEach(function (r) { %>
                 <tr class="border-b border-white/5 text-slate-200">
                   <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.name %></td>
-                  <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.match_name %></td>
+                  <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.match_name || r.match %></td>
                   <td class="px-4 py-3 align-middle whitespace-nowrap tabular-nums"><%= fmtMatchDate(r.match_date) %></td>
                   <td class="px-4 py-3 align-middle whitespace-nowrap"><%= r.accreditation_type === 'photo' ? 'Photo' : 'Píšící' %></td>
                   <td class="px-4 py-3 align-middle whitespace-nowrap">
@@ -256,13 +412,13 @@
             <% if (p.totalPages > 1) { %>
             <nav class="flex items-center gap-2" aria-label="Stránkování žádostí o akreditaci">
               <% if (p.hasPrev) { %>
-              <a href="/akreditace?page=<%= p.page - 1 %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Předchozí</a>
+              <a href="<%= accHref({ page: p.page - 1 }) %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Předchozí</a>
               <% } else { %>
               <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Předchozí</span>
               <% } %>
               <span class="rounded-lg border border-11accent/40 bg-11accent/10 px-3 py-1.5 text-sm font-semibold text-11accent"><%= p.page %> / <%= p.totalPages %></span>
               <% if (p.hasNext) { %>
-              <a href="/akreditace?page=<%= p.page + 1 %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Další</a>
+              <a href="<%= accHref({ page: p.page + 1 }) %>" class="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-200 transition hover:border-11accent/40 hover:text-white">Další</a>
               <% } else { %>
               <span class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-500">Další</span>
               <% } %>
@@ -301,5 +457,38 @@
     </div>
   </div>
 </main>
+<script>
+(function () {
+  var teamForm = document.querySelector('[data-acc-team-filter]');
+  if (teamForm) {
+    var select = teamForm.querySelector('select[name="tym"]');
+    if (select) {
+      select.addEventListener('change', function () {
+        var params = new URLSearchParams();
+        var liga = teamForm.querySelector('input[name="liga"]');
+        if (liga && liga.value) params.set('liga', liga.value);
+        if (select.value) params.set('tym', select.value);
+        var qs = params.toString();
+        window.location = '/akreditace' + (qs ? ('?' + qs) : '') + '#akreditace-rozpis-heading';
+      });
+    }
+  }
+  var root = document.querySelector('[data-acc-rozpis]');
+  if (!root) return;
+  root.addEventListener('click', function (event) {
+    var link = event.target.closest('[data-match]');
+    if (!link) return;
+    var match = document.getElementById('akreditace-match');
+    var date = document.getElementById('akreditace-match-date');
+    if (!match || !date) return;
+    event.preventDefault();
+    match.value = link.getAttribute('data-match') || '';
+    date.value = link.getAttribute('data-date') || '';
+    var form = document.getElementById('akreditace-form');
+    if (form && form.scrollIntoView) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    match.focus();
+  });
+})();
+</script>
 
 <%- include('partials/footer') %>

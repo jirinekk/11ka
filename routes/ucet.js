@@ -8,7 +8,7 @@ const usersService = require('../services/users');
 const rubricsService = require('../services/rubrics');
 const chanceLigaLogos = require('../services/chance-liga-logos');
 const { asStringArray } = require('../lib/safe-path');
-const { isStaffUser } = require('../lib/roles');
+const { isStaffUser, hasRole } = require('../lib/roles');
 
 const router = express.Router();
 const uploadRoot = path.join(__dirname, '..', 'public', 'uploads', 'avatars');
@@ -63,6 +63,8 @@ function ucetViewModel(u) {
     favoriteTeamCode: (profile && profile.favorite_team_code) || '',
     starredCodes: (profile && profile.starredCodes) || [],
     rubricSubscriptions: rubricsService.listSubscriptionsForEmail(u && u.email),
+    canAccPrefill: hasRole(u, 'fotograf'),
+    accPrefill: hasRole(u, 'fotograf') ? usersService.accPrefillForUser(u) : null,
   };
 }
 
@@ -146,6 +148,16 @@ router.post('/ucet', requireLogin, (req, res, next) => {
     favorite_team_code,
   });
   usersService.setStarredTeams(u.id, starred_teams);
+
+  if (hasRole(u, 'fotograf') && req.body.acc_prefill_present === '1') {
+    usersService.updateAccPrefill(u.id, {
+      enabled: req.body.acc_prefill_enabled === '1' || req.body.acc_prefill_enabled === 'on',
+      name: req.body.acc_prefill_name,
+      email: req.body.acc_prefill_email,
+      phone: req.body.acc_prefill_phone,
+      accreditation_type: req.body.acc_prefill_type,
+    });
+  }
 
   let bioResult = { status: 'unchanged' };
   if (isStaffUser(u)) {

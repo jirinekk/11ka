@@ -10,7 +10,7 @@
           </header>
 
           <% (sections || []).forEach(function (sec) { %>
-          <section class="card-11 p-6" <% if (sec.events) { %>id="pomaha-events"<% } %>>
+          <section class="card-11 p-6"<% if (sec.events) { %> id="pomaha-events"<% } else if (sec.id) { %> id="<%= sec.id %>"<% } %>>
             <% if (sec.partner) { %>
             <div class="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
               <% if (sec.partner.logo) { %>

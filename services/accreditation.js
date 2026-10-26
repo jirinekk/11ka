@@ -112,13 +112,34 @@ function countPublic() {
   return countByWebVisibility(false);
 }
 
-function countByWebVisibility(hidden) {
+function matchDateFilter(opts = {}) {
+  let dateFrom = isValidMatchDate(opts.dateFrom) ? String(opts.dateFrom).trim() : '';
+  let dateTo = isValidMatchDate(opts.dateTo) ? String(opts.dateTo).trim() : '';
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    const swap = dateFrom;
+    dateFrom = dateTo;
+    dateTo = swap;
+  }
+  const clauses = [];
+  const params = [];
+  if (dateFrom) {
+    clauses.push('match_date >= ?');
+    params.push(dateFrom);
+  }
+  if (dateTo) {
+    clauses.push('match_date <= ?');
+    params.push(dateTo);
+  }
+  return { dateFrom, dateTo, clauses, params };
+}
+
+function countByWebVisibility(hidden, opts = {}) {
   const flag = hidden ? 1 : 0;
+  const filter = matchDateFilter(opts);
+  const where = ['COALESCE(hidden_from_web, 0) = ?', ...filter.clauses].join(' AND ');
   const row = getDb()
-    .prepare(
-      `SELECT COUNT(*) AS c FROM accreditation_requests WHERE COALESCE(hidden_from_web, 0) = ?`
-    )
-    .get(flag);
+    .prepare(`SELECT COUNT(*) AS c FROM accreditation_requests WHERE ${where}`)
+    .get(flag, ...filter.params);
   return Number(row?.c || 0);
 }
 
@@ -137,20 +158,22 @@ function listPaged(limit, offset) {
     .map(mapRow);
 }
 
-function listPagedByWebVisibility(hidden, limit, offset) {
+function listPagedByWebVisibility(hidden, limit, offset, opts = {}) {
   const flag = hidden ? 1 : 0;
+  const filter = matchDateFilter(opts);
+  const where = ['COALESCE(hidden_from_web, 0) = ?', ...filter.clauses].join(' AND ');
   return getDb()
     .prepare(
       `SELECT id, email, phone, name, match_name, match_date, accreditation_type, email_sent, status, hidden_from_web, created_at
        FROM accreditation_requests
-       WHERE COALESCE(hidden_from_web, 0) = ?
+       WHERE ${where}
        ORDER BY
          CASE WHEN match_date IS NULL OR match_date = '' THEN 1 ELSE 0 END,
          match_date ASC,
          created_at DESC
        LIMIT ? OFFSET ?`
     )
-    .all(flag, limit, offset)
+    .all(flag, ...filter.params, limit, offset)
     .map(mapRow);
 }
 
@@ -166,7 +189,12 @@ function listPublicPaged(limit, offset) {
          created_at DESC
        LIMIT ? OFFSET ?`
     )
-    .all(limit, offset);
+    .all(limit, offset)
+    .map((row) => ({
+      ...row,
+      match: row.match_name,
+      match_date_display: formatMatchDateCs(row.match_date),
+    }));
 }
 
 function remove(id) {
@@ -413,4 +441,5 @@ module.exports = {
   getStatusTone,
   formatMatchDateCs,
   isValidMatchDate,
+  matchDateFilter,
 };

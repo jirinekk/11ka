@@ -18,6 +18,8 @@
   var showAkreditace = typeof hasAnyRole === 'function' ? hasAnyRole(currentUser, 'vedeni', 'spravce_akreditace') : (dashRoles.indexOf('vedeni') !== -1 || dashRoles.indexOf('spravce_akreditace') !== -1);
   var showAiDrafts = typeof canAccessAiDrafts === 'function' ? canAccessAiDrafts(currentUser) : false;
   var akreditaceOnly = typeof isAkreditaceOnly === 'function' ? isAkreditaceOnly(currentUser) : (dashRoles.length === 1 && dashRoles[0] === 'spravce_akreditace');
+  var fotografOnly = typeof isFotografOnly === 'function' ? isFotografOnly(currentUser) : (dashRoles.length === 1 && dashRoles[0] === 'fotograf');
+  var showFoto = typeof canAccessFoto === 'function' ? canAccessFoto(currentUser) : (!akreditaceOnly);
 %>
 
 <div class="border-b border-white/10 pb-8">
@@ -31,6 +33,12 @@
 <section class="mt-10" aria-labelledby="admin-quick-heading">
   <h2 id="admin-quick-heading" class="text-xs font-semibold uppercase tracking-wider text-11muted">Rychlé akce</h2>
   <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <% if (showFoto) { %>
+    <a href="/foto" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Foták</h3>
+      <p class="mt-1 text-sm text-11muted">Archiv zápasových fotek</p>
+    </a>
+    <% } %>
     <% if (showVedeni) { %>
     <a href="/administrace/uzivatele" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
       <h3 class="font-semibold text-white group-hover:text-11accent">Uživatelé</h3>
@@ -85,7 +93,7 @@
       <p class="mt-1 text-sm text-11muted">Koncepty a stav</p>
     </a>
     <% } %>
-    <% if (!akreditaceOnly) { %>
+    <% if (!akreditaceOnly && !fotografOnly) { %>
     <a href="/administrace/clanek/novy" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
       <h3 class="font-semibold text-white group-hover:text-11accent">Nový článek</h3>
       <p class="mt-1 text-sm text-11muted">Editor</p>

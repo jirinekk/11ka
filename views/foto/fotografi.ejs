@@ -1,0 +1,13 @@
+<%- include('layout-start') %>
+<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Fotografové</h1>
+<ul class="card-11 mt-6 divide-y divide-white/10 px-4">
+  <% photographers.forEach(function (p) { %>
+  <li>
+    <a class="fotak-row" href="/foto/fotografi/<%= p.slug %>">
+      <span><%= p.name %></span>
+      <span><%= p.album_count %> alb</span>
+    </a>
+  </li>
+  <% }); %>
+</ul>
+<%- include('layout-end') %>

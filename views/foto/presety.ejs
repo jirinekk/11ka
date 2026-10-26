@@ -1,0 +1,15 @@
+<%- include('layout-start') %>
+<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Presety</h1>
+<% if (!presets.length) { %>
+<p class="mt-16 text-center text-sm text-11muted">Zatím tu žádný preset není.</p>
+<% } else { %>
+<div class="mt-8 grid gap-4 sm:grid-cols-2">
+  <% presets.forEach(function (p) { %>
+  <article class="card-11 p-5">
+    <h2 class="font-semibold text-white"><%= p.name %></h2>
+    <p class="mt-1 text-sm text-11muted"><%= p.app %></p>
+  </article>
+  <% }); %>
+</div>
+<% } %>
+<%- include('layout-end') %>

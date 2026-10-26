@@ -1,0 +1,9 @@
+<%- include('layout-start') %>
+<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl"><%= person.name %></h1>
+<p class="mt-1 text-sm text-11muted"><%= person.album_count %> alb</p>
+<div class="fotak-tile-grid mt-6">
+  <% albums.forEach(function (album) { %>
+  <%- include('_album-card', { album: album }) %>
+  <% }); %>
+</div>
+<%- include('layout-end') %>

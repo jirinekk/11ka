@@ -60,8 +60,8 @@ function buildPrompts({ brief, sourceNote, category }) {
     'Styl: srozumitelný, aktuální, bez clickbaitu, bez emoji.',
     'Vrať POUZE platný JSON objekt bez markdownu ve tvaru:',
     '{"title":"...","excerpt":"...","paragraphs":["odstavec1","odstavec2"],"sources_line":"..."}',
-    'title: max 110 znaků.',
-    'excerpt: 1-2 věty, max 280 znaků.',
+    'title: max 100 znaků.',
+    'excerpt: 1-2 věty, max 250 znaků.',
     'paragraphs: 4-8 odstavců, každý 2-5 vět.',
     'sources_line: text zdroje, který redaktor uvedl; pokud chybí, prázdný string.',
   ].join(' ');
@@ -110,10 +110,10 @@ function extractJsonObject(text) {
 function normalizeDraft(parsed, sourceFallback) {
   const title = String(parsed.title || '')
     .trim()
-    .slice(0, 160);
+    .slice(0, 100);
   const excerpt = String(parsed.excerpt || '')
     .trim()
-    .slice(0, 400);
+    .slice(0, 250);
   const paragraphs = Array.isArray(parsed.paragraphs)
     ? parsed.paragraphs
         .map((p) => String(p || '').trim())

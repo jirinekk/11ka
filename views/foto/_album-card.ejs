@@ -1,0 +1,21 @@
+<a href="/foto/alba/<%= album.id %>" class="fotak-tile">
+  <div class="fotak-tile__cover">
+    <% if (album.cover_url) { %>
+    <img src="<%= album.cover_url %>" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" />
+    <% } %>
+    <span class="fotak-tile__fallback">
+      <% if (album.home_logo) { %><img src="<%= album.home_logo %>" alt="" width="36" height="36" /><% } %>
+      <span><%= album.score %></span>
+      <% if (album.away_logo) { %><img src="<%= album.away_logo %>" alt="" width="36" height="36" /><% } %>
+    </span>
+  </div>
+  <p class="fotak-tile__title"><%= album.title %></p>
+  <p class="fotak-tile__who">
+    <span class="fotak-tile__crests">
+      <% if (album.home_logo) { %><img src="<%= album.home_logo %>" alt="" width="18" height="18" /><% } %>
+      <% if (album.away_logo) { %><img src="<%= album.away_logo %>" alt="" width="18" height="18" /><% } %>
+    </span>
+    <span class="truncate"><%= album.photographer_name || '' %></span>
+  </p>
+  <p class="fotak-tile__meta"><%= album.photo_count || 0 %> fotek · <%= album.date_label %></p>
+</a>

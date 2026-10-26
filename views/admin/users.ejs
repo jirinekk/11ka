@@ -4,11 +4,12 @@
     vedeni: 'Vedení',
     sefredaktor: 'Šéfredaktor',
     redaktor: 'Redaktor',
+    fotograf: 'Fotograf',
     spravce_akreditace: 'Správce Akreditace',
   };
   var roleList = typeof roles !== 'undefined' && roles && roles.length
     ? roles
-    : ['vedeni', 'sefredaktor', 'redaktor', 'spravce_akreditace'];
+    : ['vedeni', 'sefredaktor', 'redaktor', 'fotograf', 'spravce_akreditace'];
   var roleCounts = {};
   roleList.forEach(function (r) { roleCounts[r] = 0; });
   users.forEach(function (u) {
@@ -31,7 +32,7 @@
 <% if (error) { %><p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p><% } %>
 <% if (success) { %><p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p><% } %>
 
-<section class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+<section class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
   <div class="card-11 p-4">
     <p class="text-xs uppercase tracking-wide text-11muted">Majitel</p>
     <p class="mt-1 text-2xl font-bold text-white"><%= roleCounts.majitel || 0 %></p>
@@ -49,6 +50,10 @@
     <p class="mt-1 text-2xl font-bold text-white"><%= roleCounts.redaktor %></p>
   </div>
   <div class="card-11 p-4">
+    <p class="text-xs uppercase tracking-wide text-11muted">Fotografové</p>
+    <p class="mt-1 text-2xl font-bold text-white"><%= roleCounts.fotograf || 0 %></p>
+  </div>
+  <div class="card-11 p-4">
     <p class="text-xs uppercase tracking-wide text-11muted">Správci akreditace</p>
     <p class="mt-1 text-2xl font-bold text-white"><%= roleCounts.spravce_akreditace %></p>
   </div>
@@ -56,7 +61,7 @@
 
 <section class="card-11 mt-8 p-6">
   <h2 class="text-lg font-semibold text-white">Nový uživatel</h2>
-  <p class="mt-1 text-sm text-11muted">Vytvořte účet a zaškrtněte jednu nebo více rolí. Např. Redaktor + Správce Akreditace. Samostatný Správce Akreditace vidí v adminu jen sekci Akreditace a nezobrazuje se na stránce Redakce.</p>
+  <p class="mt-1 text-sm text-11muted">Vytvořte účet a zaškrtněte jednu nebo více rolí. Např. Redaktor + Správce Akreditace. Samostatný Správce Akreditace vidí v adminu jen sekci Akreditace. Fotografové mají přístup do Fotáku a na stránce Redakce se nezobrazují.</p>
   <form class="mt-4 grid gap-3 sm:grid-cols-2" method="post" action="/administrace/uzivatele">
     <input type="hidden" name="action" value="create" />
     <div class="sm:col-span-2">

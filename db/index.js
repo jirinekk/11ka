@@ -532,6 +532,11 @@ function initDb() {
   } catch (e) {
     console.error('[11ka] rubrics tables failed:', e && e.message);
   }
+  try {
+    require('../services/foto').ensureTables();
+  } catch (e) {
+    console.error('[11ka] foto tables failed:', e && e.message);
+  }
   ensureAdminFromEnv();
   grantMajitelToOwners();
   seedDefaultAdsIfEmpty();
@@ -863,14 +868,83 @@ function migrateUsersCtenarRole() {
   }
 }
 
+function migrateUsersFotografRole() {
+  try {
+    const row = db
+      .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'`)
+      .get();
+    if (row && row.sql && row.sql.includes("'fotograf'")) return;
+
+    const cols = db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name);
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      BEGIN;
+      CREATE TABLE users_fotograf (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('majitel', 'vedeni', 'sefredaktor', 'redaktor', 'fotograf', 'spravce_akreditace', 'ctenar')),
+        roles TEXT,
+        display_name TEXT,
+        avatar_path TEXT,
+        author_bio TEXT,
+        author_bio_pending TEXT,
+        slug TEXT UNIQUE COLLATE NOCASE,
+        public_bio TEXT,
+        favorite_team_code TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    const dest = [
+      'id',
+      'email',
+      'password_hash',
+      'role',
+      'roles',
+      'display_name',
+      'avatar_path',
+      'author_bio',
+      'author_bio_pending',
+      'slug',
+      'public_bio',
+      'favorite_team_code',
+      'created_at',
+      'updated_at',
+    ].filter((c) => cols.includes(c));
+    db.exec(
+      `INSERT INTO users_fotograf (${dest.join(', ')}) SELECT ${dest.join(', ')} FROM users;
+       DROP TABLE users;
+       ALTER TABLE users_fotograf RENAME TO users;
+       COMMIT;`
+    );
+    db.pragma('foreign_keys = ON');
+    console.log('[11ka] users.role CHECK migrated (fotograf)');
+  } catch (e) {
+    try {
+      db.exec('ROLLBACK;');
+    } catch {
+      /* ignore */
+    }
+    try {
+      db.pragma('foreign_keys = ON');
+    } catch {
+      /* ignore */
+    }
+    console.error('[11ka] users fotograf migration failed:', e && e.message);
+  }
+}
+
 function initCommunityFeatures() {
   addColumnIfMissing('users', 'slug', 'slug TEXT');
   addColumnIfMissing('users', 'public_bio', 'public_bio TEXT');
   addColumnIfMissing('users', 'favorite_team_code', 'favorite_team_code TEXT');
   migrateUsersCtenarRole();
+  migrateUsersFotografRole();
   addColumnIfMissing('users', 'slug', 'slug TEXT');
   addColumnIfMissing('users', 'public_bio', 'public_bio TEXT');
   addColumnIfMissing('users', 'favorite_team_code', 'favorite_team_code TEXT');
+  addColumnIfMissing('users', 'acc_prefill', 'acc_prefill TEXT');
   backfillUserSlugs();
 
   addColumnIfMissing('comments', 'user_id', 'user_id INTEGER');

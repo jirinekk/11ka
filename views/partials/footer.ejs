@@ -1,8 +1,8 @@
-  <footer class="mt-auto border-t border-white/10 bg-[#080c14]">
-    <div class="mx-auto max-w-7xl px-4 py-10 lg:px-6">
+  <footer class="site-footer mt-auto">
+    <div class="site-footer__inner mx-auto max-w-7xl px-4 py-8 lg:px-6">
       <div class="site-footer__top">
         <a href="/" class="site-footer__logo inline-flex" aria-label="11ka domů">
-          <img src="/logo.png" alt="11ka" class="h-8 w-auto" />
+          <img src="/logo.png" alt="11ka" width="96" height="28" />
         </a>
         <nav class="site-footer__nav" aria-label="Patička">
           <a href="/kontakt">Kontakt</a>
@@ -16,22 +16,10 @@
         </nav>
       </div>
       <div class="site-footer__legal">
-        <div class="site-footer__meta">
-          <div class="site-footer__developer">
-            <span class="site-footer__meta-kicker">Vývojář</span>
-            <p class="site-footer__operator-name"><a href="https://danielsmrz.dev/" target="_blank" rel="noopener" class="site-footer__meta-link">Daniel Smrž</a></p>
-            <p class="site-footer__operator-detail">
-              <a href="mailto:danielsmrz25@gmail.com" class="site-footer__meta-link">danielsmrz25@gmail.com</a>
-            </p>
-          </div>
-          <div class="site-footer__operator">
-            <span class="site-footer__meta-kicker">Provozovatel</span>
-            <p class="site-footer__operator-name">Aneta Kozelková</p>
-            <p class="site-footer__operator-detail">Havlíčkova 1113, 547 01 Náchod · IČO 76075087</p>
-            <p class="site-footer__operator-detail">Fyzická osoba podnikající dle živnostenského zákona · MEU Náchod</p>
-          </div>
-          <p class="site-footer__copyright">© <%= new Date().getFullYear() %> 11ka</p>
-        </div>
+        <p class="site-footer__copyright">
+          <a href="/podminky-uziti#clanek-3">© <%= new Date().getFullYear() %> 11ka</a>
+        </p>
+        <p class="site-footer__operator">Aneta Kozelková · Havlíčkova 1113, 547 01 Náchod · IČO 76075087</p>
       </div>
     </div>
   </footer>

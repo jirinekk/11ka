@@ -1,0 +1,19 @@
+<%- include('layout-start') %>
+<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Týmy</h1>
+<form class="mt-6 max-w-xl" method="get">
+  <input class="input-11" type="search" name="q" value="<%= q || '' %>" placeholder="Klub…" />
+</form>
+<ul class="card-11 mt-6 divide-y divide-white/10 px-4">
+  <% teams.forEach(function (t) { %>
+  <li>
+    <a class="fotak-row" href="/foto/tymy/<%= t.slug %>">
+      <span class="inline-flex min-w-0 items-center gap-3">
+        <% if (t.logo) { %><img src="<%= t.logo %>" alt="" width="28" height="28" class="h-7 w-7 object-contain" /><% } %>
+        <span class="truncate"><%= t.name %></span>
+      </span>
+      <span><%= t.album_count %> alb</span>
+    </a>
+  </li>
+  <% }); %>
+</ul>
+<%- include('layout-end') %>

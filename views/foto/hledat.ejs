@@ -1,0 +1,50 @@
+<%- include('layout-start') %>
+<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Hledat</h1>
+<form class="mt-6 max-w-xl" action="/foto/hledat" method="get">
+  <input class="input-11" type="search" name="q" value="<%= q || '' %>" placeholder="Hráč, klub, album, fotograf…" autofocus />
+</form>
+<% if (results) { %>
+  <% if (results.albums.length) { %>
+  <h2 class="mt-10 text-xs font-semibold uppercase tracking-wider text-11muted">Alba</h2>
+  <div class="fotak-tile-grid mt-3">
+    <% results.albums.forEach(function (album) { %>
+    <%- include('_album-card', { album: album }) %>
+    <% }); %>
+  </div>
+  <% } %>
+  <% if (results.players.length) { %>
+  <h2 class="mt-10 text-xs font-semibold uppercase tracking-wider text-11muted">Hráči</h2>
+  <ul class="mt-3 divide-y divide-white/10">
+    <% results.players.forEach(function (p) { %>
+    <li><a class="fotak-row" href="/foto/hraci/<%= p.slug %>"><%= p.name %><span><%= p.team_short || '' %></span></a></li>
+    <% }); %>
+  </ul>
+  <% } %>
+  <% if (results.teams.length) { %>
+  <h2 class="mt-10 text-xs font-semibold uppercase tracking-wider text-11muted">Týmy</h2>
+  <ul class="mt-3 divide-y divide-white/10">
+    <% results.teams.forEach(function (t) { %>
+    <li>
+      <a class="fotak-row" href="/foto/tymy/<%= t.slug %>">
+        <span class="inline-flex items-center gap-2">
+          <% if (t.logo) { %><img src="<%= t.logo %>" alt="" width="22" height="22" class="h-5 w-5 object-contain" /><% } %>
+          <%= t.name %>
+        </span>
+      </a>
+    </li>
+    <% }); %>
+  </ul>
+  <% } %>
+  <% if (results.photographers.length) { %>
+  <h2 class="mt-10 text-xs font-semibold uppercase tracking-wider text-11muted">Fotografové</h2>
+  <ul class="mt-3 divide-y divide-white/10">
+    <% results.photographers.forEach(function (p) { %>
+    <li><a class="fotak-row" href="/foto/fotografi/<%= p.slug %>"><%= p.name %></a></li>
+    <% }); %>
+  </ul>
+  <% } %>
+  <% if (!results.albums.length && !results.players.length && !results.teams.length && !results.photographers.length) { %>
+  <p class="mt-16 text-center text-sm text-11muted">Nic se nenašlo.</p>
+  <% } %>
+<% } %>
+<%- include('layout-end') %>
