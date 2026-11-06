@@ -9,77 +9,141 @@
     { id: 'vysledky', label: 'Výsledky' },
     { id: 'tabulka', label: 'Tabulka' },
   ];
+  var programMatches = typeof clubProgram !== 'undefined' && clubProgram ? clubProgram : [];
+  var resultMatches = typeof clubResults !== 'undefined' && clubResults ? clubResults : [];
+  var nextMatch = programMatches[0] || null;
+  var recentResults = resultMatches.slice(0, 4);
 %>
 
 <main id="main-content" class="flex-1" tabindex="-1">
-  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+  <div class="mx-auto max-w-[1400px] px-4 py-6 lg:px-6 lg:py-8">
     <a href="/zapasy/live#kluby" class="text-sm text-11muted transition hover:text-11accent">← Zpět na zápasy</a>
 
     <header class="cl-club-hero">
       <% if (club.logo) { %>
-      <img class="cl-club-hero__crest" src="<%= club.logo %>" alt="" width="72" height="72" />
+      <img class="cl-club-hero__crest" src="<%= club.logo %>" alt="" width="88" height="88" />
       <% } %>
       <div class="cl-club-hero__body">
         <p class="cl-club-hero__kicker">Chance Liga</p>
         <h1 class="cl-club-hero__name"><%= club.name %></h1>
         <% if (row) { %>
-        <p class="cl-club-hero__meta">
-          <strong><%= row.rank %>.</strong> místo
-          · <%= row.played %> zápasů
-          · <%= row.pts %> b
-          · skóre <%= row.goalsLabel %>
-          · rozdíl <%= row.gdLabel %>
-        </p>
+        <p class="cl-club-hero__meta">Rozdíl <%= row.gdLabel %></p>
         <% } %>
       </div>
+      <% if (row) { %>
+      <dl class="cl-club-hero__stats">
+        <div>
+          <dt>Pozice</dt>
+          <dd><%= row.rank %>.</dd>
+        </div>
+        <div>
+          <dt>Body</dt>
+          <dd><%= row.pts %></dd>
+        </div>
+        <div>
+          <dt>Zápasy</dt>
+          <dd><%= row.played %></dd>
+        </div>
+        <div>
+          <dt>Skóre</dt>
+          <dd><%= row.goalsLabel %></dd>
+        </div>
+      </dl>
+      <% } %>
     </header>
 
-    <section class="cl-hub mt-8" data-cl-hub data-cl-hash aria-label="<%= club.short %>">
-      <div class="cl-matches__tabs" role="tablist" aria-label="Profil klubu">
-        <% hubTabs.forEach(function (tab) { %>
-        <button
-          type="button"
-          class="cl-matches__tab<%= tab.id === hubView ? ' is-active' : '' %>"
-          role="tab"
-          aria-selected="<%= tab.id === hubView ? 'true' : 'false' %>"
-          data-cl-tab="<%= tab.id %>"
-        ><%= tab.label %></button>
-        <% }); %>
-      </div>
-
-      <div class="cl-matches__pane<%= hubView === 'soupiska' ? ' is-active' : '' %> mt-5" data-cl-pane="soupiska" role="tabpanel" <%= hubView === 'soupiska' ? '' : 'hidden' %>>
-        <%- include('partials/chance-liga-squad', { squad: typeof clubSquad !== 'undefined' ? clubSquad : { groups: [], coach: null } }) %>
-      </div>
-      <div class="cl-matches__pane<%= hubView === 'program' ? ' is-active' : '' %> mt-5" data-cl-pane="program" role="tabpanel" <%= hubView === 'program' ? '' : 'hidden' %>>
-        <%- include('partials/chance-liga-board', { chanceMatchLeagues: typeof clubProgramLeagues !== 'undefined' ? clubProgramLeagues : [], chanceLigaShowAll: false, chanceLigaTitle: 'Program' }) %>
-      </div>
-      <div class="cl-matches__pane<%= hubView === 'vysledky' ? ' is-active' : '' %> mt-5" data-cl-pane="vysledky" role="tabpanel" <%= hubView === 'vysledky' ? '' : 'hidden' %>>
-        <%- include('partials/chance-liga-board', { chanceMatchLeagues: typeof clubResultLeagues !== 'undefined' ? clubResultLeagues : [], chanceLigaShowAll: false, chanceLigaTitle: 'Výsledky' }) %>
-      </div>
-      <div class="cl-matches__pane<%= hubView === 'tabulka' ? ' is-active' : '' %> mt-5" data-cl-pane="tabulka" role="tabpanel" <%= hubView === 'tabulka' ? '' : 'hidden' %>>
-        <%- include('partials/chance-liga-table', { standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [], highlightCode: club.code }) %>
-      </div>
-    </section>
-
-    <% if (typeof clubArticles !== 'undefined' && clubArticles && clubArticles.length) { %>
-    <section class="related-stories related-stories--after-article mt-10" aria-labelledby="club-articles-heading">
-      <h2 id="club-articles-heading" class="related-stories__title">Články o klubu</h2>
-      <div class="related-stories__grid">
-        <% clubArticles.forEach(function (item) { %>
-        <a href="<%= item.href %>" class="related-card">
-          <img src="<%= item.image %>" alt="" loading="lazy" decoding="async" style="object-position: <%= item.heroPosition || '50% 50%' %>;" />
-          <div class="related-card__shade" aria-hidden="true"></div>
-          <div class="related-card__body">
-            <% if (item.tag || item.category) { %>
-            <span class="related-card__cat"><%= item.tag || item.category %></span>
-            <% } %>
-            <h3 class="related-card__title font-article-title"><%= item.title %></h3>
+    <div class="site-shell mt-8">
+      <div class="site-shell__main min-w-0">
+        <section class="cl-hub" data-cl-hub data-cl-hash aria-label="<%= club.short %>">
+          <div class="cl-matches__tabs" role="tablist" aria-label="Profil klubu">
+            <% hubTabs.forEach(function (tab) { %>
+            <button
+              type="button"
+              class="cl-matches__tab<%= tab.id === hubView ? ' is-active' : '' %>"
+              role="tab"
+              aria-selected="<%= tab.id === hubView ? 'true' : 'false' %>"
+              data-cl-tab="<%= tab.id %>"
+            ><%= tab.label %></button>
+            <% }); %>
           </div>
-        </a>
-        <% }); %>
+
+          <div class="cl-matches__pane<%= hubView === 'soupiska' ? ' is-active' : '' %> mt-5" data-cl-pane="soupiska" role="tabpanel" <%= hubView === 'soupiska' ? '' : 'hidden' %>>
+            <%- include('partials/chance-liga-squad', { squad: typeof clubSquad !== 'undefined' ? clubSquad : { groups: [], coach: null } }) %>
+          </div>
+          <div class="cl-matches__pane<%= hubView === 'program' ? ' is-active' : '' %> mt-5" data-cl-pane="program" role="tabpanel" <%= hubView === 'program' ? '' : 'hidden' %>>
+            <%- include('partials/chance-liga-board', { chanceMatchLeagues: typeof clubProgramLeagues !== 'undefined' ? clubProgramLeagues : [], chanceLigaShowAll: false, chanceLigaTitle: 'Program' }) %>
+          </div>
+          <div class="cl-matches__pane<%= hubView === 'vysledky' ? ' is-active' : '' %> mt-5" data-cl-pane="vysledky" role="tabpanel" <%= hubView === 'vysledky' ? '' : 'hidden' %>>
+            <%- include('partials/chance-liga-board', { chanceMatchLeagues: typeof clubResultLeagues !== 'undefined' ? clubResultLeagues : [], chanceLigaShowAll: false, chanceLigaTitle: 'Výsledky' }) %>
+          </div>
+          <div class="cl-matches__pane<%= hubView === 'tabulka' ? ' is-active' : '' %> mt-5" data-cl-pane="tabulka" role="tabpanel" <%= hubView === 'tabulka' ? '' : 'hidden' %>>
+            <%- include('partials/chance-liga-table', { standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [], highlightCode: club.code }) %>
+          </div>
+        </section>
+
+        <% if (typeof clubArticles !== 'undefined' && clubArticles && clubArticles.length) { %>
+        <section class="related-stories related-stories--after-article mt-10" aria-labelledby="club-articles-heading">
+          <h2 id="club-articles-heading" class="related-stories__title">Články o klubu</h2>
+          <div class="related-stories__grid">
+            <% clubArticles.forEach(function (item) { %>
+            <a href="<%= item.href %>" class="related-card">
+              <img src="<%= item.image %>" alt="" loading="lazy" decoding="async" style="object-position: <%= item.heroPosition || '50% 50%' %>;" />
+              <div class="related-card__shade" aria-hidden="true"></div>
+              <div class="related-card__body">
+                <% if (item.tag || item.category) { %>
+                <span class="related-card__cat"><%= item.tag || item.category %></span>
+                <% } %>
+                <h3 class="related-card__title font-article-title"><%= item.title %></h3>
+              </div>
+            </a>
+            <% }); %>
+          </div>
+        </section>
+        <% } %>
       </div>
-    </section>
-    <% } %>
+
+      <aside class="site-shell__rail space-y-6">
+        <div class="news-rail" data-rail-keep>
+          <%- include('partials/sidebar-most-read', { items: typeof sidebarMostRead !== 'undefined' ? sidebarMostRead : [], mostReadLimit: 4 }) %>
+        </div>
+
+        <% if (nextMatch) { %>
+        <section class="card-11 p-4 cl-club-side">
+          <h2 class="cl-club-side__title">Další zápas</h2>
+          <div class="cl-club-side__round">
+            <%- include('partials/fotmob-match-row', { match: nextMatch }) %>
+          </div>
+        </section>
+        <% } %>
+
+        <% if (recentResults.length) { %>
+        <section class="card-11 p-4 cl-club-side">
+          <h2 class="cl-club-side__title">Poslední výsledky</h2>
+          <div class="cl-club-side__round">
+            <% recentResults.forEach(function (row) { %>
+            <%- include('partials/fotmob-match-row', { match: row }) %>
+            <% }); %>
+          </div>
+        </section>
+        <% } %>
+
+        <%- include('partials/chance-liga-table', { standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [], compactTable: true, tableRail: true, tableHref: (club.href || '/zapasy/live') + '?view=tabulka', highlightCode: club.code }) %>
+
+        <div class="card-11 p-4">
+          <h2 class="mb-2 text-lg font-bold text-11accent">Newsletter</h2>
+          <p class="text-sm text-11muted"><%= typeof newsletter !== 'undefined' && newsletter ? newsletter.description : 'Novinky z 11ky do e-mailu.' %></p>
+          <form class="mt-4 space-y-2" action="/newsletter" method="post">
+            <label class="sr-only" for="newsletter-email">E-mail</label>
+            <input id="newsletter-email" name="email" type="email" required autocomplete="email" placeholder="váš@email.cz" class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40" />
+            <button type="submit" class="btn-11 btn-11--primary btn-11--block">Přihlásit se</button>
+          </form>
+        </div>
+
+        <div data-rail-priority="low">
+          <%- include('partials/sidebar-social') %>
+        </div>
+      </aside>
+    </div>
   </div>
 </main>
 

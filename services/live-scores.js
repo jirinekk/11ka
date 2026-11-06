@@ -3102,43 +3102,11 @@ async function listChanceLigaSchedule({ limit = 40 } = {}) {
     return chanceBoardCache.data;
   }
   try {
-    const [aHtml, bHtml, lsMatches] = await Promise.all([
-      fetchText(CHANCE_LIGA_SCHEDULE_URL).catch(() => ''),
-      fetchText(CHNL_SCHEDULE_URL).catch(() => ''),
-      livesportChance.listUpcoming(limit).catch(() => []),
-    ]);
-    const officialChance = pickUpcomingMatches(parseChanceLigaUpcomingFromHtml(aHtml, 200), limit, now);
-    let chanceMatches = officialChance;
-    if (lsMatches && lsMatches.length) {
-      chanceMatches = livesportChance.attachLivesport(
-        officialChance.length ? officialChance : lsMatches,
-        lsMatches,
-      );
-    }
-    chanceMatches = (chanceMatches || []).map((m) =>
-      chanceLigaLogos.withLogos({
-        ...m,
-        meta: m.meta || formatMatchMeta(m.date, m.round || ''),
-        score: m.isLive || m.isDone ? m.score || '0:0' : '0:0',
-        homeInitials: m.homeInitials || teamInitials(m.home),
-        awayInitials: m.awayInitials || teamInitials(m.away),
-        detailHref: m.detailHref && String(m.detailHref).startsWith('/zapasy/chance/') ? m.detailHref : '',
-      }),
+    const leagues = await livesportChance.listBoardLeagues(limit);
+    const hasLive = (leagues || []).some((league) =>
+      (league.matches || []).some((m) => m && m.isLive)
     );
-
-    const leagues = [
-      {
-        id: 'chance-liga',
-        label: 'Chance Liga',
-        matches: chanceMatches,
-      },
-      {
-        id: 'chance-narodni',
-        label: 'Chance Národní liga',
-        matches: pickUpcomingMatches(parseChnlUpcomingFromHtml(bHtml, 200), limit, now),
-      },
-    ].filter((league) => league.matches && league.matches.length);
-    chanceBoardCache = { expiresAt: now + 5 * 60 * 1000, data: leagues };
+    chanceBoardCache = { expiresAt: now + (hasLive ? 20 * 1000 : 5 * 60 * 1000), data: leagues };
     return leagues;
   } catch {
     return chanceBoardCache.data || [];

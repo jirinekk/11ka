@@ -20,6 +20,7 @@
   let player = null;
   let stadiumOnly = false;
   let hold = null;
+  let squadQuery = '';
 
   function visible() {
     return photos.filter((p) => {
@@ -40,26 +41,61 @@
     return open !== null ? list[open] : null;
   }
 
+  function lastName(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    const particle = /^(van|von|de|der|den|di|da|la|le|del|du|ter|ten|tot|te)$/i;
+    if (parts.length >= 4 && particle.test(parts[parts.length - 3]) && particle.test(parts[parts.length - 2])) {
+      return parts.slice(-3).join(' ');
+    }
+    if (parts.length >= 2 && particle.test(parts[parts.length - 2])) {
+      return parts.slice(-2).join(' ');
+    }
+    return parts[parts.length - 1];
+  }
+
+  function playerPhoto(player) {
+    if (player && player.photo && player.photo !== '/user.png') return player.photo;
+    const all = []
+      .concat((squads.home && squads.home.players) || [])
+      .concat((squads.away && squads.away.players) || []);
+    const hit = all.find(
+      (p) =>
+        (player && player.id && p.id === player.id) ||
+        (player && player.slug && p.slug === player.slug) ||
+        (player && player.name && p.name === player.name)
+    );
+    return (hit && hit.photo) || '/user.png';
+  }
+
   function playerRow(p) {
-    const num = p.number != null && p.number !== '' ? '#' + p.number : '';
+    const num = p.number != null && p.number !== '' ? String(p.number) : '';
     const on = hold && hold.id === p.id ? ' is-on' : '';
-    const src = escapeHtml(p.photo || '/user.png');
-    const local = '/players/' + encodeURIComponent(p.livesportId || p.id) + '.jpg';
-    return `<button type="button" class="foto-squad__player${on}" data-hold-player="${escapeHtml(p.id)}" data-hold-name="${escapeHtml(p.name)}" data-hold-slug="${escapeHtml(p.slug)}" data-hold-number="${p.number != null ? p.number : ''}">
-      <img src="${src}" alt="" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='${local}';}else{this.onerror=null;this.src='/user.png';}" />
-      <span class="foto-squad__num">${num}</span>
-      <span class="foto-squad__name">${escapeHtml(p.name)}</span>
+    const label = lastName(p.name) || p.name || '';
+    const src = escapeHtml(playerPhoto(p));
+    return `<button type="button" class="foto-squad__player${on}" title="${escapeHtml(p.name || '')}" data-hold-player="${escapeHtml(p.id)}" data-hold-name="${escapeHtml(p.name)}" data-hold-slug="${escapeHtml(p.slug)}" data-hold-number="${p.number != null ? p.number : ''}" data-hold-photo="${src}">
+      <img src="${src}" alt="" loading="lazy" onerror="this.onerror=null;this.src='/user.png'" />
+      <span class="foto-squad__num">${escapeHtml(num)}</span>
+      <span class="foto-squad__name">${escapeHtml(label)}</span>
     </button>`;
   }
 
   function teamBlock(team, fallback) {
-    const name = (team && (team.name || team.short)) || fallback;
+    const name = (team && (team.short || team.name)) || fallback;
     const crest = team && team.logo
       ? `<img class="foto-squad__crest" src="${escapeHtml(team.logo)}" alt="" />`
       : '';
-    const people = (team && team.players) || [];
-    const list = people.length
-      ? people.map(playerRow).join('')
+    const groups = (team && team.groups && team.groups.length)
+      ? team.groups
+      : [{ title: '', players: (team && team.players) || [] }];
+    const hasPeople = groups.some((g) => (g.players || []).length);
+    const list = hasPeople
+      ? groups.map((g) => {
+          const heading = g.title
+            ? `<h4 class="foto-squad__pos">${escapeHtml(g.title)}</h4>`
+            : '';
+          return `${heading}${(g.players || []).map(playerRow).join('')}`;
+        }).join('')
       : '<p class="foto-squad__empty">Soupiska chybí.</p>';
     return `<section class="foto-squad__team">
       <h3>${crest}${escapeHtml(name)}</h3>
@@ -70,10 +106,11 @@
   function squadHtml() {
     if (!canEdit) return '';
     const hint = hold
-      ? `Klikni na ${escapeHtml(hold.name)} na fotce`
-      : 'Vyber hráče, pak klikni na fotku';
+      ? `Teď ${escapeHtml(lastName(hold.name) || hold.name)}`
+      : 'Vyber hráče';
     return `<aside class="foto-squad">
       <p class="foto-squad__hint" data-hold-hint="1">${hint}</p>
+      <input class="foto-squad__find" type="search" data-squad-find placeholder="Hledat…" autocomplete="off" value="${escapeHtml(squadQuery)}" />
       ${teamBlock(squads.home, 'Domácí')}
       ${teamBlock(squads.away, 'Hosté')}
     </aside>`;
@@ -88,14 +125,14 @@
     const hint = root.querySelector('[data-hold-hint]');
     if (hint) {
       hint.textContent = hold
-        ? 'Klikni na ' + hold.name + ' na fotce'
-        : 'Vyber hráče, pak klikni na fotku';
+        ? 'Teď ' + (lastName(hold.name) || hold.name)
+        : 'Vyber hráče';
     }
     const chrome = root.querySelector('[data-hold-chrome]');
     if (chrome) {
       const list = visible();
       chrome.textContent =
-        open + 1 + ' z ' + list.length + (canEdit ? (hold ? ' · klikni na fotku' : ' · vyber hráče ze soupisky') : '');
+        open + 1 + ' z ' + list.length + (canEdit ? (hold ? ' · klikni na fotku' : '') : '');
     }
   }
 
@@ -123,14 +160,18 @@
       );
     }
     players.slice(0, 12).forEach((p) => {
+      const label = (p.number != null ? p.number + '  ' : '') + lastName(p.name || '');
       chips.push(
-        `<a class="team-chip" href="/foto/hraci/${encodeURIComponent(p.slug)}">${p.number != null ? '#' + p.number + ' ' : ''}${escapeHtml(p.name)}</a>`
+        `<a class="team-chip" href="/foto/hraci/${encodeURIComponent(p.slug)}">${escapeHtml(label)}</a>`
       );
     });
 
     const tiles = list
       .map((p, i) => {
-        return `<button type="button" class="photo-tile" data-open="${i}"><img src="${p.thumbSrc}" alt="" loading="${i < 8 ? 'eager' : 'lazy'}" decoding="async" onerror="this.parentNode.classList.add('is-missing')" /></button>`;
+        const del = canEdit
+          ? `<button type="button" class="photo-tile__del" data-del-photo="${escapeHtml(p.id)}" aria-label="Smazat fotku">×</button>`
+          : '';
+        return `<div class="photo-tile-wrap"><button type="button" class="photo-tile" data-open="${i}"><img src="${p.thumbSrc}" alt="" loading="${i < 8 ? 'eager' : 'lazy'}" decoding="async" onerror="this.parentNode.classList.add('is-missing')" /></button>${del}</div>`;
       })
       .join('');
 
@@ -140,27 +181,26 @@
       const tags = showTags
         ? (cur.tags || [])
             .map((t) => {
-              const label = `${t.player.number != null ? '#' + t.player.number + ' ' : ''}${escapeHtml(t.player.name)}`;
+              const name = escapeHtml(lastName(t.player.name) || t.player.name || '');
+              const pic = `<img class="foto-tag__pic" src="${escapeHtml(playerPhoto(t.player))}" alt="" onerror="this.onerror=null;this.src='/user.png'" />`;
+              const no = t.player.number != null ? `<span class="foto-tag__no">${escapeHtml(String(t.player.number))}</span>` : '';
+              const inner = `${pic}${no}<span class="foto-tag__name">${name}</span>`;
               if (canEdit) {
-                return `<button type="button" class="foto-tag foto-tag--edit" data-del-tag="${escapeHtml(t.id)}" style="left:${t.x}%;top:${t.y}%" title="Odebrat štítek">${label} ×</button>`;
+                return `<button type="button" class="foto-tag foto-tag--edit" data-del-tag="${escapeHtml(t.id)}" style="left:${t.x}%;top:${t.y}%" title="Odebrat ${escapeHtml(t.player.name)}">${inner}<span class="foto-tag__x" aria-hidden="true">×</span></button>`;
               }
-              return `<a class="foto-tag" href="/foto/hraci/${encodeURIComponent(t.player.slug)}" style="left:${t.x}%;top:${t.y}%">${label}</a>`;
+              return `<a class="foto-tag" href="/foto/hraci/${encodeURIComponent(t.player.slug)}" style="left:${t.x}%;top:${t.y}%">${inner}</a>`;
             })
             .join('')
         : '';
-      const chromeHint = canEdit
-        ? hold
-          ? ' · klikni na fotku'
-          : ' · vyber hráče ze soupisky'
-        : '';
+      const chromeHint = canEdit && hold ? ' · klikni na fotku' : '';
       lightbox = `<div class="foto-lb${canEdit ? ' has-squad' : ''}" data-lb="1">
         <div class="lightbox-chrome">
           <button type="button" class="foto-lb__icon" data-close="1" aria-label="Zavřít">×</button>
           <p class="text-[13px] font-medium tabular-nums tracking-tight text-white/75" data-hold-chrome="1">${open + 1} z ${list.length}${chromeHint}</p>
           <div class="flex items-center gap-1">
-            ${(cur.tags || []).length || canEdit ? `<button type="button" class="rounded-full bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white" data-tags="1">${showTags ? 'Štítky' : 'Bez štítků'}</button>` : ''}
+            ${(cur.tags || []).length || canEdit ? `<button type="button" class="foto-lb__chip" data-tags="1">${showTags ? 'Štítky' : 'Bez štítků'}</button>` : ''}
             ${canEdit && albumId ? `<button type="button" class="rounded-full bg-white/10 px-3 py-1.5 text-[13px] font-medium text-red-200" data-del-photo="${escapeHtml(cur.id)}">Smazat</button>` : ''}
-            <a class="foto-lb__icon" href="${cur.viewSrc}&dl=original" aria-label="Stáhnout">↓</a>
+            ${downloadMenu(cur)}
           </div>
         </div>
         <div class="foto-lb__body">
@@ -185,6 +225,24 @@
       lightbox;
     document.body.style.overflow = open !== null ? 'hidden' : '';
     fitOpenImage();
+    applySquadFilter();
+  }
+
+  function applySquadFilter() {
+    const needle = String(squadQuery || '').trim().toLowerCase();
+    root.querySelectorAll('.foto-squad__player').forEach((btn) => {
+      const hay = String(btn.getAttribute('data-hold-name') || '').toLowerCase();
+      btn.hidden = Boolean(needle) && hay.indexOf(needle) === -1;
+    });
+    root.querySelectorAll('.foto-squad__pos').forEach((heading) => {
+      let node = heading.nextElementSibling;
+      let any = false;
+      while (node && !node.classList.contains('foto-squad__pos')) {
+        if (node.classList.contains('foto-squad__player') && !node.hidden) any = true;
+        node = node.nextElementSibling;
+      }
+      heading.hidden = Boolean(needle) && !any;
+    });
   }
 
   function fitOpenImage() {
@@ -218,6 +276,7 @@
       name: hold.name,
       slug: hold.slug,
       number: hold.number === '' ? null : hold.number,
+      photo: hold.photo || playerPhoto(hold),
     };
     try {
       const res = await fetch('/foto/api/tags', {
@@ -265,6 +324,28 @@
     draw();
   }
 
+  function downloadHref(cur, fmt) {
+    try {
+      const u = new URL(cur.viewSrc, window.location.origin);
+      u.searchParams.delete('v');
+      u.searchParams.set('dl', fmt);
+      return u.pathname + u.search;
+    } catch {
+      return `/foto/media/${encodeURIComponent(cur.id)}?dl=${encodeURIComponent(fmt)}`;
+    }
+  }
+
+  function downloadMenu(cur) {
+    return `<details class="foto-dl">
+      <summary class="foto-lb__icon" aria-label="Stáhnout">↓</summary>
+      <div class="foto-dl__menu">
+        <a href="${downloadHref(cur, 'jpeg')}">JPEG</a>
+        <a href="${downloadHref(cur, 'webp')}">WebP</a>
+        <a href="${downloadHref(cur, 'original')}">Originál</a>
+      </div>
+    </details>`;
+  }
+
   function escapeHtml(s) {
     return String(s || '')
       .replace(/&/g, '&amp;')
@@ -272,6 +353,13 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
   }
+
+  root.addEventListener('input', (e) => {
+    const field = e.target.closest('[data-squad-find]');
+    if (!field) return;
+    squadQuery = String(field.value || '');
+    applySquadFilter();
+  });
 
   root.addEventListener('click', (e) => {
     const holdBtn = e.target.closest('[data-hold-player]');
@@ -286,6 +374,7 @@
           name: holdBtn.getAttribute('data-hold-name'),
           slug: holdBtn.getAttribute('data-hold-slug'),
           number: holdBtn.getAttribute('data-hold-number'),
+          photo: holdBtn.getAttribute('data-hold-photo') || '',
         };
       }
       applyHold();

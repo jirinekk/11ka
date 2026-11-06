@@ -18,6 +18,23 @@
     scroller.scrollBy({ left: dir * amount, behavior: 'smooth' });
   }
 
+  function jumpScrollerToNow(scroller) {
+    if (!scroller) return;
+    var now = Date.now() - 3 * 60 * 60 * 1000;
+    var cards = Array.prototype.slice.call(scroller.querySelectorAll('.cl-card'));
+    var target = scroller.querySelector('.cl-card.is-live');
+    if (!target) {
+      target = cards.find(function (card) {
+        if (card.classList.contains('is-done')) return false;
+        var ts = Date.parse(card.getAttribute('data-cl-kickoff') || '');
+        return Number.isFinite(ts) && ts >= now;
+      });
+    }
+    if (!target) return;
+    var left = target.offsetLeft - 12;
+    scroller.scrollLeft = Math.max(0, left);
+  }
+
   function selectTab(root, id) {
     if (!id) return;
     own(root, '[data-cl-tab]').forEach(function (tab) {
@@ -51,6 +68,7 @@
     } else if (tab) {
       e.preventDefault();
       selectTab(root, tab.getAttribute('data-cl-tab'));
+      jumpScrollerToNow(activeScroller(root));
     }
   }
 
@@ -155,6 +173,7 @@
       root.setAttribute('data-cl-bound', '1');
       root.addEventListener('click', onRootClick);
       if (root.hasAttribute('data-cl-hash')) applyHash(root);
+      jumpScrollerToNow(activeScroller(root));
     });
     bindDayNav();
   }

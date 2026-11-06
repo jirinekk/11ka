@@ -1,0 +1,18 @@
+<%
+  var live = !!(m.isLive || m.state === 'in');
+  var done = !!(m.isDone || m.state === 'post');
+  var rawScore = String(m.scoreLine || '').replace(/\s+/g, ' ').trim();
+  if (!rawScore || rawScore === '–' || rawScore === '-') {
+    rawScore = String(m.score || '').trim();
+  }
+  rawScore = rawScore.replace(/^(\d+)\s*[-:]\s*(\d+)$/, '$1 : $2');
+  var liveCls = typeof liveClass !== 'undefined' && liveClass ? liveClass : 'cl-card__live';
+  var scoreCls = typeof scoreClass !== 'undefined' && scoreClass ? scoreClass : 'cl-card__score';
+  var vsCls = typeof vsClass !== 'undefined' && vsClass ? vsClass : 'cl-card__vs';
+%>
+<% if (live || done) { %>
+<% if (live) { %><span class="<%= liveCls %>">Živě</span><% } %>
+<span class="<%= scoreCls %>"><%= rawScore || '0 : 0' %></span>
+<% } else { %>
+<span class="<%= vsCls %>" aria-label="versus">VS</span>
+<% } %>

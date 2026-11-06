@@ -15,13 +15,17 @@
 
     <div class="fm-shell">
       <aside class="fm-rail fm-rail--left">
-        <section class="fm-card">
+        <section class="fm-card" data-rail-keep>
           <h2 class="fm-card__title">Soutěže</h2>
           <nav class="fm-leagues" aria-label="Soutěže">
             <a class="fm-leagues__item<%= !ligaFilter ? ' is-active' : '' %>" href="<%= ligaHrefs.all || '/zapasy/live' %>">Všechny zápasy</a>
             <a class="fm-leagues__item<%= ligaFilter === 'chance-liga' ? ' is-active' : '' %>" href="<%= ligaHrefs['chance-liga'] || '/zapasy/live?liga=chance-liga' %>">Chance Liga</a>
             <a class="fm-leagues__item<%= ligaFilter === 'chance-narodni' ? ' is-active' : '' %>" href="<%= ligaHrefs['chance-narodni'] || '/zapasy/live?liga=chance-narodni' %>">Chance Národní liga</a>
+            <a class="fm-leagues__item<%= ligaFilter === 'mol-cup' ? ' is-active' : '' %>" href="<%= ligaHrefs['mol-cup'] || '/zapasy/live?liga=mol-cup' %>">MOL Cup</a>
             <a class="fm-leagues__item<%= ligaFilter === 'ceska-reprezentace' ? ' is-active' : '' %>" href="<%= ligaHrefs['ceska-reprezentace'] || '/zapasy/live?liga=ceska-reprezentace' %>">Česká reprezentace</a>
+            <a class="fm-leagues__item<%= ligaFilter === 'liga-mistru' ? ' is-active' : '' %>" href="<%= ligaHrefs['liga-mistru'] || '/zapasy/live?liga=liga-mistru' %>">Liga mistrů</a>
+            <a class="fm-leagues__item<%= ligaFilter === 'evropska-liga' ? ' is-active' : '' %>" href="<%= ligaHrefs['evropska-liga'] || '/zapasy/live?liga=evropska-liga' %>">Evropská liga</a>
+            <a class="fm-leagues__item<%= ligaFilter === 'konferencni-liga' ? ' is-active' : '' %>" href="<%= ligaHrefs['konferencni-liga'] || '/zapasy/live?liga=konferencni-liga' %>">Konferenční liga</a>
           </nav>
         </section>
         <% if (clubs.length) { %>
@@ -87,7 +91,7 @@
       <aside class="fm-rail fm-rail--right">
         <%- include('partials/sidebar-ssp-ad') %>
         <%- include('partials/chance-liga-table', { standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [], compactTable: true, tableRail: true, tableHref: '/zapasy/live' }) %>
-        <div class="news-rail">
+        <div class="news-rail" data-rail-keep>
           <%- include('partials/sidebar-most-read', { items: typeof sidebarMostRead !== 'undefined' ? sidebarMostRead : [], mostReadLimit: 4 }) %>
         </div>
         <div class="card-11 p-4">
@@ -106,7 +110,9 @@
             <button type="submit" class="btn-11 btn-11--primary btn-11--block">Přihlásit se</button>
           </form>
         </div>
+        <div data-rail-priority="low">
         <%- include('partials/sidebar-social') %>
+        </div>
       </aside>
     </div>
   </div>

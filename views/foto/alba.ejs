@@ -1,14 +1,17 @@
 <%- include('layout-start') %>
-<div class="flex flex-wrap items-end justify-between gap-3">
-  <div>
-    <h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Alba</h1>
-    <p class="mt-1 text-sm text-11muted"><%= albums.length %> zápasů v archivu</p>
-  </div>
+<div class="fotak-head">
+  <h1>Alba</h1>
+  <p data-foto-albums-count><%= albums.length === 1 ? '1 zápas v archivu' : (albums.length >= 2 && albums.length <= 4 ? albums.length + ' zápasy v archivu' : albums.length + ' zápasů v archivu') %></p>
 </div>
 
-<form class="fotak-filter mt-5" method="get" action="/foto">
+<% if (typeof smazano !== 'undefined' && smazano) { %>
+<p class="fotak-note fotak-note--ok">Album bylo smazáno.</p>
+<% } %>
+
+<form class="fotak-filter fotak-filter--stack" method="get" action="/foto" data-foto-albums-filter>
+  <% if (tym) { %><input type="hidden" name="tym" value="<%= tym %>" /><% } %>
   <label class="fotak-filter__q">
-    <span class="sr-only">Hledat</span>
+    <span class="sr-only">Hledat album</span>
     <svg class="fotak-filter__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/>
     </svg>
@@ -17,32 +20,64 @@
       type="search"
       name="q"
       value="<%= q || '' %>"
-      placeholder="Klub, soutěž, fotograf…"
+      placeholder="Hledat klub, soutěž nebo fotografa"
+      autocomplete="off"
+      data-foto-albums-q
     />
   </label>
-  <select class="input-11 fotak-filter__liga" name="liga" aria-label="Soutěž">
-    <option value="">Všechny soutěže</option>
-    <% (leagues || []).forEach(function (name) { %>
-    <option value="<%= name %>" <%= liga === name ? 'selected' : '' %>><%= name %></option>
-    <% }); %>
-  </select>
-  <button type="submit" class="fotak-filter__go">Hledat</button>
+  <div class="fotak-filter__tools">
+    <label class="fotak-filter__field fotak-filter__field--liga">
+      <span>Soutěž</span>
+      <select class="input-11 fotak-filter__liga" name="liga">
+        <option value="">Všechny</option>
+        <% (typeof competitionGroups !== 'undefined' && competitionGroups.length ? competitionGroups : [{ label: '', items: leagues || [] }]).forEach(function (group) { %>
+        <% if (group.label) { %><optgroup label="<%= group.label %>"><% } %>
+          <% group.items.forEach(function (name) { %>
+          <option value="<%= name %>" <%= liga === name ? 'selected' : '' %>><%= name %></option>
+          <% }); %>
+        <% if (group.label) { %></optgroup><% } %>
+        <% }); %>
+        <% (leagues || []).forEach(function (name) { %>
+          <% var known = (competitions || []).indexOf(name) !== -1; %>
+          <% if (!known) { %><option value="<%= name %>" <%= liga === name ? 'selected' : '' %>><%= name %></option><% } %>
+        <% }); %>
+      </select>
+    </label>
+    <label class="fotak-filter__field fotak-filter__date<%= dateFrom ? '' : ' is-empty' %>">
+      <span>Od</span>
+      <span class="fotak-filter__date-box">
+        <input class="input-11" type="date" name="od" value="<%= dateFrom || '' %>" />
+        <span class="fotak-filter__date-ph" aria-hidden="true">dd.mm.rrrr</span>
+      </span>
+    </label>
+    <label class="fotak-filter__field fotak-filter__date<%= dateTo ? '' : ' is-empty' %>">
+      <span>Do</span>
+      <span class="fotak-filter__date-box">
+        <input class="input-11" type="date" name="do" value="<%= dateTo || '' %>" />
+        <span class="fotak-filter__date-ph" aria-hidden="true">dd.mm.rrrr</span>
+      </span>
+    </label>
+    <div class="fotak-filter__actions">
+      <button type="submit" class="fotak-filter__go">Filtrovat</button>
+      <% if (q || liga || dateFrom || dateTo || tym) { %>
+      <a class="fotak-filter__reset" href="/foto">Zrušit</a>
+      <% } %>
+    </div>
+  </div>
 </form>
 
 <% if (tym) { %>
-<p class="mt-3 text-sm text-11muted">
-  Filtr klubu: <strong class="text-white"><%= tym %></strong>
-  · <a href="/foto" class="text-11accent hover:underline">zrušit</a>
+<p class="fotak-filter-note">
+  Klub <strong><%= tym %></strong>
+  · <a href="/foto">zrušit</a>
 </p>
 <% } %>
 
-<% if (!albums.length) { %>
-<p class="mt-16 text-center text-sm text-11muted">Žádné album neodpovídá filtru.</p>
-<% } else { %>
-<div class="fotak-tile-grid mt-6">
+<p class="fotak-empty" <%= albums.length ? 'hidden' : '' %> data-foto-albums-empty>Žádné album neodpovídá filtru.</p>
+<div class="fotak-tile-grid" <%= albums.length ? '' : 'hidden' %>>
   <% albums.forEach(function (album) { %>
   <%- include('_album-card', { album: album }) %>
   <% }); %>
 </div>
-<% } %>
+<script src="/js/foto-albums-filter.js?v=<%= encodeURIComponent((typeof assetVersion !== 'undefined' ? assetVersion : '1') + '-af1') %>"></script>
 <%- include('layout-end') %>

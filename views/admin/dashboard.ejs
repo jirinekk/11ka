@@ -99,6 +99,12 @@
       <p class="mt-1 text-sm text-11muted">Editor</p>
     </a>
     <% } %>
+    <% if (!akreditaceOnly) { %>
+    <a href="/administrace/grafici" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
+      <h3 class="font-semibold text-white group-hover:text-11accent">Grafici</h3>
+      <p class="mt-1 text-sm text-11muted">PNG tabulky, výsledky a statistiky</p>
+    </a>
+    <% } %>
     <% if (showAkreditace) { %>
     <a href="/administrace/akreditace" class="card-11 group flex min-h-[6.5rem] flex-col justify-center p-6 transition hover:border-11accent/35 hover:shadow-[0_0_32px_-12px_rgba(22,223,251,0.35)]">
       <h3 class="font-semibold text-white group-hover:text-11accent">Akreditace</h3>

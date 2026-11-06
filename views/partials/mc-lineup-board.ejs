@@ -1,17 +1,56 @@
 <%
   var home = typeof homeLineup !== 'undefined' && homeLineup ? homeLineup : null;
   var away = typeof awayLineup !== 'undefined' && awayLineup ? awayLineup : null;
+  function rateNum(v) {
+    return parseFloat(String(v || '').replace(',', '.'));
+  }
   function rateClass(v) {
-    var n = parseFloat(String(v || '').replace(',', '.'));
+    var n = rateNum(v);
     if (!Number.isFinite(n)) return '';
     if (n >= 8) return 'is-hot';
     if (n >= 7) return 'is-good';
     if (n >= 6) return 'is-ok';
     return 'is-low';
   }
+  function rateRgb(v) {
+    var n = rateNum(v);
+    if (!Number.isFinite(n)) return null;
+    var stops = [
+      [4, [214, 48, 48]],
+      [5.5, [228, 92, 42]],
+      [6.15, [222, 176, 40]],
+      [7, [240, 154, 42]],
+      [7.7, [244, 132, 38]],
+      [8.15, [62, 154, 255]],
+      [9.2, [46, 196, 150]],
+    ];
+    if (n <= stops[0][0]) return stops[0][1];
+    if (n >= stops[stops.length - 1][0]) return stops[stops.length - 1][1];
+    for (var i = 1; i < stops.length; i++) {
+      if (n <= stops[i][0]) {
+        var t = (n - stops[i - 1][0]) / (stops[i][0] - stops[i - 1][0]);
+        var a = stops[i - 1][1];
+        var b = stops[i][1];
+        return [
+          Math.round(a[0] + (b[0] - a[0]) * t),
+          Math.round(a[1] + (b[1] - a[1]) * t),
+          Math.round(a[2] + (b[2] - a[2]) * t),
+        ];
+      }
+    }
+    return stops[stops.length - 1][1];
+  }
+  function rateStyle(v) {
+    var rgb = rateRgb(v);
+    if (!rgb) return '';
+    return 'background:linear-gradient(180deg, rgba(255,255,255,.34) 0%, rgba(255,255,255,.1) 46%, rgba(0,0,0,.2) 100%), rgb(' + rgb.join(',') + ');';
+  }
   function lastName(name) {
-    var parts = String(name || '').trim().split(/\s+/);
-    return parts.length ? parts[parts.length - 1] : '';
+    var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    var particle = /^(van|von|de|der|den|di|da|la|le|del|du|ter|ten|tot|te)$/i;
+    if (parts.length >= 2 && particle.test(parts[parts.length - 2])) return parts.slice(-2).join(' ');
+    return parts[parts.length - 1];
   }
   function playerLabel(p) {
     if (!p) return '';
@@ -29,9 +68,15 @@
 %>
 <section class="mc-lineup">
   <header class="mc-lineup__head">
-    <span class="mc-lineup__form"><%= (home && home.formation) || '' %></span>
-    <h2 class="mc-lineup__title">Rozestavení hráčů</h2>
-    <span class="mc-lineup__form is-away"><%= (away && away.formation) || '' %></span>
+    <span class="mc-lineup__form">
+      <% if (homeCrest) { %><img src="<%= homeCrest %>" alt="" /><% } %>
+      <strong><%= (home && home.formation) || '' %></strong>
+    </span>
+    <h2 class="mc-lineup__title">Rozestavení</h2>
+    <span class="mc-lineup__form is-away">
+      <strong><%= (away && away.formation) || '' %></strong>
+      <% if (awayCrest) { %><img src="<%= awayCrest %>" alt="" /><% } %>
+    </span>
   </header>
   <% if (pitch.length) { %>
   <div class="mc-pitch" role="img" aria-label="Rozestavení hráčů">
@@ -46,17 +91,18 @@
       <span class="mc-pitch__six is-away"></span>
     </div>
     <% if (home && home.rating) { %>
-    <span class="mc-pitch__avg is-home">Ø <em class="mc-rate <%= rateClass(home.rating) %>"><%= home.rating %></em></span>
+    <span class="mc-pitch__avg is-home">Ø <em class="mc-rate <%= rateClass(home.rating) %>" style="<%= rateStyle(home.rating) %>"><%= home.rating %></em></span>
     <% } %>
     <% if (away && away.rating) { %>
-    <span class="mc-pitch__avg is-away">Ø <em class="mc-rate <%= rateClass(away.rating) %>"><%= away.rating %></em></span>
+    <span class="mc-pitch__avg is-away">Ø <em class="mc-rate <%= rateClass(away.rating) %>" style="<%= rateStyle(away.rating) %>"><%= away.rating %></em></span>
     <% } %>
     <% pitch.forEach(function (p) { %>
-    <% var crest = p.side === 'away' ? awayCrest : homeCrest; %>
     <div class="mc-dot<%= p.isBest ? ' is-best' : '' %><%= p.side === 'away' ? ' is-away' : '' %>" style="left: <%= p.left %>%; top: <%= p.top %>%">
       <span class="mc-dot__face">
         <img src="<%= p.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
-        <% if (p.rating) { %><em class="mc-rate mc-rate--dot <%= rateClass(p.rating) %>"><%= p.rating %></em><% } %>
+        <% if (p.rating) { %>
+        <em class="mc-rate mc-rate--dot <%= rateClass(p.rating) %>" style="<%= rateStyle(p.rating) %>"><% if (p.isBest) { %><i class="mc-rate__star" aria-hidden="true"></i><% } %><%= p.rating %></em>
+        <% } %>
         <% if (p.badges && (p.badges.goals || p.badges.yellow || p.badges.red || p.badges.subIn || p.badges.subOut)) { %>
         <span class="mc-dot__pins">
           <% if (p.badges.goals) { %><%- include('mc-ico', { kind: 'goal' }) %><% } %>
@@ -66,10 +112,7 @@
         </span>
         <% } %>
       </span>
-      <span class="mc-dot__tag">
-        <% if (crest) { %><img class="mc-dot__crest" src="<%= crest %>" alt="" /><% } %>
-        <span><%= lastName(p.short || p.name) %></span>
-      </span>
+      <span class="mc-dot__name"><% if (p.number) { %><b><%= p.number %></b><% } %><%= lastName(p.short || p.name) %></span>
     </div>
     <% }); %>
   </div>
@@ -86,7 +129,7 @@
         <% if (s.in) { %>
         <img src="<%= s.in.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
         <div class="mc-subs__meta">
-          <p class="mc-subs__name"><%= s.in.name %><% if (s.in.rating) { %> <em class="mc-rate mc-rate--sm <%= rateClass(s.in.rating) %>"><%= s.in.rating %></em><% } %></p>
+          <p class="mc-subs__name"><%= s.in.name %><% if (s.in.rating) { %> <em class="mc-rate mc-rate--sm <%= rateClass(s.in.rating) %>" style="<%= rateStyle(s.in.rating) %>"><%= s.in.rating %></em><% } %></p>
           <p class="mc-subs__out"><%- include('mc-ico', { kind: 'out' }) %> <%= s.out ? s.out.name : '' %> · <%= s.minute || '' %></p>
         </div>
         <% } %>
@@ -98,7 +141,7 @@
       <li>
         <% if (s.in) { %>
         <div class="mc-subs__meta">
-          <p class="mc-subs__name"><% if (s.in.rating) { %><em class="mc-rate mc-rate--sm <%= rateClass(s.in.rating) %>"><%= s.in.rating %></em> <% } %><%= s.in.name %></p>
+          <p class="mc-subs__name"><% if (s.in.rating) { %><em class="mc-rate mc-rate--sm <%= rateClass(s.in.rating) %>" style="<%= rateStyle(s.in.rating) %>"><%= s.in.rating %></em> <% } %><%= s.in.name %></p>
           <p class="mc-subs__out"><%= s.minute || '' %> · <%= s.out ? s.out.name : '' %> <%- include('mc-ico', { kind: 'out' }) %></p>
         </div>
         <img src="<%= s.in.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
@@ -116,20 +159,18 @@
     <ol class="mc-xi">
       <% ((home && home.starters) || []).forEach(function (p) { %>
       <li>
-        <img src="<%= p.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
         <span class="mc-xi__num"><%= p.number || '' %></span>
         <span class="mc-xi__name"><%= playerLabel(p) %></span>
-        <% if (p.rating) { %><em class="mc-rate mc-rate--sm <%= rateClass(p.rating) %>"><%= p.rating %></em><% } %>
+        <% if (p.rating) { %><em class="mc-rate mc-rate--sm <%= rateClass(p.rating) %>" style="<%= rateStyle(p.rating) %>"><%= p.rating %></em><% } %>
       </li>
       <% }); %>
     </ol>
     <ol class="mc-xi is-away">
       <% ((away && away.starters) || []).forEach(function (p) { %>
       <li>
-        <% if (p.rating) { %><em class="mc-rate mc-rate--sm <%= rateClass(p.rating) %>"><%= p.rating %></em><% } %>
+        <% if (p.rating) { %><em class="mc-rate mc-rate--sm <%= rateClass(p.rating) %>" style="<%= rateStyle(p.rating) %>"><%= p.rating %></em><% } %>
         <span class="mc-xi__name"><%= playerLabel(p) %></span>
         <span class="mc-xi__num"><%= p.number || '' %></span>
-        <img src="<%= p.photo || '/user.png' %>" alt="" onerror="this.onerror=null;this.src='/user.png'" />
       </li>
       <% }); %>
     </ol>

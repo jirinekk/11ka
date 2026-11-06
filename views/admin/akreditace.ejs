@@ -1,6 +1,6 @@
 <%- include('../partials/admin-layout-start') %>
 <%
-  var activeTab = typeof tab !== 'undefined' && (tab === 'skryte' || tab === 'spis') ? tab : 'viditelne';
+  var activeTab = typeof tab !== 'undefined' && (tab === 'skryte' || tab === 'spis' || tab === 'statistiky') ? tab : 'viditelne';
   var counts = typeof tabCounts !== 'undefined' && tabCounts ? tabCounts : { viditelne: 0, skryte: 0, spis: 0 };
   var applicantsList = typeof applicants !== 'undefined' && applicants ? applicants : [];
   var personList = typeof personRequests !== 'undefined' && personRequests ? personRequests : [];
@@ -15,6 +15,7 @@
     var parts = [];
     if (t === 'skryte') parts.push('tab=skryte');
     if (t === 'spis') parts.push('tab=spis');
+    if (t === 'statistiky') parts.push('tab=statistiky');
     if (t === 'spis' && searchQ) parts.push('q=' + encodeURIComponent(searchQ));
     if (t === 'spis' && selectedEmail && (!extra || !extra.clearPerson)) {
       parts.push('email=' + encodeURIComponent(selectedEmail));
@@ -77,6 +78,8 @@
   <p class="mt-1 text-sm text-11muted">
     <% if (activeTab === 'spis') { %>
     Spis žadatelů podle e-mailu - kolik žádostí, kolik schváleno / zamítnuto / čeká.
+    <% } else if (activeTab === 'statistiky') { %>
+    Kde se fotí, kdo fotí a který klub kdy hostil fotografy 11ky.
     <% } else { %>
     Odeslané formuláře z /akreditace včetně data zápasu, seřazené od nejbližšího termínu.
     <% } %>
@@ -119,6 +122,12 @@
     Spis
     <span class="rounded-full bg-black/25 px-1.5 py-0.5 text-xs tabular-nums"><%= counts.spis || 0 %></span>
   </a>
+  <a
+    href="<%= tabHref('statistiky', 1) %>"
+    class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition <%= activeTab === 'statistiky' ? 'border-11accent/50 bg-11accent/15 text-11accent' : 'border-white/15 text-slate-300 hover:border-white/25 hover:text-white' %>"
+  >
+    Statistiky
+  </a>
 </nav>
 
 <style>
@@ -134,7 +143,134 @@
   }
 </style>
 
-<% if (activeTab === 'spis') { %>
+<% if (activeTab === 'statistiky') { %>
+<% var cov = typeof coverage !== 'undefined' && coverage ? coverage : { venues: [], clubs: [], photographers: [], clubTimeline: [], photographerPlaces: [], requestLeaders: [] }; %>
+
+<section class="acc-stat-grid mt-8">
+  <article class="acc-stat">
+    <h2>Kde se nejvíc fotí</h2>
+    <p>Stadiony podle počtu alb.</p>
+    <div class="acc-stat__table">
+      <table>
+        <thead><tr><th>Místo</th><th>Alba</th><th>Fotky</th></tr></thead>
+        <tbody>
+          <% (cov.venues || []).forEach(function (row) { %>
+          <tr><td><%= row.label %></td><td class="tabular-nums"><%= row.albums %></td><td class="tabular-nums"><%= row.photos %></td></tr>
+          <% }); %>
+          <% if (!(cov.venues || []).length) { %><tr><td colspan="3">Zatím žádná alba.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </article>
+  <article class="acc-stat">
+    <h2>Kluby s nejvíc fotkami</h2>
+    <p>Domácí i venkovní zápasy dohromady.</p>
+    <div class="acc-stat__table">
+      <table>
+        <thead><tr><th>Klub</th><th>Alba</th><th>Fotky</th></tr></thead>
+        <tbody>
+          <% (cov.clubs || []).forEach(function (row) { %>
+          <tr><td><%= row.label %></td><td class="tabular-nums"><%= row.albums %></td><td class="tabular-nums"><%= row.photos %></td></tr>
+          <% }); %>
+          <% if (!(cov.clubs || []).length) { %><tr><td colspan="3">Zatím žádná alba.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
+<section class="acc-stat mt-6">
+  <h2>Kdo nejvíc fotí</h2>
+  <p>Pořadí fotografů podle nahraných snímků v archivu.</p>
+  <div class="acc-stat__table">
+    <table>
+      <thead><tr><th>#</th><th>Fotograf</th><th>Alba</th><th>Fotky</th></tr></thead>
+      <tbody>
+        <% (cov.photographers || []).forEach(function (row, i) { %>
+        <tr>
+          <td class="tabular-nums"><%= i + 1 %></td>
+          <td><span class="text-white"><%= row.name %></span><% if (row.email) { %><span class="block text-xs text-11muted"><%= row.email %></span><% } %></td>
+          <td class="tabular-nums"><%= row.albums %></td>
+          <td class="tabular-nums"><%= row.photos %></td>
+        </tr>
+        <% }); %>
+        <% if (!(cov.photographers || []).length) { %><tr><td colspan="4">Zatím nikdo nahrál album.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="acc-stat mt-6">
+  <h2>Žádosti o fotoakreditaci</h2>
+  <p>Kdo nejčastěji žádá o photo akreditaci.</p>
+  <div class="acc-stat__table">
+    <table>
+      <thead><tr><th>Jméno</th><th>E-mail</th><th>Žádosti</th><th>Schváleno</th></tr></thead>
+      <tbody>
+        <% (cov.requestLeaders || []).forEach(function (row) { %>
+        <tr>
+          <td><%= row.name %></td>
+          <td><a class="text-11accent hover:underline" href="mailto:<%= row.email %>"><%= row.email %></a></td>
+          <td class="tabular-nums"><%= row.requests %></td>
+          <td class="tabular-nums"><%= row.approved %></td>
+        </tr>
+        <% }); %>
+        <% if (!(cov.requestLeaders || []).length) { %><tr><td colspan="4">Zatím žádné foto žádosti.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="acc-stat mt-6">
+  <h2>Přehled klubů</h2>
+  <p>Kdo tam kdy fotil.</p>
+  <div class="acc-stat__table acc-stat__table--wide">
+    <table>
+      <thead><tr><th>Klub</th><th>Fotograf</th><th>Soupeř</th><th>Datum</th><th>Album</th></tr></thead>
+      <tbody>
+        <% (cov.clubTimeline || []).forEach(function (row) { %>
+        <tr>
+          <td><%= row.club %></td>
+          <td><%= row.photographer %></td>
+          <td><%= row.opponent %></td>
+          <td class="tabular-nums whitespace-nowrap"><%= fmtCreated(row.match_date) %></td>
+          <td>
+            <% if (row.album_id) { %><a class="text-11accent hover:underline" href="/foto/alba/<%= row.album_id %>"><%= row.title %></a>
+            <% } else { %><%= row.title %><% } %>
+          </td>
+        </tr>
+        <% }); %>
+        <% if (!(cov.clubTimeline || []).length) { %><tr><td colspan="5">Zatím prázdné.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="acc-stat mt-6">
+  <h2>Přehled fotografů</h2>
+  <p>Kde jednotliví fotografové fotili.</p>
+  <div class="acc-stat__table acc-stat__table--wide">
+    <table>
+      <thead><tr><th>Fotograf</th><th>Zápas</th><th>Stadion</th><th>Datum</th></tr></thead>
+      <tbody>
+        <% (cov.photographerPlaces || []).forEach(function (row) { %>
+        <tr>
+          <td><%= row.photographer %></td>
+          <td>
+            <% if (row.album_id) { %><a class="text-11accent hover:underline" href="/foto/alba/<%= row.album_id %>"><%= row.home %> – <%= row.away %></a>
+            <% } else { %><%= row.home %> – <%= row.away %><% } %>
+          </td>
+          <td><%= row.venue || '—' %></td>
+          <td class="tabular-nums whitespace-nowrap"><%= fmtCreated(row.match_date) %></td>
+        </tr>
+        <% }); %>
+        <% if (!(cov.photographerPlaces || []).length) { %><tr><td colspan="4">Zatím prázdné.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<% } else if (activeTab === 'spis') { %>
 
 <form method="get" action="/administrace/akreditace" class="mt-6 flex flex-wrap items-end gap-3">
   <input type="hidden" name="tab" value="spis" />

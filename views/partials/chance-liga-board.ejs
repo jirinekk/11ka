@@ -46,7 +46,7 @@
   >
     <div class="cl-matches__scroller" data-cl-scroller>
       <% (league.matches || []).forEach(function (m) { %>
-      <article class="cl-card<%= m.isLive ? ' is-live' : '' %>">
+      <article class="cl-card<%= m.isLive ? ' is-live' : '' %><%= m.isDone ? ' is-done' : '' %>" data-cl-kickoff="<%= m.date || m.kickoff || '' %>">
         <p class="cl-card__comp"><%= m.league || league.label %></p>
         <p class="cl-card__meta"><%= m.meta || m.time || '' %></p>
         <div class="cl-card__duel">
@@ -62,14 +62,7 @@
             </<%= homeTag %>>
           </div>
           <div class="cl-card__mid">
-            <% if (m.isLive) { %>
-            <span class="cl-card__live">Živě</span>
-            <span class="cl-card__score"><%= m.score || '0:0' %></span>
-            <% } else if (m.isDone) { %>
-            <span class="cl-card__score"><%= m.score || '0:0' %></span>
-            <% } else { %>
-            <span class="cl-card__vs" aria-label="versus">VS</span>
-            <% } %>
+            <%- include('match-score', { m: m }) %>
           </div>
           <div class="cl-card__side">
             <% var awayTag = m.awayHref ? 'a' : 'span'; %>

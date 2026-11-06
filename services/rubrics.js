@@ -3,8 +3,23 @@ const { slugify, uniqueSlug } = require('../lib/slug');
 const { hasAnyRole } = require('../lib/roles');
 
 const DEFAULT_RUBRICS = [
-  { slug: 'hlas-edenu', label: 'Hlas Edenu', description: 'Slávistický sloupek' },
-  { slug: 'spartanska-konina', label: 'Sparťanská konina', description: 'Spartanský sloupek' },
+  {
+    slug: 'hlas-edenu',
+    label: 'Hlas Edenu',
+    description:
+      'Hlas Edenu je pravidelná týdenní rubrika zaměřená na aktuální dění v SK Slavia Praha. Každé pondělí přináší přehled nejdůležitějších událostí, novinek a zajímavostí ze světa sešívaných.',
+  },
+  {
+    slug: 'plzen-pod-lupo',
+    label: 'Viktorianský zápisník',
+    description:
+      'Dva trenéři, jedna lavička a odlišné výsledkové začátky. Martin Hyský a Radoslav Kováč dostali za úkol držet Viktorii Plzeň mezi českou elitou.',
+  },
+  {
+    slug: 'letna-pod-lupou',
+    label: 'Letná pod lupou',
+    description: 'Pravidelný pohled na dění ve Spartě Praha.',
+  },
 ];
 
 const LABEL_MAX = 80;

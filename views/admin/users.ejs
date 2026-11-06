@@ -7,9 +7,10 @@
     fotograf: 'Fotograf',
     spravce_akreditace: 'Správce Akreditace',
   };
+  var limitedUsers = typeof fotografOnlyMode !== 'undefined' && fotografOnlyMode;
   var roleList = typeof roles !== 'undefined' && roles && roles.length
     ? roles
-    : ['vedeni', 'sefredaktor', 'redaktor', 'fotograf', 'spravce_akreditace'];
+    : (limitedUsers ? ['fotograf'] : ['vedeni', 'sefredaktor', 'redaktor', 'fotograf', 'spravce_akreditace']);
   var roleCounts = {};
   roleList.forEach(function (r) { roleCounts[r] = 0; });
   users.forEach(function (u) {
@@ -25,13 +26,20 @@
 %>
 
 <div class="border-b border-white/10 pb-6">
-  <h1 class="text-2xl font-bold text-white md:text-3xl">Uživatelé</h1>
-  <p class="mt-1 text-sm text-11muted">Správa účtů a rolí · uživatel může mít více práv najednou · bio schvalujte v sekci <a href="/administrace/bio" class="text-11accent hover:underline">Bio</a></p>
+  <h1 class="text-2xl font-bold text-white md:text-3xl"><%= limitedUsers ? 'Fotografové' : 'Uživatelé' %></h1>
+  <p class="mt-1 text-sm text-11muted">
+    <% if (limitedUsers) { %>
+    Správce akreditace může zakládat jen účty s rolí fotograf.
+    <% } else { %>
+    Správa účtů a rolí · uživatel může mít více práv najednou · bio schvalujte v sekci <a href="/administrace/bio" class="text-11accent hover:underline">Bio</a>
+    <% } %>
+  </p>
 </div>
 
 <% if (error) { %><p class="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"><%= error %></p><% } %>
 <% if (success) { %><p class="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"><%= success %></p><% } %>
 
+<% if (!limitedUsers) { %>
 <section class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
   <div class="card-11 p-4">
     <p class="text-xs uppercase tracking-wide text-11muted">Majitel</p>
@@ -58,10 +66,17 @@
     <p class="mt-1 text-2xl font-bold text-white"><%= roleCounts.spravce_akreditace %></p>
   </div>
 </section>
+<% } %>
 
 <section class="card-11 mt-8 p-6">
-  <h2 class="text-lg font-semibold text-white">Nový uživatel</h2>
-  <p class="mt-1 text-sm text-11muted">Vytvořte účet a zaškrtněte jednu nebo více rolí. Např. Redaktor + Správce Akreditace. Samostatný Správce Akreditace vidí v adminu jen sekci Akreditace. Fotografové mají přístup do Fotáku a na stránce Redakce se nezobrazují.</p>
+  <h2 class="text-lg font-semibold text-white"><%= limitedUsers ? 'Nový fotograf' : 'Nový uživatel' %></h2>
+  <p class="mt-1 text-sm text-11muted">
+    <% if (limitedUsers) { %>
+    Účet dostane jen roli fotograf a přístup do Fotáku.
+    <% } else { %>
+    Vytvořte účet a zaškrtněte jednu nebo více rolí. Např. Redaktor + Správce Akreditace. Samostatný Správce Akreditace vidí v adminu Akreditace a Foták. Fotografové mají přístup do Fotáku a na stránce Redakce se nezobrazují.
+    <% } %>
+  </p>
   <form class="mt-4 grid gap-3 sm:grid-cols-2" method="post" action="/administrace/uzivatele">
     <input type="hidden" name="action" value="create" />
     <div class="sm:col-span-2">
@@ -74,6 +89,10 @@
     </div>
     <div class="sm:col-span-2">
       <p class="text-xs text-11muted">Role</p>
+      <% if (limitedUsers) { %>
+      <input type="hidden" name="roles" value="fotograf" />
+      <p class="mt-2 inline-flex items-center rounded-full border border-11accent/40 bg-11accent/10 px-3 py-1.5 text-sm font-semibold text-11accent">Fotograf</p>
+      <% } else { %>
       <div class="mt-2 flex flex-wrap gap-3">
         <% roleList.forEach(function (r) { %>
         <label class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-slate-200">
@@ -82,6 +101,7 @@
         </label>
         <% }); %>
       </div>
+      <% } %>
     </div>
     <div class="sm:col-span-2">
       <label class="text-xs text-11muted" for="n-name">Jméno (volitelné)</label>
@@ -122,6 +142,10 @@
         </div>
         <div class="sm:col-span-2">
           <p class="text-xs text-11muted">Role</p>
+          <% if (limitedUsers) { %>
+          <input type="hidden" name="roles" value="fotograf" />
+          <p class="mt-2 text-sm text-slate-300">Fotograf</p>
+          <% } else { %>
           <div class="mt-2 flex flex-wrap gap-3">
             <% roleList.forEach(function (r) { %>
             <label class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm text-slate-200">
@@ -130,6 +154,7 @@
             </label>
             <% }); %>
           </div>
+          <% } %>
         </div>
         <div class="sm:col-span-2">
           <label class="text-xs text-11muted">Jméno</label>

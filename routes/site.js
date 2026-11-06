@@ -11,8 +11,8 @@ const { formatCzDate, relativeTime } = require('../lib/format');
 const { slugify } = require('../lib/slug');
 const { parseBlocksInput, renderBlocksToHtml } = require('../lib/article-blocks');
 const { prepareLineupForView } = require('../lib/lineup');
-const { sendAccreditationRequest } = require('../services/mail');
 const accreditationService = require('../services/accreditation');
+const accreditationNotify = require('../services/accreditation-notify');
 const {
   resolveTagOptions,
   getTagsForNav,
@@ -591,6 +591,16 @@ async function renderAkreditacePage(req, res, opts = {}) {
   let rozpis = { liga: '', tym: '', leagues: ACC_ROZPIS_LEAGUES, teams: [], live: [], today: [], groups: [] };
   try {
     rozpis = await loadAkreditaceRozpis(liga, tym);
+    const counts = accreditationService.listMatchCounts();
+    const stamp = (f) => {
+      const hit = accreditationService.lookupMatchCounts(counts, f.matchName, f.matchDate);
+      f.photoCount = hit.photo || 0;
+      f.writerCount = hit.pisi || 0;
+      return f;
+    };
+    (rozpis.live || []).forEach(stamp);
+    (rozpis.today || []).forEach(stamp);
+    (rozpis.groups || []).forEach((g) => (g.items || []).forEach(stamp));
   } catch (err) {
     console.error('[11ka] akreditace rozpis:', err && err.message);
   }
@@ -1062,8 +1072,7 @@ function groupAgendaDays(leagues, fromDay) {
     (league.matches || []).forEach((m) => {
       const rawKey = m.dayKey || '';
       if (!rawKey && !m.isLive) return;
-      if (fromDay && rawKey && rawKey < fromDay && !m.isLive) return;
-      const key = m.isLive && fromDay ? fromDay : rawKey || fromDay;
+      const key = m.isLive && fromDay && rawKey === fromDay ? fromDay : rawKey || fromDay;
       if (!key) return;
       const bucket = ensure(key);
       let group = bucket.leagues.find((item) => item.id === league.id);
@@ -1115,6 +1124,13 @@ router.get('/zapasy/live', async (req, res) => {
     narodni = [];
   }
 
+  let molCup = [];
+  try {
+    molCup = await livesportChance.listMolCup();
+  } catch {
+    molCup = [];
+  }
+
   let repre = [];
   try {
     repre = await livesportChance.listCzechNational();
@@ -1122,18 +1138,47 @@ router.get('/zapasy/live', async (req, res) => {
     repre = [];
   }
 
+  let europe = [];
+  try {
+    europe = await livesportChance.listEuropeLeagues(48);
+  } catch {
+    europe = [];
+  }
+
   let leagues = [
     { id: 'chance-liga', label: 'Chance Liga', matches: agenda.matches || [] },
     { id: 'chance-narodni', label: 'Chance Národní liga', matches: narodni },
+    { id: 'mol-cup', label: 'MOL Cup', matches: molCup },
     { id: 'ceska-reprezentace', label: 'Česká reprezentace', matches: repre },
+    ...europe,
   ];
   try {
     const seenIds = new Set();
-    leagues.forEach((league) => (league.matches || []).forEach((m) => m.id && seenIds.add(m.id)));
+    const seenPairs = new Set();
+    const pairKey = (m) => {
+      const home = foldTeamName(m.home || m.homeName);
+      const away = foldTeamName(m.away || m.awayName);
+      const day = m.dayKey || livesportChance.pragueDayKey(m.date || m.kickoff || '');
+      return `${home}|${away}|${day}`;
+    };
+    leagues.forEach((league) =>
+      (league.matches || []).forEach((m) => {
+        if (m.id) seenIds.add(m.id);
+        seenPairs.add(pairKey(m));
+      })
+    );
     const extra = fotoService
       .listFixtures()
-      .filter((f) => (f.isLive || f.isToday) && !seenIds.has(f.id))
-      .map((f) => fotoService.fixtureToMatchCard(f));
+      .filter((f) => f.isLive || f.isToday)
+      .map((f) => fotoService.fixtureToMatchCard(f))
+      .filter((card) => {
+        if (card.id && seenIds.has(card.id)) return false;
+        const key = pairKey(card);
+        if (seenPairs.has(key)) return false;
+        if (card.id) seenIds.add(card.id);
+        seenPairs.add(key);
+        return true;
+      });
     const byLeague = new Map();
     extra.forEach((card) => {
       const label = card.league || 'Další zápasy';
@@ -1141,6 +1186,11 @@ router.get('/zapasy/live', async (req, res) => {
       byLeague.get(label).push(card);
     });
     byLeague.forEach((matches, label) => {
+      const existing = leagues.find((league) => league.label === label);
+      if (existing) {
+        existing.matches = (existing.matches || []).concat(matches);
+        return;
+      }
       leagues.push({
         id: `foto-${String(label).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
         label,
@@ -1165,7 +1215,14 @@ router.get('/zapasy/live', async (req, res) => {
     leagues = leagues.filter((league) => league.id === ligaFilter);
   }
 
-  const matchDays = groupAgendaDays(leagues, today).slice(0, 12);
+  let matchDays = groupAgendaDays(leagues, today);
+  const todayIdx = matchDays.findIndex((day) => day.day === today);
+  if (todayIdx >= 0) {
+    const start = Math.max(0, todayIdx - 10);
+    matchDays = matchDays.slice(start, start + 22);
+  } else {
+    matchDays = matchDays.slice(-16);
+  }
   const liveCount = matchDays.reduce(
     (sum, day) =>
       sum +
@@ -1190,7 +1247,11 @@ router.get('/zapasy/live', async (req, res) => {
       all: matchesHubQs({ live: liveOnly ? '1' : '' }, { liga: '' }),
       'chance-liga': matchesHubQs(qsBase, { liga: 'chance-liga' }),
       'chance-narodni': matchesHubQs(qsBase, { liga: 'chance-narodni' }),
+      'mol-cup': matchesHubQs(qsBase, { liga: 'mol-cup' }),
       'ceska-reprezentace': matchesHubQs(qsBase, { liga: 'ceska-reprezentace' }),
+      'liga-mistru': matchesHubQs(qsBase, { liga: 'liga-mistru' }),
+      'evropska-liga': matchesHubQs(qsBase, { liga: 'evropska-liga' }),
+      'konferencni-liga': matchesHubQs(qsBase, { liga: 'konferencni-liga' }),
     },
     chanceStandings,
     chanceClubs: chanceLigaLogos.listClubs(),
@@ -1200,7 +1261,7 @@ router.get('/zapasy/live', async (req, res) => {
     adMap,
     ...seoForPage({
       title: 'Zápasy - 11ka.cz',
-      description: 'Program, výsledky a tabulka Chance Ligy na 11ka.cz.',
+      description: 'Program, výsledky a tabulka Chance Ligy, evropských pohárů a MOL Cupu na 11ka.cz.',
       path: '/zapasy/live',
       structuredData: [
         {
@@ -1234,6 +1295,10 @@ router.get('/klub/:slug', async (req, res) => {
     ? hubRaw
     : 'soupiska';
 
+  const nl = req.query.newsletter;
+  const newsletterStatus =
+    nl === 'ok' || nl === 'dupe' || nl === 'bad' ? nl : null;
+
   res.render('klub', {
     title: `${club.name} - Chance Liga - 11ka`,
     activeNav: 'zapasy',
@@ -1241,10 +1306,15 @@ router.get('/klub/:slug', async (req, res) => {
     clubRow: profile.row,
     clubSquad: profile.squad,
     chanceStandings: profile.standings || [],
+    clubProgram: profile.program || [],
+    clubResults: profile.results || [],
     clubProgramLeagues: asChanceLeague('club-program', 'Program', profile.program),
     clubResultLeagues: asChanceLeague('club-results', 'Výsledky', profile.results),
     clubArticles,
     clubHubView,
+    sidebarMostRead: mostReadService.getMostReadCards({ layout: 'sidebar', limit: 4 }),
+    newsletter: homeFallback.newsletter,
+    newsletterStatus,
     ...seoForPage({
       title: `${club.name} - Chance Liga - 11ka`,
       description: `Profil ${club.name}: soupiska, program, výsledky a tabulka Chance Ligy na 11ka.cz.`,
@@ -1277,14 +1347,33 @@ router.get('/zapasy/chance/:slug', async (req, res) => {
   if (!match) {
     return res.status(404).render('404', { title: 'Zápas nenalezen - 11ka', activeNav: 'zapasy' });
   }
-  match = chanceLigaLogos.withLogos(match);
+  try {
+    const fx = fotoService.getFixtureById(match.id);
+    if (fx) {
+      const bothChance =
+        chanceLigaLogos.matchTeam(match.home) && chanceLigaLogos.matchTeam(match.away);
+      const misleadingChance =
+        /chance liga/i.test(String(match.league || '')) && !/narodni/i.test(String(match.league || '')) && !bothChance;
+      if (!match.league || misleadingChance) match.league = fx.league || match.league;
+      if (!match.round) match.round = fx.round || '';
+      if (!match.venue) match.venue = fx.venue || '';
+      if (!match.city) match.city = fx.city || '';
+      if (!match.date && fx.kickoff) {
+        match.date = fx.kickoff;
+        match.kickoff = fx.kickoff;
+      }
+    }
+  } catch {
+    /* seed fixture overlay optional */
+  }
+  match = livesportChance.decorateMatch(match);
   const matchArticles = articlesService
-    .listPublishedByMatchKey(`chance:${slug}`, 8)
+    .listPublishedForMatchSlug(slug, 8)
     .map((row) => mapArticleCard(row));
   const chanceStandings = await loadChanceStandings();
   let roundMates = [];
   try {
-    roundMates = await livesportChance.listSameRound(match.round, match.id);
+    roundMates = await livesportChance.listSameRound(match.round, match.id, match.league);
   } catch {
     roundMates = [];
   }
@@ -1293,7 +1382,8 @@ router.get('/zapasy/chance/:slug', async (req, res) => {
   const nl = req.query.newsletter;
   const newsletterStatus = nl === 'ok' || nl === 'dupe' || nl === 'bad' ? nl : null;
   const pageTitle = `${match.home} vs ${match.away}`;
-  const seoTitle = `${pageTitle} - Chance Liga - 11ka`;
+  const leagueName = match.league || 'Chance Liga';
+  const seoTitle = `${pageTitle} - ${leagueName} - 11ka`;
 
   res.render('chance-zapas-detail', {
     title: seoTitle,
@@ -1308,7 +1398,7 @@ router.get('/zapasy/chance/:slug', async (req, res) => {
     adMap,
     ...seoForPage({
       title: seoTitle,
-      description: `Zápas ${match.home} vs ${match.away} (Chance Liga) na 11ka.cz — skóre, střelci a sestavy.`,
+      description: `Zápas ${match.home} vs ${match.away} (${leagueName}) na 11ka.cz — skóre, střelci a sestavy.`,
       path: match.href || `/zapasy/chance/${slug}`,
       ogType: 'website',
       structuredData: [
@@ -1923,17 +2013,10 @@ router.post('/akreditace', akreditaceLimiter, async (req, res) => {
     });
   }
 
-  const mailResult = await sendAccreditationRequest({
-    email: data.email,
-    phone: data.phone,
-    name: data.name,
-    match: data.match,
-    matchDate: data.match_date,
-    accreditationType: data.accreditation_type,
-  });
-
-  if (mailResult.ok) {
-    accreditationService.markEmailSent(requestId);
+  try {
+    await accreditationNotify.afterAccreditationCreated(requestId, data);
+  } catch (err) {
+    console.error('[11ka] akreditace follow-up:', err && err.message);
   }
 
   res.redirect(302, '/akreditace?submitted=ok');
@@ -2580,10 +2663,9 @@ router.get('/clanek/:slug', async (req, res) => {
   const relatedArticles = articlesService
     .listRelatedForArticle(article, 6)
     .map((a) => mapArticleCard(a));
-  const mentionedTeams = articlesService.getMentionedTeams(article.id);
   let linkedMatch = null;
   const parsedMatch = articlesService.parseMatchKey(article.match_key);
-  if (parsedMatch && parsedMatch.type === 'chance') {
+  if (parsedMatch) {
     try {
       linkedMatch = chanceLigaLogos.withLogos(await livesportChance.getMatchDetail(parsedMatch.slug));
       if (linkedMatch && !linkedMatch.detailHref) linkedMatch.detailHref = parsedMatch.href;
@@ -2654,7 +2736,6 @@ router.get('/clanek/:slug', async (req, res) => {
     ratingSuccess: req.query.rate === 'ok',
     tags,
     relatedArticles,
-    mentionedTeams,
     linkedMatch,
     shareUrls,
     audioDurationSec: articleTts.estimateDurationSec({

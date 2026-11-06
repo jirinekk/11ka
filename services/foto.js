@@ -2,27 +2,60 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { getDb } = require('../db');
-const { slugify } = require('../lib/slug');
+const { slugify, uniqueSlug } = require('../lib/slug');
 const fotoS3 = require('./foto-s3');
-const { chancePlayerPhoto } = require('../lib/player-photos');
+const { chancePlayerPhoto, foldName } = require('../lib/player-photos');
+const livesportChance = require('./livesport-chance');
+const clubCrests = require('../lib/club-crests');
 
 const SEED_PATH = path.join(__dirname, '..', 'data', 'seed-foto.json');
 const FIXTURES_PATH = path.join(__dirname, '..', 'data', 'seed-foto-fixtures.json');
 
-const COMPETITIONS = [
-  'Chance Liga',
-  'Chance Národní Liga',
-  'MOL Cup',
-  'Fortuna liga žen',
-  'Liga mistrů',
-  'Evropská liga',
-  'Konferenční liga',
-  'Liga národů UEFA',
-  'ME do 21 let',
-  'Reprezentace',
-  'Dorost',
-  'Přátelské',
+const COMPETITION_GROUPS = [
+  {
+    label: 'České soutěže',
+    items: ['Chance Liga', 'Chance Národní Liga', 'MOL Cup', 'Ženská liga'],
+  },
+  {
+    label: 'Evropa',
+    items: ['Liga mistrů', 'Evropská liga', 'Konferenční liga', 'UEFA Youth League'],
+  },
+  {
+    label: 'Reprezentace',
+    items: [
+      'Reprezentace',
+      'Ženská reprezentace',
+      'Reprezentace do 21 let',
+      'Liga národů UEFA',
+      'ME do 21 let',
+    ],
+  },
+  {
+    label: 'Ostatní',
+    items: ['Dorost', 'Přátelské'],
+  },
 ];
+
+const COMPETITIONS = COMPETITION_GROUPS.flatMap((group) => group.items);
+
+const TEAM_LEAGUES_FOR_COMP = {
+  'Chance Liga': ['Chance Liga'],
+  'Chance Národní Liga': ['Chance Národní Liga'],
+  'MOL Cup': ['MOL Cup', 'Chance Liga', 'Chance Národní Liga'],
+  'Ženská liga': ['Fortuna liga žen', 'Ženská liga'],
+  'Fortuna liga žen': ['Fortuna liga žen', 'Ženská liga'],
+  'Liga mistrů': ['Liga mistrů', 'Chance Liga'],
+  'Evropská liga': ['Evropská liga', 'Chance Liga'],
+  'Konferenční liga': ['Konferenční liga', 'Chance Liga'],
+  'UEFA Youth League': ['UEFA Youth League', 'Chance Liga'],
+  'Liga národů UEFA': ['Liga národů UEFA', 'Reprezentace'],
+  'Reprezentace': ['Liga národů UEFA', 'Reprezentace'],
+  'Ženská reprezentace': ['Ženská reprezentace'],
+  'Reprezentace do 21 let': ['ME do 21 let', 'Reprezentace do 21 let'],
+  'ME do 21 let': ['ME do 21 let', 'Reprezentace do 21 let'],
+  Dorost: ['Dorost', 'UEFA Youth League'],
+  Přátelské: [],
+};
 
 function newId() {
   return `c${crypto.randomBytes(12).toString('hex')}`;
@@ -136,8 +169,23 @@ function ensureTables() {
       revoked_at TEXT,
       last_seen_at TEXT
     );
+    CREATE TABLE IF NOT EXISTS foto_logs (
+      id TEXT PRIMARY KEY,
+      actor_id INTEGER,
+      actor_email TEXT,
+      actor_name TEXT,
+      action TEXT NOT NULL,
+      album_id TEXT,
+      photo_id TEXT,
+      detail TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_foto_logs_created ON foto_logs (created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_foto_logs_album ON foto_logs (album_id, created_at DESC);
   `);
   seedIfEmpty();
+  cleanupDuplicateSquadPlayers();
+  ensureDerivedTeams();
 }
 
 function seedIfEmpty() {
@@ -356,9 +404,31 @@ function initials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function mediaToken(id, variant) {
+  const secret = process.env.SESSION_SECRET || 'dev-change-me';
+  const v = variant === 'view' || variant === 'original' ? 'view' : 'thumb';
+  return crypto
+    .createHmac('sha256', secret)
+    .update(`foto-media:${id}:${v}`)
+    .digest('base64url')
+    .slice(0, 27);
+}
+
+function checkMediaToken(id, variant, token) {
+  const expected = mediaToken(id, variant);
+  const got = String(token || '');
+  if (!got || got.length !== expected.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
 function mediaUrl(id, variant, extra) {
+  const v = variant || 'thumb';
   const q = extra ? `&${extra}` : '';
-  return `/foto/media/${encodeURIComponent(id)}?v=${encodeURIComponent(variant || 'thumb')}${q}`;
+  return `/foto/media/${encodeURIComponent(id)}?v=${encodeURIComponent(v)}&m=${mediaToken(id, v)}${q}`;
 }
 
 function albumScore(album) {
@@ -375,25 +445,49 @@ const ALBUM_SELECT = `
   ht.name AS home_name, ht.short_name AS home_short, ht.slug AS home_slug, ht.logo AS home_logo, ht.color AS home_color, ht.league AS home_league,
   at.name AS away_name, at.short_name AS away_short, at.slug AS away_slug, at.logo AS away_logo, at.color AS away_color, at.league AS away_league,
   u.name AS photographer_name, u.slug AS photographer_slug, u.avatar AS photographer_avatar, u.id AS photographer_id,
-  (SELECT COUNT(*) FROM foto_photos p WHERE p.album_id = a.id) AS photo_count
+  (SELECT COUNT(*) FROM foto_photos p WHERE p.album_id = a.id) AS photo_count,
+  COALESCE(
+    a.cover_photo_id,
+    (SELECT p.id FROM foto_photos p WHERE p.album_id = a.id ORDER BY p.sort_order ASC, p.created_at ASC, p.id ASC LIMIT 1)
+  ) AS preview_photo_id
 `;
+
+function prettyAlbumTitle(row) {
+  const raw = String(row.title || '').trim();
+  const home = String(row.home_name || '').trim();
+  const away = String(row.away_name || '').trim();
+  const fakeHome = /domaci|neznamy/i.test(String(row.home_slug || ''));
+  const fakeAway = /hoste|neznamy/i.test(String(row.away_slug || ''));
+  const hasTeams = home && away && !fakeHome && !fakeAway;
+  const generic =
+    !raw ||
+    raw === 'Obnovené album' ||
+    /^Fotky\s+\d/i.test(raw) ||
+    /^[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]{2,4}\s+vs\s+[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]{2,4}$/i.test(raw);
+  if (generic && hasTeams) return `${home} vs ${away}`;
+  if (raw === 'Obnovené album' && row.home_short && row.away_short) {
+    return `${row.home_short} vs ${row.away_short}`;
+  }
+  return raw;
+}
 
 function shapeAlbum(row) {
   if (!row) return null;
-  const title =
-    row.title === 'Obnovené album' ? `${row.home_short} vs ${row.away_short}` : row.title;
+  const title = prettyAlbumTitle(row);
   return {
     ...row,
     title,
     score: albumScore(row),
     date_label: formatDate(row.match_date),
     date_input: dateInput(row.match_date),
-    cover_url: row.cover_photo_id ? mediaUrl(row.cover_photo_id, 'thumb') : null,
+    cover_url: row.preview_photo_id || row.cover_photo_id
+      ? mediaUrl(row.preview_photo_id || row.cover_photo_id, 'thumb')
+      : null,
     photographer_initials: initials(row.photographer_name),
   };
 }
 
-function listAlbums({ tym, liga, q } = {}) {
+function listAlbums({ tym, liga, q, dateFrom, dateTo } = {}) {
   const db = getDb();
   const where = [];
   const params = {};
@@ -410,6 +504,14 @@ function listAlbums({ tym, liga, q } = {}) {
     );
     params.q = `%${q}%`;
   }
+  if (dateFrom) {
+    where.push(`substr(a.match_date, 1, 10) >= @dateFrom`);
+    params.dateFrom = dateFrom;
+  }
+  if (dateTo) {
+    where.push(`substr(a.match_date, 1, 10) <= @dateTo`);
+    params.dateTo = dateTo;
+  }
   const sql = `
     SELECT ${ALBUM_SELECT}
     FROM foto_albums a
@@ -422,29 +524,252 @@ function listAlbums({ tym, liga, q } = {}) {
   return db.prepare(sql).all(params).map(shapeAlbum);
 }
 
+const SQUAD_SYNC_TTL_MS = 30 * 60 * 1000;
+const squadSyncAt = new Map();
+const POS_ORDER = ['Brankáři', 'Obránci', 'Záložníci', 'Útočníci'];
+
+function shapeSquadPlayer(p, teamName) {
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    number: p.number,
+    position: p.position || '',
+    livesportId: p.livesport_id || '',
+    photo: chancePlayerPhoto(p.livesport_id, p.name, teamName) || p.photo || '/user.png',
+  };
+}
+
+function groupSquadPlayers(players) {
+  const byPos = new Map();
+  const order = [];
+  for (const p of players) {
+    const title = normalizePosition(p.position);
+    if (!byPos.has(title)) {
+      byPos.set(title, []);
+      order.push(title);
+    }
+    byPos.get(title).push(p);
+  }
+  order.sort((a, b) => {
+    const ia = POS_ORDER.indexOf(a);
+    const ib = POS_ORDER.indexOf(b);
+    if (!a) return 1;
+    if (!b) return -1;
+    if (ia === -1 && ib === -1) return a.localeCompare(b, 'cs');
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+  return order.map((title) => ({ title, players: byPos.get(title) || [] }));
+}
+
 function packSquad(teamId, name, shortName, logo) {
   if (!teamId) {
-    return { id: null, name: name || '', short: shortName || '', logo: logo || '', players: [] };
+    return { id: null, name: name || '', short: shortName || '', logo: logo || '', players: [], groups: [] };
   }
+  const players = listTeamPlayers(teamId, 'PLAYER').map((p) => shapeSquadPlayer(p, name));
   return {
     id: teamId,
     name: name || '',
     short: shortName || '',
     logo: logo || '',
-    players: listTeamPlayers(teamId, 'PLAYER').map((p) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      number: p.number,
-      position: p.position || '',
-      livesportId: p.livesport_id || '',
-      photo: chancePlayerPhoto(p.livesport_id, p.name, name) || p.photo || '/user.png',
-    })),
+    players,
+    groups: groupSquadPlayers(players),
   };
 }
 
-function albumSquads(album) {
+function nameKey(name) {
+  return foldName(name)
+    .split(' ')
+    .filter(Boolean)
+    .sort()
+    .join(' ');
+}
+
+const NAME_PARTICLE = /^(van|von|de|der|den|di|da|la|le|del|du|ter|ten|tot|te)$/i;
+const CANONICAL_PLAYER_NAMES = {
+  'buren mick van': 'Mick Van Buren',
+};
+
+function canonicalizePlayerName(name) {
+  const key = nameKey(name);
+  return CANONICAL_PLAYER_NAMES[key] || String(name || '').trim();
+}
+
+function preferPersonName(...names) {
+  const list = names.map((n) => String(n || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (!list.length) return '';
+  const score = (n) => {
+    const parts = n.split(' ');
+    let s = 0;
+    if (NAME_PARTICLE.test(parts[parts.length - 1])) s -= 4;
+    if (NAME_PARTICLE.test(parts[0])) s -= 2;
+    if (parts.length >= 2 && NAME_PARTICLE.test(parts[1])) s += 3;
+    s += Math.min(parts.length, 4);
+    return s;
+  };
+  return list.slice().sort((a, b) => score(b) - score(a) || b.length - a.length)[0];
+}
+
+function photographerCredit(name) {
+  const n = String(name || '').trim();
+  return n ? `${n} / 11ka` : '11ka';
+}
+
+let squadCleanupDone = false;
+
+function mergeDuplicateSquadPlayers(teamId) {
+  if (!teamId) return;
+  const db = getDb();
+  const players = listTeamPlayers(teamId, 'PLAYER');
+  const groups = new Map();
+  for (const p of players) {
+    const keyName = nameKey(p.name);
+    if (!keyName) continue;
+    const key = `${p.number == null || p.number === '' ? '' : Number(p.number)}|${keyName}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(p);
+  }
+  const retag = db.prepare(
+    'UPDATE OR IGNORE foto_photo_tags SET player_id = ? WHERE player_id = ?'
+  );
+  const delTags = db.prepare('DELETE FROM foto_photo_tags WHERE player_id = ?');
+  const reOfficial = db.prepare(
+    'UPDATE OR IGNORE foto_album_officials SET player_id = ? WHERE player_id = ?'
+  );
+  const delOfficial = db.prepare('DELETE FROM foto_album_officials WHERE player_id = ?');
+  const reShare = db.prepare('UPDATE foto_shares SET player_id = ? WHERE player_id = ?');
+  const delPlayer = db.prepare('DELETE FROM foto_players WHERE id = ?');
+  const rename = db.prepare('UPDATE foto_players SET name = ? WHERE id = ?');
+  const run = db.transaction(() => {
+    for (const list of groups.values()) {
+      const keeper = list.slice().sort((a, b) => {
+        const score = (p) => (p.livesport_id ? 4 : 0) + (p.photo ? 1 : 0) + (p.tag_count || 0);
+        return score(b) - score(a);
+      })[0];
+      const nextName = canonicalizePlayerName(preferPersonName(...list.map((p) => p.name)));
+      if (nextName && nextName !== keeper.name) rename.run(nextName, keeper.id);
+      for (const extra of list) {
+        if (extra.id === keeper.id) continue;
+        retag.run(keeper.id, extra.id);
+        delTags.run(extra.id);
+        reOfficial.run(keeper.id, extra.id);
+        delOfficial.run(extra.id);
+        reShare.run(keeper.id, extra.id);
+        delPlayer.run(extra.id);
+      }
+    }
+  });
+  run();
+}
+
+function cleanupDuplicateSquadPlayers() {
+  if (squadCleanupDone) return;
+  squadCleanupDone = true;
+  try {
+    const teams = getDb()
+      .prepare('SELECT DISTINCT team_id AS id FROM foto_players WHERE team_id IS NOT NULL')
+      .all();
+    for (const t of teams) mergeDuplicateSquadPlayers(t.id);
+  } catch (err) {
+    squadCleanupDone = false;
+    console.error('[11ka] foto squad cleanup failed:', err && err.message);
+  }
+}
+
+function normalizePosition(title) {
+  const t = String(title || '').trim();
+  if (/brank/i.test(t)) return 'Brankáři';
+  if (/obr[aá]nc/i.test(t)) return 'Obránci';
+  if (/z[aá]lo[zž]/i.test(t)) return 'Záložníci';
+  if (/[uú]to[cč]/i.test(t)) return 'Útočníci';
+  return t;
+}
+
+function findSquadPlayer(existing, name, number) {
+  const folded = foldName(name);
+  if (!folded) return null;
+  const key = nameKey(name);
+  const exact = existing.find((p) => foldName(p.name) === folded || nameKey(p.name) === key);
+  if (exact) return exact;
+  const last = folded.split(' ').filter(Boolean).pop();
+  const lastHits = existing.filter((p) => {
+    const parts = foldName(p.name).split(' ').filter(Boolean);
+    return parts[parts.length - 1] === last;
+  });
+  if (number != null && number !== '') {
+    const n = Number(number);
+    const byNum = lastHits.filter((p) => Number(p.number) === n);
+    if (byNum.length === 1) return byNum[0];
+    const sameNum = existing.filter((p) => Number(p.number) === n && nameKey(p.name).includes(last));
+    if (sameNum.length === 1) return sameNum[0];
+  }
+  if (lastHits.length === 1) return lastHits[0];
+  return null;
+}
+
+async function syncTeamSquad(teamId, teamName) {
+  if (!teamId || !teamName) return;
+  const prev = squadSyncAt.get(teamId) || 0;
+  if (Date.now() - prev < SQUAD_SYNC_TTL_MS) return;
+  let data = { groups: [], coach: null };
+  try {
+    data = await livesportChance.getSquadForTeamName(teamName);
+  } catch (err) {
+    console.error('[11ka] foto squad sync failed:', teamName, err && err.message);
+    squadSyncAt.set(teamId, Date.now());
+    return;
+  }
+  if (!data || !Array.isArray(data.groups) || !data.groups.length) {
+    squadSyncAt.set(teamId, Date.now());
+    return;
+  }
+  const db = getDb();
+  const existing = listTeamPlayers(teamId, 'PLAYER');
+  const now = new Date().toISOString();
+  const slugTaken = db.prepare('SELECT id FROM foto_players WHERE slug = ?');
+  const update = db.prepare(
+    `UPDATE foto_players SET name = ?, number = ?, position = ? WHERE id = ?`
+  );
+  const insert = db.prepare(
+    `INSERT INTO foto_players (id, name, slug, number, position, photo, livesport_id, role, team_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'PLAYER', ?, ?)`
+  );
+  const run = db.transaction(() => {
+    for (const group of data.groups) {
+        const position = normalizePosition(group.title);
+      for (const p of group.players || []) {
+        if (p.out) continue;
+        const name = canonicalizePlayerName(String(p.name || '').trim());
+        if (!name) continue;
+        const number = /^\d+$/.test(String(p.jersey || '')) ? Number(p.jersey) : null;
+        const hit = findSquadPlayer(existing, name, number);
+        if (hit) {
+          const nextName = canonicalizePlayerName(preferPersonName(hit.name, name));
+          update.run(nextName, number, position || hit.position || null, hit.id);
+          hit.name = nextName;
+          hit.number = number;
+          continue;
+        }
+        const slug = uniqueSlug(slugify(name), (s) => Boolean(slugTaken.get(s)));
+        const id = newId();
+        insert.run(id, name, slug, number, position || null, null, null, teamId, now);
+        existing.push({ id, name, slug, number, position, team_id: teamId });
+      }
+    }
+  });
+  run();
+  mergeDuplicateSquadPlayers(teamId);
+  squadSyncAt.set(teamId, Date.now());
+}
+
+async function albumSquads(album) {
   if (!album) return { home: packSquad(null), away: packSquad(null) };
+  await Promise.all([
+    syncTeamSquad(album.home_team_id, album.home_name || album.home_short),
+    syncTeamSquad(album.away_team_id, album.away_name || album.away_short),
+  ]);
   return {
     home: packSquad(album.home_team_id, album.home_name, album.home_short, album.home_logo),
     away: packSquad(album.away_team_id, album.away_name, album.away_short, album.away_logo),
@@ -476,7 +801,8 @@ function listAlbumPhotos(albumId) {
     .all(albumId);
   const tags = db
     .prepare(
-      `SELECT t.id, t.photo_id, t.x, t.y, p.name, p.slug, p.number, tm.short_name AS team, tm.slug AS team_slug
+      `SELECT t.id, t.photo_id, t.x, t.y, p.name, p.slug, p.number, p.photo, p.livesport_id,
+              tm.short_name AS team, tm.slug AS team_slug, tm.name AS team_name
        FROM foto_photo_tags t
        JOIN foto_players p ON p.id = t.player_id
        LEFT JOIN foto_teams tm ON tm.id = p.team_id
@@ -494,6 +820,7 @@ function listAlbumPhotos(albumId) {
         name: tag.name,
         slug: tag.slug,
         number: tag.number,
+        photo: chancePlayerPhoto(tag.livesport_id, tag.name, tag.team_name) || tag.photo || '/user.png',
         team: tag.team || null,
         teamSlug: tag.team_slug || null,
       },
@@ -568,6 +895,16 @@ function listTeams({ q, liga } = {}) {
     .all(params);
 }
 
+function teamsForPicker() {
+  return listTeams().map((t) => ({
+    id: t.id,
+    name: t.name,
+    short: t.short_name,
+    league: t.league || 'Ostatní',
+    logo: t.logo || '',
+  }));
+}
+
 function listTeamPlayers(teamId, role) {
   const db = getDb();
   if (role) {
@@ -629,10 +966,12 @@ function playerPhotos(playerId, limit = 60) {
   const db = getDb();
   return db
     .prepare(
-      `SELECT ph.id, ph.width, ph.height, ph.kind, a.id AS album_id, a.title AS album_title
+      `SELECT ph.id, ph.width, ph.height, ph.kind, a.id AS album_id, a.title AS album_title,
+              u.name AS photographer_name
        FROM foto_photo_tags t
        JOIN foto_photos ph ON ph.id = t.photo_id
        JOIN foto_albums a ON a.id = ph.album_id
+       JOIN foto_users u ON u.id = a.photographer_id
        WHERE t.player_id = ?
        ORDER BY a.match_date DESC
        LIMIT ?`
@@ -642,7 +981,40 @@ function playerPhotos(playerId, limit = 60) {
       ...p,
       thumbSrc: mediaUrl(p.id, 'thumb'),
       viewSrc: mediaUrl(p.id, 'view'),
+      credit: photographerCredit(p.photographer_name),
     }));
+}
+
+function shapePickerPlayer(p) {
+  if (!p) return null;
+  return {
+    id: p.id,
+    name: p.name,
+    number: p.number,
+    team: p.team_short || p.team_name || '',
+    photo: chancePlayerPhoto(p.livesport_id, p.name, p.team_name) || p.photo || '/user.png',
+    photo_count: p.tag_count || 0,
+  };
+}
+
+function pickerPlayers(q) {
+  const query = String(q || '').trim();
+  let list = listPlayers({ q: query || undefined, role: 'PLAYER' });
+  if (!query) list = list.filter((p) => Number(p.tag_count) > 0);
+  return list.slice(0, 40).map(shapePickerPlayer);
+}
+
+function pickerPlayer(id) {
+  const p = getDb()
+    .prepare(
+      `SELECT p.*, t.name AS team_name, t.short_name AS team_short,
+        (SELECT COUNT(*) FROM foto_photo_tags tg WHERE tg.player_id = p.id) AS tag_count
+       FROM foto_players p
+       LEFT JOIN foto_teams t ON t.id = p.team_id
+       WHERE p.id = ?`
+    )
+    .get(id);
+  return shapePickerPlayer(p);
 }
 
 function listPhotographers() {
@@ -652,6 +1024,7 @@ function listPhotographers() {
         (SELECT COUNT(*) FROM foto_albums a WHERE a.photographer_id = u.id) AS album_count
        FROM foto_users u
        WHERE u.status = 'APPROVED' AND u.role IN ('PHOTOGRAPHER', 'ADMIN')
+         AND u.slug != 'neznamy-fotograf'
        ORDER BY album_count DESC, u.name ASC`
     )
     .all();
@@ -757,12 +1130,16 @@ function listFixtures({ liga, q } = {}) {
 
 function fixtureToMatchCard(f) {
   const slug = `${slugify(f.homeName || 'domaci')}-vs-${slugify(f.awayName || 'hoste')}-${f.id}`;
-  return {
+  const homeSlug = f.homeSlug || slugify(f.homeName || '');
+  const awaySlug = f.awaySlug || slugify(f.awayName || '');
+  return livesportChance.decorateMatch({
     id: f.id,
     home: f.homeName,
     away: f.awayName,
-    homeLogo: f.homeLogo || '',
-    awayLogo: f.awayLogo || '',
+    homeLogo: clubCrests.isUsableLogo(f.homeLogo) ? f.homeLogo : '',
+    awayLogo: clubCrests.isUsableLogo(f.awayLogo) ? f.awayLogo : '',
+    homeSlug,
+    awaySlug,
     date: f.kickoff,
     kickoff: f.kickoff,
     dayKey: f.date_key,
@@ -775,8 +1152,14 @@ function fixtureToMatchCard(f) {
     league: f.league || '',
     round: f.round || '',
     detailHref: `/zapasy/chance/${slug}`,
-    matchKey: `foto:${f.id}`,
-  };
+    matchKey: `${livesportChance.matchKeyPrefix(f.league)}:${slug}`,
+  });
+}
+
+function getFixtureById(id) {
+  const key = String(id || '').trim();
+  if (!key) return null;
+  return loadFixtures().find((f) => String(f.id) === key) || null;
 }
 
 function fixtureLeagues() {
@@ -799,11 +1182,56 @@ function stats() {
 function ensurePhotographerForUser(user) {
   const db = getDb();
   const email = String(user && user.email ? user.email : '').trim().toLowerCase();
-  if (email) {
-    const existing = db.prepare('SELECT * FROM foto_users WHERE email = ?').get(email);
+  const slug = String(user && user.slug ? user.slug : '').trim().toLowerCase();
+  const aliases = new Set();
+  if (email) aliases.add(email);
+  const display = String(user && (user.display_name || user.name) ? user.display_name || user.name : '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  if (
+    email === 'admin@11ka.local' ||
+    email === 'jgalba@11ka.cz' ||
+    email === 'admin@11ka.cz' ||
+    slug === 'jiri-galba' ||
+    display.includes('jiri galba')
+  ) {
+    aliases.add('admin@11ka.cz');
+    aliases.add('admin@11ka.local');
+    aliases.add('jgalba@11ka.cz');
+  }
+  for (const key of aliases) {
+    const existing = db.prepare('SELECT * FROM foto_users WHERE email = ?').get(key);
     if (existing) return existing;
   }
+  const byGalbaSlug = db.prepare(`SELECT * FROM foto_users WHERE slug = 'jiri-galba'`).get();
+  if (byGalbaSlug && (aliases.has('admin@11ka.cz') || slug === 'jiri-galba')) return byGalbaSlug;
+  if (slug) {
+    const bySlug = db.prepare('SELECT * FROM foto_users WHERE slug = ? COLLATE NOCASE').get(slug);
+    if (bySlug) return bySlug;
+  }
   const name = (user && (user.display_name || user.email)) || 'Redakce 11ka';
+  const folded = String(name)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  if (folded) {
+    const byName = db
+      .prepare(`SELECT * FROM foto_users WHERE role IN ('PHOTOGRAPHER','ADMIN') AND status = 'APPROVED'`)
+      .all()
+      .find((row) => {
+        const n = String(row.name || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, ' ')
+          .trim();
+        return n === folded;
+      });
+    if (byName) return byName;
+  }
   const baseSlug = String(name)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -811,17 +1239,90 @@ function ensurePhotographerForUser(user) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
     .slice(0, 60) || 'redakce';
-  let slug = baseSlug;
+  let nextSlug = baseSlug;
   let i = 2;
-  while (db.prepare('SELECT id FROM foto_users WHERE slug = ?').get(slug)) {
-    slug = `${baseSlug}-${i++}`;
+  while (db.prepare('SELECT id FROM foto_users WHERE slug = ?').get(nextSlug)) {
+    nextSlug = `${baseSlug}-${i++}`;
   }
   const id = newId();
   db.prepare(
     `INSERT INTO foto_users (id, email, name, slug, avatar, role, status, created_at)
      VALUES (?, ?, ?, ?, ?, 'PHOTOGRAPHER', 'APPROVED', ?)`
-  ).run(id, email || null, name, slug, user && user.avatar_path ? user.avatar_path : null, new Date().toISOString());
+  ).run(id, email || null, name, nextSlug, user && user.avatar_path ? user.avatar_path : null, new Date().toISOString());
   return db.prepare('SELECT * FROM foto_users WHERE id = ?').get(id);
+}
+
+function uniqueTeamSlug(db, name) {
+  const slugBase =
+    String(name || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 80) || `tym-${newId().slice(0, 6)}`;
+  let slug = slugBase;
+  let i = 2;
+  while (db.prepare('SELECT id FROM foto_teams WHERE slug = ?').get(slug)) {
+    slug = `${slugBase}-${i++}`;
+  }
+  return slug;
+}
+
+function insertDerivedTeam(source, { name, shortName, league }) {
+  const db = getDb();
+  const n = String(name || '').trim();
+  if (n.length < 2) return null;
+  const existing = db.prepare('SELECT id FROM foto_teams WHERE name = ? COLLATE NOCASE').get(n);
+  if (existing) return existing;
+  const short = String(shortName || source.short_name || n)
+    .trim()
+    .slice(0, 8)
+    .toUpperCase();
+  db.prepare(
+    `INSERT INTO foto_teams (id, name, slug, short_name, city, color, logo, league)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    newId(),
+    n,
+    uniqueTeamSlug(db, n),
+    short,
+    source.city || null,
+    source.color || '#16dffb',
+    source.logo || null,
+    league
+  );
+  return true;
+}
+
+function ensureDerivedTeams() {
+  const db = getDb();
+  const seniors = db
+    .prepare(
+      `SELECT * FROM foto_teams
+       WHERE league IN ('Liga národů UEFA', 'Reprezentace')
+       ORDER BY name`
+    )
+    .all();
+  for (const team of seniors) {
+    if (/\bženy\b/i.test(team.name) || /\bu21\b/i.test(team.name) || /\bu19\b/i.test(team.name)) {
+      continue;
+    }
+    insertDerivedTeam(team, {
+      name: `${team.name} ženy`,
+      shortName: team.short_name,
+      league: 'Ženská reprezentace',
+    });
+  }
+  const clubs = db.prepare(`SELECT * FROM foto_teams WHERE league = 'Chance Liga' ORDER BY name`).all();
+  for (const team of clubs) {
+    if (/\bu19\b/i.test(team.name) || /\bž\b/i.test(team.name)) continue;
+    insertDerivedTeam(team, {
+      name: `${team.name} U19`,
+      shortName: team.short_name,
+      league: 'UEFA Youth League',
+    });
+  }
 }
 
 function findOrCreateTeam({ id, name, shortName }) {
@@ -929,22 +1430,23 @@ async function addPhotoFile(albumId, file) {
   const db = getDb();
   const album = db.prepare('SELECT id FROM foto_albums WHERE id = ?').get(albumId);
   if (!album) return null;
-  const sharp = require('sharp');
+  const { toWebJpeg } = require('../lib/optimize-upload-image');
   const buf = file.buffer;
   const id = newId();
   let width = 0;
   let height = 0;
   let thumbBuf = buf;
   try {
-    const image = sharp(buf, { failOn: 'none' }).rotate();
-    const meta = await image.metadata();
+    const sharp = require('sharp');
+    const meta = await sharp(buf, {
+      failOn: 'none',
+      sequentialRead: true,
+      limitInputPixels: 268402689,
+    }).rotate().metadata();
     width = meta.width || 0;
     height = meta.height || 0;
-    thumbBuf = await image
-      .clone()
-      .resize({ width: 1800, height: 1800, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 82, mozjpeg: true })
-      .toBuffer();
+    thumbBuf =
+      (await toWebJpeg(buf, { maxWidth: 1400, quality: 80 })) || buf;
   } catch {
     thumbBuf = buf;
   }
@@ -1005,6 +1507,136 @@ function deletePhoto(photoId) {
   return true;
 }
 
+function deleteAlbum(id) {
+  const db = getDb();
+  const album = db.prepare('SELECT id FROM foto_albums WHERE id = ?').get(id);
+  if (!album) return false;
+  const photos = db
+    .prepare('SELECT original_path, thumb_path FROM foto_photos WHERE album_id = ?')
+    .all(id);
+  db.prepare('UPDATE foto_albums SET cover_photo_id = NULL WHERE id = ?').run(id);
+  db.prepare('DELETE FROM foto_album_officials WHERE album_id = ?').run(id);
+  db.prepare(
+    'DELETE FROM foto_photo_tags WHERE photo_id IN (SELECT id FROM foto_photos WHERE album_id = ?)'
+  ).run(id);
+  db.prepare('DELETE FROM foto_photos WHERE album_id = ?').run(id);
+  db.prepare('DELETE FROM foto_albums WHERE id = ?').run(id);
+  for (const photo of photos) {
+    for (const rel of [photo.original_path, photo.thumb_path]) {
+      if (!rel || fotoS3.isS3Path(rel) || String(rel).startsWith('http')) continue;
+      try {
+        if (fs.existsSync(rel)) fs.unlinkSync(rel);
+      } catch {
+        /* ignore missing files */
+      }
+    }
+  }
+  return true;
+}
+
+function parseMatchSides(match) {
+  const raw = String(match || '').trim();
+  const parts = raw.split(/\s*(?:–|—|−|-|vs\.?)\s*/i).map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) return { home: parts[0], away: parts.slice(1).join(' - ') };
+  return { home: raw || 'Domácí', away: 'Soupeř' };
+}
+
+function createAlbumFromAccreditation(data) {
+  const sides = parseMatchSides(data && data.match);
+  let homeName = sides.home;
+  let awayName = sides.away;
+  if (homeName.toLowerCase() === awayName.toLowerCase()) awayName = `${awayName} (hosté)`;
+  const photographer = ensurePhotographerForUser({
+    email: data && data.email,
+    display_name: data && data.name,
+  });
+  const noteBits = ['Fotoakreditace', data && data.name, data && data.email, data && data.phone].filter(Boolean);
+  return createAlbum({
+    title: String(data && data.match ? data.match : '').trim() || `${homeName} vs ${awayName}`,
+    matchDate: data && data.match_date,
+    competition: 'Chance Liga',
+    notes: noteBits.join(' · '),
+    homeTeamName: homeName,
+    awayTeamName: awayName,
+    photographerId: photographer.id,
+  });
+}
+
+function logEvent({ actorId, actorEmail, actorName, action, albumId, photoId, detail } = {}) {
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO foto_logs (id, actor_id, actor_email, actor_name, action, album_id, photo_id, detail, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    newId(),
+    actorId || null,
+    String(actorEmail || '').trim() || null,
+    String(actorName || '').trim() || null,
+    String(action || 'action').slice(0, 40),
+    albumId || null,
+    photoId || null,
+    String(detail || '').trim().slice(0, 500) || null,
+    new Date().toISOString()
+  );
+}
+
+function listLogs({ q, dateFrom, dateTo, action, limit = 200 } = {}) {
+  const db = getDb();
+  const where = [];
+  const params = {};
+  if (action) {
+    where.push('l.action = @action');
+    params.action = action;
+  }
+  if (q) {
+    where.push(
+      `(l.actor_name LIKE @q OR l.actor_email LIKE @q OR l.detail LIKE @q OR l.action LIKE @q OR a.title LIKE @q)`
+    );
+    params.q = `%${q}%`;
+  }
+  if (dateFrom) {
+    where.push(`substr(l.created_at, 1, 10) >= @dateFrom`);
+    params.dateFrom = dateFrom;
+  }
+  if (dateTo) {
+    where.push(`substr(l.created_at, 1, 10) <= @dateTo`);
+    params.dateTo = dateTo;
+  }
+  params.limit = Math.min(500, Math.max(20, Number(limit) || 200));
+  return db
+    .prepare(
+      `SELECT l.id, l.actor_id, l.actor_email, l.actor_name, l.action, l.album_id, l.photo_id, l.detail, l.created_at,
+              a.title AS album_title
+       FROM foto_logs l
+       LEFT JOIN foto_albums a ON a.id = l.album_id
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       ORDER BY l.created_at DESC
+       LIMIT @limit`
+    )
+    .all(params);
+}
+
+async function convertDownload(photo, format) {
+  const source = await readMediaBytes(photo, 'original');
+  if (!source) return null;
+  const fmt = String(format || 'jpeg').toLowerCase();
+  const originalExt = path.extname(photo.original_name || '') || '.jpg';
+  if (fmt === 'original') {
+    return {
+      buf: source.buf,
+      contentType: source.contentType || photo.mime_type || 'image/jpeg',
+      ext: originalExt,
+    };
+  }
+  const sharp = require('sharp');
+  if (fmt === 'webp') {
+    const buf = await sharp(source.buf, { failOn: 'none' }).rotate().webp({ quality: 86 }).toBuffer();
+    return { buf, contentType: 'image/webp', ext: '.webp' };
+  }
+  const buf = await sharp(source.buf, { failOn: 'none' }).rotate().jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+  return { buf, contentType: 'image/jpeg', ext: '.jpg' };
+}
+
 function shapeTag(row) {
   if (!row) return null;
   return {
@@ -1017,6 +1649,7 @@ function shapeTag(row) {
       name: row.name,
       slug: row.slug,
       number: row.number,
+      photo: chancePlayerPhoto(row.livesport_id, row.name, row.team_name) || row.photo || '/user.png',
       team: row.team || null,
       teamSlug: row.team_slug || null,
     },
@@ -1027,8 +1660,8 @@ function getTag(id) {
   return shapeTag(
     getDb()
       .prepare(
-        `SELECT t.id, t.photo_id, t.x, t.y, t.player_id, p.name, p.slug, p.number,
-                tm.short_name AS team, tm.slug AS team_slug
+        `SELECT t.id, t.photo_id, t.x, t.y, t.player_id, p.name, p.slug, p.number, p.photo, p.livesport_id,
+                tm.short_name AS team, tm.slug AS team_slug, tm.name AS team_name
          FROM foto_photo_tags t
          JOIN foto_players p ON p.id = t.player_id
          LEFT JOIN foto_teams tm ON tm.id = p.team_id
@@ -1124,14 +1757,58 @@ function findHeroByTag(query) {
     return {
       photoId: photo.id,
       player: { name: hit.player.name, slug: hit.player.slug, team: hit.player.team_name || null },
-      credit: `${photo.photographer || 'Foták 11ka'} / foto.11ka.cz`,
+      credit: photographerCredit(photo.photographer || 'Foták 11ka'),
     };
   }
   return null;
 }
 
+function mimeExt(mime, originalName) {
+  const fromName = path.extname(String(originalName || '')).toLowerCase();
+  if (fromName && /^\.(jpe?g|png|webp|gif)$/.test(fromName)) return fromName === '.jpeg' ? '.jpg' : fromName;
+  const m = String(mime || '').toLowerCase();
+  if (m.includes('png')) return '.png';
+  if (m.includes('webp')) return '.webp';
+  if (m.includes('gif')) return '.gif';
+  return '.jpg';
+}
+
+async function copyPhotoForPublic(photoId, destDir, publicPrefix) {
+  const photo = getPhoto(photoId);
+  if (!photo) return { error: 'Fotka nenalezena' };
+  const album = getAlbum(photo.album_id);
+  const source = await readMediaBytes(photo, 'view');
+  if (!source || !source.buf) return { error: 'Soubor fotky chybí' };
+  if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+  const { toWebJpeg, MAX_WIDTH, JPEG_QUALITY } = require('../lib/optimize-upload-image');
+  let out = source.buf;
+  let ext = '.jpg';
+  try {
+    const web = await toWebJpeg(source.buf, { maxWidth: MAX_WIDTH, quality: JPEG_QUALITY });
+    if (web && web.length) {
+      out = web;
+      ext = '.jpg';
+    } else {
+      ext = mimeExt(photo.mime_type || source.contentType, photo.original_name);
+    }
+  } catch {
+    ext = mimeExt(photo.mime_type || source.contentType, photo.original_name);
+  }
+  const filename = crypto.randomBytes(16).toString('hex') + ext;
+  fs.writeFileSync(path.join(destDir, filename), out);
+  return {
+    path: `${publicPrefix}/${filename}`,
+    credit: photographerCredit(album && album.photographer_name),
+    photographer: (album && album.photographer_name) || '',
+  };
+}
+
 async function readMediaBytes(photo, variant) {
   const rel = variant === 'view' || variant === 'original' ? photo.original_path : photo.thumb_path;
+  if (rel && typeof fotoS3.readDiskCache === 'function') {
+    const cached = fotoS3.readDiskCache(rel);
+    if (cached) return cached;
+  }
   if (fotoS3.isS3Path(rel) && fotoS3.hasS3Store()) {
     try {
       const hit = await fotoS3.readS3Bytes(rel);
@@ -1151,30 +1828,40 @@ async function readMediaBytes(photo, variant) {
     }
   }
   const remote = await fotoS3.readRemotePublicMedia(photo.id, variant === 'view' || variant === 'original' ? 'view' : 'thumb');
-  if (remote) return remote;
+  if (remote) {
+    if (rel && typeof fotoS3.writeDiskCache === 'function') fotoS3.writeDiskCache(rel, remote);
+    return remote;
+  }
   return null;
 }
 
 module.exports = {
   COMPETITIONS,
+  COMPETITION_GROUPS,
+  TEAM_LEAGUES_FOR_COMP,
   ensureTables,
   stats,
   formatDate,
   initials,
   mediaUrl,
+  checkMediaToken,
   listAlbums,
   getAlbum,
   albumSquads,
+  syncTeamSquad,
   listAlbumPhotos,
   getPhoto,
   usedTeams,
   usedLeagues,
   getTeam,
   listTeams,
+  teamsForPicker,
   listTeamPlayers,
   getPlayer,
   listPlayers,
   playerPhotos,
+  pickerPlayers,
+  pickerPlayer,
   listPhotographers,
   getPhotographer,
   listPresets,
@@ -1182,16 +1869,24 @@ module.exports = {
   sharePhotos,
   searchAll,
   listFixtures,
+  getFixtureById,
   fixtureToMatchCard,
   fixtureLeagues,
   ensurePhotographerForUser,
   createAlbum,
+  createAlbumFromAccreditation,
   updateAlbum,
   addPhotoFile,
   deletePhoto,
+  deleteAlbum,
+  logEvent,
+  listLogs,
+  convertDownload,
   addTag,
   removeTag,
   searchPlayers,
   findHeroByTag,
   readMediaBytes,
+  photographerCredit,
+  copyPhotoForPublic,
 };

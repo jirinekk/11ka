@@ -1,21 +1,21 @@
 <%- include('layout-start') %>
-<div class="flex items-center gap-4">
-  <% if (team.logo) { %><img src="<%= team.logo %>" alt="" width="56" height="56" class="h-14 w-14 object-contain" /><% } %>
+<header class="fotak-person">
+  <% if (team.logo) { %><img src="<%= team.logo %>" alt="" width="56" height="56" /><% } %>
   <div>
-    <p class="text-xs font-semibold uppercase tracking-wider text-11accent"><%= team.league || 'Klub' %></p>
-    <h1 class="mt-1 text-2xl font-bold tracking-tight text-white md:text-3xl"><%= team.name %></h1>
+    <p class="fotak-kicker"><%= team.league || 'Klub' %></p>
+    <h1><%= team.name %></h1>
   </div>
-</div>
+</header>
 <% if (albums.length) { %>
-<h2 class="mt-10 text-xs font-semibold uppercase tracking-wider text-11muted">Alba</h2>
-<div class="fotak-tile-grid mt-3">
+<h2 class="fotak-section">Alba</h2>
+<div class="fotak-tile-grid">
   <% albums.forEach(function (album) { %>
   <%- include('_album-card', { album: album }) %>
   <% }); %>
 </div>
 <% } %>
-<h2 class="mt-10 text-xs font-semibold uppercase tracking-wider text-11muted">Soupiska</h2>
-<ul class="card-11 mt-3 divide-y divide-white/10 px-4">
+<h2 class="fotak-section">Soupiska</h2>
+<ul class="fotak-list">
   <% players.forEach(function (p) { %>
   <li>
     <a class="fotak-row" href="/foto/hraci/<%= p.slug %>">

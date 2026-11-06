@@ -9,6 +9,8 @@
 <% var canAkreditace = typeof hasAnyRole === 'function' ? hasAnyRole(currentUser, 'vedeni', 'spravce_akreditace') : (role === 'vedeni' || role === 'spravce_akreditace'); %>
 <% var canAiDrafts = typeof canAccessAiDrafts === 'function' ? canAccessAiDrafts(currentUser) : false; %>
 <% var canFoto = typeof canAccessFoto === 'function' ? canAccessFoto(currentUser) : !akreditaceOnly; %>
+<% var canGrafici = typeof hasAnyRole === 'function' ? hasAnyRole(currentUser, 'vedeni', 'sefredaktor', 'redaktor', 'fotograf') : !akreditaceOnly; %>
+<% var canUsers = typeof canCreateFotografUsers === 'function' ? canCreateFotografUsers(currentUser) : canVedeni; %>
 <% var adminHomeHref = akreditaceOnly ? '/administrace/akreditace' : (fotografOnly ? '/foto' : '/administrace'); %>
 <% function admLink(k) { return admNav === k ? 'bg-11accent/10 text-11accent' : 'text-slate-300 hover:bg-white/5 hover:text-white'; } %>
 <body data-admin="1" class="site-v2 flex min-h-screen flex-col bg-11bg font-sans text-slate-200 antialiased">
@@ -19,9 +21,6 @@
           <img src="/logo.png" alt="11ka" class="h-7 w-auto md:h-8" />
           <span class="hidden text-sm font-semibold tracking-tight text-white sm:inline">Administrace</span>
         </a>
-        <% if (canFoto) { %>
-        <a href="/foto" class="inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-sm font-semibold text-11accent transition hover:bg-11accent/10">Foták</a>
-        <% } %>
       </div>
       <div class="flex items-center gap-2 md:hidden">
         <details class="nav-mobile-dd relative">
@@ -40,7 +39,7 @@
             <% } %>
             <% if (!akreditaceOnly && !fotografOnly) { %>
             <a href="/administrace" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'dashboard' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Přehled</a>
-            <a href="/administrace/clanek/novy" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'editor' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Nový článek</a>
+            <a href="/administrace/clanek/novy" class="adm-nav-new block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'editor' ? 'is-on' : '' %>">Nový článek</a>
             <% if (canSef) { %>
             <a href="/administrace/clanky" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'clanky' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Všechny články</a>
             <a href="/administrace/zadosti" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'zadosti' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Žádosti</a>
@@ -49,14 +48,19 @@
             <a href="/administrace/moje-clanky" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'moje' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Moje články</a>
             <% } %>
             <% } %>
+            <% if (canGrafici) { %>
+            <a href="/administrace/grafici" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'grafici' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Grafici</a>
+            <% } %>
             <% if (canAkreditace) { %>
             <a href="/administrace/akreditace" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'akreditace' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Akreditace</a>
             <% } %>
             <% if (canAiDrafts) { %>
             <a href="/administrace/ai-clanky" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'ai-clanky' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">AI články</a>
             <% } %>
-            <% if (canVedeni) { %>
+            <% if (canUsers) { %>
             <a href="/administrace/uzivatele" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'uzivatele' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Uživatelé</a>
+            <% } %>
+            <% if (canVedeni) { %>
             <a href="/administrace/bio" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'bio' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Bio</a>
             <a href="/administrace/pomaha" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'pomaha' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">11ka Pomáhá</a>
             <a href="/administrace/reklamy" class="block px-4 py-2.5 text-sm leading-tight whitespace-normal <%= admNav === 'reklamy' ? 'font-semibold text-11accent' : 'text-slate-200 hover:bg-white/5' %>">Reklamy</a>
@@ -93,7 +97,7 @@
         <% } %>
         <% if (!akreditaceOnly && !fotografOnly) { %>
         <a href="/administrace" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('dashboard') %>">Přehled</a>
-        <a href="/administrace/clanek/novy" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('editor') %>">Nový článek</a>
+        <a href="/administrace/clanek/novy" class="adm-nav-new block rounded-lg px-3 py-2 text-sm font-medium transition <%= admNav === 'editor' ? 'is-on' : '' %>">Nový článek</a>
         <% if (canSef) { %>
         <a href="/administrace/clanky" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('clanky') %>">Všechny články</a>
         <% } %>
@@ -104,14 +108,19 @@
         <a href="/administrace/zadosti" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('zadosti') %>">Žádosti</a>
         <% } %>
         <% } %>
+        <% if (canGrafici) { %>
+        <a href="/administrace/grafici" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('grafici') %>">Grafici</a>
+        <% } %>
         <% if (canAkreditace) { %>
         <a href="/administrace/akreditace" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('akreditace') %>">Akreditace</a>
         <% } %>
         <% if (canAiDrafts) { %>
         <a href="/administrace/ai-clanky" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('ai-clanky') %>">AI články</a>
         <% } %>
-        <% if (canVedeni) { %>
+        <% if (canUsers) { %>
         <a href="/administrace/uzivatele" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('uzivatele') %>">Uživatelé</a>
+        <% } %>
+        <% if (canVedeni) { %>
         <a href="/administrace/bio" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('bio') %>">Bio</a>
         <a href="/administrace/pomaha" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('pomaha') %>">11ka Pomáhá</a>
         <a href="/administrace/reklamy" class="block rounded-lg px-3 py-2 text-sm font-medium transition <%= admLink('reklamy') %>">Reklamy</a>

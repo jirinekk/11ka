@@ -23,7 +23,7 @@
       </div>
 
       <aside class="site-shell__rail space-y-6">
-        <div class="news-rail">
+        <div class="news-rail" data-rail-keep>
           <%- include('partials/sidebar-most-read', { items: typeof sidebarMostRead !== 'undefined' ? sidebarMostRead : [], mostReadLimit: 4 }) %>
         </div>
 
@@ -56,7 +56,9 @@
           <%- include('partials/sidebar-favorites', { items: sidebarFavorites }) %>
         </div>
         <% } %>
+        <div data-rail-priority="low">
         <%- include('partials/sidebar-social') %>
+        </div>
       </aside>
     </div>
   </div>

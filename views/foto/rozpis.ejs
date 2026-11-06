@@ -3,28 +3,30 @@
   var liveItems = typeof live !== 'undefined' && live ? live : [];
   var todayItems = typeof today !== 'undefined' && today ? today : [];
 %>
-<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Rozpis</h1>
-<form class="mt-6 flex flex-wrap gap-2" method="get">
-  <a href="/foto/rozpis" class="fotak-tab<%= !liga ? ' is-on' : '' %>">Vše</a>
+<div class="fotak-head">
+  <h1>Rozpis</h1>
+</div>
+<div class="fotak-chips">
+  <a href="/foto/rozpis" class="fotak-chip<%= !liga ? ' is-on' : '' %>">Vše</a>
   <% leagues.forEach(function (l) { %>
-  <a href="/foto/rozpis?liga=<%= encodeURIComponent(l) %>" class="fotak-tab<%= liga === l ? ' is-on' : '' %>"><%= l %></a>
+  <a href="/foto/rozpis?liga=<%= encodeURIComponent(l) %>" class="fotak-chip<%= liga === l ? ' is-on' : '' %>"><%= l %></a>
   <% }); %>
-</form>
+</div>
 
 <% if (!liveItems.length && !todayItems.length && !groups.length) { %>
-<p class="mt-16 text-center text-sm text-11muted">Žádné zápasy v tomhle filtru.</p>
+<p class="fotak-empty">Žádné zápasy v tomhle filtru.</p>
 <% } %>
 
 <% if (liveItems.length) { %>
-  <h2 class="mt-8 text-xs font-semibold uppercase tracking-wider text-11accent">Živě</h2>
-  <ul class="card-11 mt-3 divide-y divide-white/10 px-4">
+  <h2 class="fotak-section">Živě</h2>
+  <ul class="fotak-list">
     <% liveItems.forEach(function (f) { %>
     <li class="fotak-fx<%= f.isLive ? ' is-live' : '' %>">
       <span class="fotak-fx__teams">
         <% if (f.homeLogo) { %><img src="<%= f.homeLogo %>" alt="" width="22" height="22" /><% } %>
-        <span class="truncate font-medium text-white"><%= f.homeName %></span>
-        <span class="text-11muted">–</span>
-        <span class="truncate font-medium text-white"><%= f.awayName %></span>
+        <span class="truncate"><%= f.homeName %></span>
+        <span class="fotak-fx__vs">–</span>
+        <span class="truncate"><%= f.awayName %></span>
         <% if (f.awayLogo) { %><img src="<%= f.awayLogo %>" alt="" width="22" height="22" /><% } %>
       </span>
       <span class="fotak-fx__time is-live">Živě</span>
@@ -34,15 +36,15 @@
 <% } %>
 
 <% if (todayItems.length) { %>
-  <h2 class="mt-8 text-xs font-semibold uppercase tracking-wider text-11muted">Dnes</h2>
-  <ul class="card-11 mt-3 divide-y divide-white/10 px-4">
+  <h2 class="fotak-section">Dnes</h2>
+  <ul class="fotak-list">
     <% todayItems.forEach(function (f) { %>
     <li class="fotak-fx<%= f.isLive ? ' is-live' : '' %>">
       <span class="fotak-fx__teams">
         <% if (f.homeLogo) { %><img src="<%= f.homeLogo %>" alt="" width="22" height="22" /><% } %>
-        <span class="truncate font-medium text-white"><%= f.homeName %></span>
-        <span class="text-11muted">–</span>
-        <span class="truncate font-medium text-white"><%= f.awayName %></span>
+        <span class="truncate"><%= f.homeName %></span>
+        <span class="fotak-fx__vs">–</span>
+        <span class="truncate"><%= f.awayName %></span>
         <% if (f.awayLogo) { %><img src="<%= f.awayLogo %>" alt="" width="22" height="22" /><% } %>
       </span>
       <span class="fotak-fx__time<%= f.isLive ? ' is-live' : '' %>"><%= f.time_label %></span>
@@ -50,20 +52,20 @@
     <% }); %>
   </ul>
 <% } else if (!liveItems.length) { %>
-  <h2 class="mt-8 text-xs font-semibold uppercase tracking-wider text-11muted">Dnes</h2>
-  <p class="mt-3 text-sm text-11muted">Dnes v tomhle filtru nic nehraje.</p>
+  <h2 class="fotak-section">Dnes</h2>
+  <p class="fotak-quiet">Dnes v tomhle filtru nic nehraje.</p>
 <% } %>
 
 <% groups.forEach(function (g) { %>
-  <h2 class="mt-8 text-xs font-semibold uppercase tracking-wider text-11muted"><%= g.date_label %></h2>
-  <ul class="card-11 mt-3 divide-y divide-white/10 px-4">
+  <h2 class="fotak-section"><%= g.date_label %></h2>
+  <ul class="fotak-list">
     <% g.items.forEach(function (f) { %>
     <li class="fotak-fx">
       <span class="fotak-fx__teams">
         <% if (f.homeLogo) { %><img src="<%= f.homeLogo %>" alt="" width="22" height="22" /><% } %>
-        <span class="truncate font-medium text-white"><%= f.homeName %></span>
-        <span class="text-11muted">–</span>
-        <span class="truncate font-medium text-white"><%= f.awayName %></span>
+        <span class="truncate"><%= f.homeName %></span>
+        <span class="fotak-fx__vs">–</span>
+        <span class="truncate"><%= f.awayName %></span>
         <% if (f.awayLogo) { %><img src="<%= f.awayLogo %>" alt="" width="22" height="22" /><% } %>
       </span>
       <span class="fotak-fx__time"><%= f.time_label %></span>

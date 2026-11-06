@@ -28,8 +28,8 @@
 %>
 
 <main id="main-content" class="flex-1" tabindex="-1">
-  <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
-    <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+  <div class="mx-auto max-w-[1400px] px-4 py-6 lg:px-6 lg:py-8">
+    <div class="acc-shell">
       <div class="min-w-0 space-y-6">
         <article class="card-11 p-6 sm:p-8" id="akreditace-form">
           <header class="mb-6">
@@ -222,95 +222,6 @@
           <% } %>
         </article>
 
-        <section class="card-11 p-6 sm:p-8" aria-labelledby="akreditace-rozpis-heading" data-acc-rozpis>
-          <h2 id="akreditace-rozpis-heading" class="text-xl font-bold text-white sm:text-2xl">Rozpis zápasů</h2>
-          <p class="mt-1 text-sm text-11muted">Vyberte zápas a tlačítkem Zažádat se vyplní název i datum ve formuláři.</p>
-          <div class="mt-5 flex flex-wrap gap-2">
-            <% (rp.leagues || []).forEach(function (l) { %>
-            <a href="<%= accHref({ liga: l.id, tym: '' }) %>#akreditace-rozpis-heading" class="fotak-tab<%= (rp.liga || '') === (l.id || '') ? ' is-on' : '' %>"><%= l.label %></a>
-            <% }); %>
-          </div>
-          <% if ((rp.teams || []).length) { %>
-          <form class="acc-team-filter" method="get" action="/akreditace" data-acc-team-filter>
-            <% if (rp.liga) { %><input type="hidden" name="liga" value="<%= rp.liga %>" /><% } %>
-            <label class="acc-team-filter__label" for="acc-team">Tým</label>
-            <select id="acc-team" name="tym" class="input-11 acc-team-filter__select">
-              <option value="">Všechny týmy</option>
-              <% rp.teams.forEach(function (t) { %>
-              <option value="<%= t.slug %>" <%= rp.tym === t.slug ? 'selected' : '' %>><%= t.name %></option>
-              <% }); %>
-            </select>
-          </form>
-          <% } %>
-
-          <% if (!liveItems.length && !todayItems.length && !rozpisGroups.length) { %>
-          <p class="mt-8 text-sm text-11muted">V tomhle filtru teď žádný nadcházející zápas není.</p>
-          <% } %>
-
-          <% if (liveItems.length) { %>
-          <h3 class="mt-8 text-xs font-semibold uppercase tracking-wider text-11accent">Živě</h3>
-          <ul class="mt-3 divide-y divide-white/10 rounded-xl border border-white/10 px-4">
-            <% liveItems.forEach(function (f) { %>
-            <li class="fotak-fx is-live">
-              <span class="fotak-fx__teams">
-                <% if (f.homeLogo) { %><img src="<%= f.homeLogo %>" alt="" width="22" height="22" /><% } %>
-                <span class="truncate font-medium text-white"><%= f.homeName || f.home %></span>
-                <span class="text-11muted">–</span>
-                <span class="truncate font-medium text-white"><%= f.awayName || f.away %></span>
-                <% if (f.awayLogo) { %><img src="<%= f.awayLogo %>" alt="" width="22" height="22" /><% } %>
-              </span>
-              <span class="fotak-fx__meta">
-                <span class="fotak-fx__time is-live">Živě</span>
-                <a class="fotak-fx__ask" href="<%= accAskHref(f) %>" data-match="<%= f.matchName %>" data-date="<%= f.matchDate %>">Zažádat</a>
-              </span>
-            </li>
-            <% }); %>
-          </ul>
-          <% } %>
-
-          <% if (todayItems.length) { %>
-          <h3 class="mt-8 text-xs font-semibold uppercase tracking-wider text-11muted">Dnes</h3>
-          <ul class="mt-3 divide-y divide-white/10 rounded-xl border border-white/10 px-4">
-            <% todayItems.forEach(function (f) { %>
-            <li class="fotak-fx<%= f.isLive ? ' is-live' : '' %>">
-              <span class="fotak-fx__teams">
-                <% if (f.homeLogo) { %><img src="<%= f.homeLogo %>" alt="" width="22" height="22" /><% } %>
-                <span class="truncate font-medium text-white"><%= f.homeName || f.home %></span>
-                <span class="text-11muted">–</span>
-                <span class="truncate font-medium text-white"><%= f.awayName || f.away %></span>
-                <% if (f.awayLogo) { %><img src="<%= f.awayLogo %>" alt="" width="22" height="22" /><% } %>
-              </span>
-              <span class="fotak-fx__meta">
-                <span class="fotak-fx__time<%= f.isLive ? ' is-live' : '' %>"><%= f.time_label %></span>
-                <a class="fotak-fx__ask" href="<%= accAskHref(f) %>" data-match="<%= f.matchName %>" data-date="<%= f.matchDate %>">Zažádat</a>
-              </span>
-            </li>
-            <% }); %>
-          </ul>
-          <% } %>
-
-          <% rozpisGroups.forEach(function (g) { %>
-          <h3 class="mt-8 text-xs font-semibold uppercase tracking-wider text-11muted"><%= g.date_label %></h3>
-          <ul class="mt-3 divide-y divide-white/10 rounded-xl border border-white/10 px-4">
-            <% g.items.forEach(function (f) { %>
-            <li class="fotak-fx">
-              <span class="fotak-fx__teams">
-                <% if (f.homeLogo) { %><img src="<%= f.homeLogo %>" alt="" width="22" height="22" /><% } %>
-                <span class="truncate font-medium text-white"><%= f.homeName || f.home %></span>
-                <span class="text-11muted">–</span>
-                <span class="truncate font-medium text-white"><%= f.awayName || f.away %></span>
-                <% if (f.awayLogo) { %><img src="<%= f.awayLogo %>" alt="" width="22" height="22" /><% } %>
-              </span>
-              <span class="fotak-fx__meta">
-                <span class="fotak-fx__time"><%= f.time_label %></span>
-                <a class="fotak-fx__ask" href="<%= accAskHref(f) %>" data-match="<%= f.matchName %>" data-date="<%= f.matchDate %>">Zažádat</a>
-              </span>
-            </li>
-            <% }); %>
-          </ul>
-          <% }); %>
-        </section>
-
         <section class="card-11 p-6 sm:p-8" aria-labelledby="akreditace-prehled-heading">
           <style>
             @media (max-width: 767.98px) {
@@ -429,30 +340,63 @@
         </section>
       </div>
 
-      <aside class="space-y-6 lg:sticky lg:top-24">
-        <%- include('partials/sidebar-ssp-ad') %>
-
-        <%- include('partials/sidebar-live-matches') %>
-
-        <div class="card-11 p-4">
-          <h2 class="mb-2 text-lg font-bold text-11accent">Newsletter</h2>
-          <p class="text-sm text-11muted"><%= newsletter.description %></p>
-          <form class="mt-4 space-y-2" action="/newsletter" method="post">
-            <label class="sr-only" for="newsletter-email-akreditace">E-mail</label>
-            <input
-              id="newsletter-email-akreditace"
-              name="email"
-              type="email"
-              required
-              autocomplete="email"
-              placeholder="váš@email.cz"
-              class="input-11 w-full rounded-xl border border-white/10 bg-[#111827] px-3 py-2.5 text-sm text-white placeholder:text-11muted focus:border-11accent/50 focus:outline-none focus:ring-1 focus:ring-11accent/40"
-            />
-            <button type="submit" class="w-full rounded-xl bg-11accent py-2.5 text-sm font-semibold text-11bg transition hover:brightness-110">
-              Přihlásit se
-            </button>
+      <aside class="acc-side">
+        <section class="acc-rozpis" aria-labelledby="akreditace-rozpis-heading" data-acc-rozpis>
+          <div class="acc-rozpis__head">
+            <h2 id="akreditace-rozpis-heading">Rozpis</h2>
+            <p>Počty žádostí u každého zápasu. Zažádat vyplní formulář.</p>
+          </div>
+          <div class="acc-rozpis__tabs">
+            <% (rp.leagues || []).forEach(function (l) { %>
+            <a href="<%= accHref({ liga: l.id, tym: '' }) %>#akreditace-rozpis-heading" class="fotak-tab<%= (rp.liga || '') === (l.id || '') ? ' is-on' : '' %>"><%= l.label %></a>
+            <% }); %>
+          </div>
+          <% if ((rp.teams || []).length) { %>
+          <form class="acc-team-filter" method="get" action="/akreditace" data-acc-team-filter>
+            <% if (rp.liga) { %><input type="hidden" name="liga" value="<%= rp.liga %>" /><% } %>
+            <label class="acc-team-filter__label" for="acc-team">Tým</label>
+            <select id="acc-team" name="tym" class="input-11 acc-team-filter__select">
+              <option value="">Všechny týmy</option>
+              <% rp.teams.forEach(function (t) { %>
+              <option value="<%= t.slug %>" <%= rp.tym === t.slug ? 'selected' : '' %>><%= t.name %></option>
+              <% }); %>
+            </select>
           </form>
-        </div>
+          <% } %>
+
+          <div class="acc-rozpis__scroller">
+            <% if (!liveItems.length && !todayItems.length && !rozpisGroups.length) { %>
+            <p class="acc-rozpis__empty">V tomhle filtru teď žádný nadcházející zápas není.</p>
+            <% } %>
+
+            <% if (liveItems.length) { %>
+            <h3 class="acc-rozpis__label is-live">Živě</h3>
+            <ul class="acc-fx-list">
+              <% liveItems.forEach(function (f) { %>
+              <%- include('partials/acc-fixture', { f: f, accAskHref: accAskHref }) %>
+              <% }); %>
+            </ul>
+            <% } %>
+
+            <% if (todayItems.length) { %>
+            <h3 class="acc-rozpis__label">Dnes</h3>
+            <ul class="acc-fx-list">
+              <% todayItems.forEach(function (f) { %>
+              <%- include('partials/acc-fixture', { f: f, accAskHref: accAskHref }) %>
+              <% }); %>
+            </ul>
+            <% } %>
+
+            <% rozpisGroups.forEach(function (g) { %>
+            <h3 class="acc-rozpis__label"><%= g.date_label %></h3>
+            <ul class="acc-fx-list">
+              <% g.items.forEach(function (f) { %>
+              <%- include('partials/acc-fixture', { f: f, accAskHref: accAskHref }) %>
+              <% }); %>
+            </ul>
+            <% }); %>
+          </div>
+        </section>
       </aside>
     </div>
   </div>

@@ -11,6 +11,10 @@ const {
   userRoles,
   primaryRole,
   parseRoles,
+  canAccessFoto,
+  canManageFotoArchive,
+  canCreateFotografUsers,
+  isFotografManagedUser,
 } = require('../lib/roles');
 const { canAccessAiDrafts } = require('../config/ai-drafts');
 const authCookie = require('../lib/auth-cookie');
@@ -166,6 +170,10 @@ module.exports = {
   canDeleteArticle,
   canPublish,
   canManageUsers,
+  canCreateFotografUsers,
+  canManageFotoArchive,
+  canAccessFoto,
+  isFotografManagedUser,
   canManageAds,
   canViewStats,
   attachUser,

@@ -1,0 +1,19 @@
+<li class="acc-fx<%= f.isLive ? ' is-live' : '' %>">
+  <div class="acc-fx__main">
+    <span class="acc-fx__teams">
+      <% if (f.homeLogo) { %><img src="<%= f.homeLogo %>" alt="" width="22" height="22" /><% } %>
+      <span class="acc-fx__name"><%= f.homeName || f.home %></span>
+      <span class="acc-fx__dash">–</span>
+      <span class="acc-fx__name"><%= f.awayName || f.away %></span>
+      <% if (f.awayLogo) { %><img src="<%= f.awayLogo %>" alt="" width="22" height="22" /><% } %>
+    </span>
+    <span class="acc-fx__counts">
+      <span class="acc-count acc-count--photo">Foto <%= f.photoCount || 0 %></span>
+      <span class="acc-count acc-count--pisi">Red. <%= f.writerCount || 0 %></span>
+    </span>
+  </div>
+  <span class="acc-fx__meta">
+    <span class="acc-fx__time<%= f.isLive ? ' is-live' : '' %>"><%= f.isLive ? 'Živě' : (f.time_label || '') %></span>
+    <a class="acc-fx__ask" href="<%= accAskHref(f) %>" data-match="<%= f.matchName %>" data-date="<%= f.matchDate %>">Zažádat</a>
+  </span>
+</li>

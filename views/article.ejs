@@ -2,7 +2,7 @@
 
 <main id="main-content" class="flex-1" tabindex="-1">
 <% if (typeof cmsArticle !== 'undefined' && cmsArticle) { %>
-  <div class="article-page mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+  <div class="article-page mx-auto max-w-[1400px] px-4 py-6 lg:px-6 lg:py-8">
     <article class="min-w-0" itemscope itemtype="https://schema.org/NewsArticle">
       <nav class="article-breadcrumbs mb-4 text-xs text-11muted sm:text-sm" aria-label="Drobečková navigace">
         <% breadcrumbs.forEach(function (crumb, i) { %>
@@ -31,14 +31,6 @@
               <span class="article-kicker__pill"><%= category %></span>
               <% if (typeof tag !== 'undefined' && tag) { %>
               <span class="article-kicker__pill article-kicker__pill--muted"><%= tag %></span>
-              <% } %>
-              <% if (typeof mentionedTeams !== 'undefined' && mentionedTeams && mentionedTeams.length) { %>
-              <% mentionedTeams.forEach(function (team) { %>
-              <span class="article-kicker__pill article-kicker__pill--muted article-kicker__pill--team">
-                <img src="<%= team.logo %>" alt="" width="14" height="14" />
-                <%= team.short || team.name %>
-              </span>
-              <% }); %>
               <% } %>
             </p>
             <h1 class="font-article-title" itemprop="headline"><%= headline %></h1>
@@ -102,42 +94,22 @@
           </div>
           <script>
             (function () {
-              function fixFig(fig) {
-                var img = fig.querySelector('img');
+              function fullSize(img) {
                 if (!img) return;
-                function apply() {
-                  var parent = fig.parentElement;
-                  var cap = parent ? parent.getBoundingClientRect().width : window.innerWidth;
+                img.removeAttribute('width');
+                img.removeAttribute('height');
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                var w = (img.style.width || '').trim();
+                if (!w || /px$/i.test(w)) img.style.width = '100%';
+                var fig = img.closest('figure');
+                if (fig) {
                   fig.style.maxWidth = '100%';
-                  img.style.maxWidth = '100%';
-                  img.style.height = 'auto';
-                  var imgW = (img.style.width || '').trim();
-                  if (imgW === '100%') {
-                    fig.style.width = '';
-                    return;
-                  }
-                  var saved = fig.style.width;
-                  fig.style.width = '';
-                  var w = Math.round(img.getBoundingClientRect().width);
-                  if (w > 0) {
-                    fig.style.width = Math.min(w, Math.max(0, cap)) + 'px';
-                    img.style.width = '100%';
-                    var ml = img.style.marginLeft;
-                    var mr = img.style.marginRight;
-                    var centered = ml === 'auto' || mr === 'auto';
-                    fig.style.marginLeft = centered ? 'auto' : (ml || '');
-                    fig.style.marginRight = centered ? 'auto' : (mr || '');
-                    img.style.marginLeft = '';
-                    img.style.marginRight = '';
-                  } else {
-                    fig.style.width = saved;
-                  }
+                  if (!/%/.test(fig.style.width || '')) fig.style.width = '';
                 }
-                if (img.complete && img.naturalWidth > 0) apply();
-                else img.addEventListener('load', apply);
               }
               function fixAll() {
-                document.querySelectorAll('figure.article-img-credit-wrap').forEach(fixFig);
+                document.querySelectorAll('.article-body img').forEach(fullSize);
               }
               fixAll();
               window.addEventListener('load', fixAll);
@@ -195,14 +167,16 @@
         </div>
 
         <aside class="article-sidebar">
-          <div class="news-rail">
+          <div class="news-rail" data-rail-keep>
             <%- include('partials/sidebar-most-read', { items: sidebarMostRead }) %>
           </div>
 
           <%- include('partials/article-penalty-game', { sidebar: true }) %>
 
           <%- include('partials/sidebar-ssp-ad') %>
+          <div data-rail-priority="low">
           <%- include('partials/sidebar-social') %>
+          </div>
         </aside>
       </div>
     </article>

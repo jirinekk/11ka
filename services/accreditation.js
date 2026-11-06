@@ -56,8 +56,8 @@ function create(data) {
   const result = getDb()
     .prepare(
       `INSERT INTO accreditation_requests
-        (email, phone, name, match_name, match_date, accreditation_type, email_sent, status, hidden_from_web, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 0, 'pending', 0, ?)`
+        (email, phone, name, match_name, match_date, accreditation_type, email_sent, status, hidden_from_web, album_id, applicant_email_sent, match_day_email_sent, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 0, 'pending', 0, NULL, 0, 0, ?)`
     )
     .run(
       data.email,
@@ -75,6 +75,179 @@ function markEmailSent(id) {
   getDb()
     .prepare(`UPDATE accreditation_requests SET email_sent = 1 WHERE id = ?`)
     .run(id);
+}
+
+function markApplicantEmailSent(id) {
+  getDb()
+    .prepare(`UPDATE accreditation_requests SET applicant_email_sent = 1 WHERE id = ?`)
+    .run(id);
+}
+
+function markMatchDayEmailSent(id) {
+  getDb()
+    .prepare(`UPDATE accreditation_requests SET match_day_email_sent = 1 WHERE id = ?`)
+    .run(id);
+}
+
+function linkAlbum(id, albumId) {
+  getDb()
+    .prepare(`UPDATE accreditation_requests SET album_id = ? WHERE id = ?`)
+    .run(albumId || null, id);
+}
+
+function todayPrague() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
+}
+
+function listDueMatchDay(day = todayPrague()) {
+  return getDb()
+    .prepare(
+      `SELECT id, email, phone, name, match_name, match_date, accreditation_type, album_id, status
+       FROM accreditation_requests
+       WHERE accreditation_type = 'photo'
+         AND match_date = ?
+         AND COALESCE(match_day_email_sent, 0) = 0
+         AND status != 'rejected'
+         AND album_id IS NOT NULL
+         AND TRIM(album_id) != ''`
+    )
+    .all(day)
+    .map(mapRow);
+}
+
+function matchCountKey(name, date) {
+  const n = String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[–—−]/g, '-')
+    .replace(/\s*vs\.?\s*/g, '-')
+    .replace(/\s*-\s*/g, '-')
+    .replace(/[^a-z0-9-]+/g, '')
+    .replace(/-+/g, '-');
+  return `${String(date || '').trim()}|${n}`;
+}
+
+function listMatchCounts() {
+  const rows = getDb()
+    .prepare(`SELECT match_name, match_date, accreditation_type FROM accreditation_requests`)
+    .all();
+  const map = {};
+  for (const row of rows) {
+    const key = matchCountKey(row.match_name, row.match_date);
+    if (!map[key]) map[key] = { photo: 0, pisi: 0 };
+    if (row.accreditation_type === 'photo') map[key].photo += 1;
+    else map[key].pisi += 1;
+  }
+  return map;
+}
+
+function lookupMatchCounts(map, name, date) {
+  const empty = { photo: 0, pisi: 0 };
+  if (!map) return empty;
+  const direct = map[matchCountKey(name, date)];
+  if (direct) return direct;
+  const parts = String(name || '')
+    .split(/\s*(?:–|—|−|-|vs\.?)\s*/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    const reversed = map[matchCountKey(`${parts[1]} – ${parts[0]}`, date)];
+    if (reversed) return reversed;
+  }
+  return empty;
+}
+
+function photoCoverageStats() {
+  const db = getDb();
+  let venues = [];
+  let clubs = [];
+  let photographers = [];
+  let clubTimeline = [];
+  let photographerPlaces = [];
+  try {
+    venues = db
+      .prepare(
+        `SELECT COALESCE(NULLIF(TRIM(a.venue), ''), 'Bez stadionu') AS label,
+                COUNT(DISTINCT a.id) AS albums,
+                COUNT(p.id) AS photos
+         FROM foto_albums a
+         LEFT JOIN foto_photos p ON p.album_id = a.id
+         GROUP BY label
+         ORDER BY albums DESC, photos DESC
+         LIMIT 20`
+      )
+      .all();
+    clubs = db
+      .prepare(
+        `SELECT t.name AS label, COUNT(DISTINCT a.id) AS albums, COUNT(p.id) AS photos
+         FROM foto_teams t
+         JOIN foto_albums a ON a.home_team_id = t.id OR a.away_team_id = t.id
+         LEFT JOIN foto_photos p ON p.album_id = a.id
+         GROUP BY t.id
+         ORDER BY albums DESC, photos DESC
+         LIMIT 20`
+      )
+      .all();
+    photographers = db
+      .prepare(
+        `SELECT u.id, u.name, u.email,
+                COUNT(DISTINCT a.id) AS albums,
+                COUNT(p.id) AS photos
+         FROM foto_users u
+         JOIN foto_albums a ON a.photographer_id = u.id
+         LEFT JOIN foto_photos p ON p.album_id = a.id
+         GROUP BY u.id
+         ORDER BY photos DESC, albums DESC
+         LIMIT 30`
+      )
+      .all();
+    clubTimeline = db
+      .prepare(
+        `SELECT club, photographer, match_date, title, opponent, album_id FROM (
+           SELECT ht.name AS club, u.name AS photographer, a.match_date, a.title, at.name AS opponent, a.id AS album_id
+           FROM foto_albums a
+           JOIN foto_teams ht ON ht.id = a.home_team_id
+           JOIN foto_teams at ON at.id = a.away_team_id
+           JOIN foto_users u ON u.id = a.photographer_id
+           UNION ALL
+           SELECT at.name AS club, u.name AS photographer, a.match_date, a.title, ht.name AS opponent, a.id AS album_id
+           FROM foto_albums a
+           JOIN foto_teams ht ON ht.id = a.home_team_id
+           JOIN foto_teams at ON at.id = a.away_team_id
+           JOIN foto_users u ON u.id = a.photographer_id
+         ) AS club_shots
+         ORDER BY match_date DESC
+         LIMIT 80`
+      )
+      .all();
+    photographerPlaces = db
+      .prepare(
+        `SELECT u.name AS photographer, a.venue, ht.name AS home, at.name AS away, a.match_date, a.title, a.id AS album_id
+         FROM foto_albums a
+         JOIN foto_teams ht ON ht.id = a.home_team_id
+         JOIN foto_teams at ON at.id = a.away_team_id
+         JOIN foto_users u ON u.id = a.photographer_id
+         ORDER BY u.name COLLATE NOCASE, a.match_date DESC`
+      )
+      .all();
+  } catch (err) {
+    console.error('[11ka] photo coverage stats:', err && err.message);
+  }
+
+  const requestLeaders = db
+    .prepare(
+      `SELECT name, email, COUNT(*) AS requests,
+              SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved
+       FROM accreditation_requests
+       WHERE accreditation_type = 'photo'
+       GROUP BY LOWER(TRIM(email))
+       ORDER BY requests DESC, name COLLATE NOCASE
+       LIMIT 30`
+    )
+    .all();
+
+  return { venues, clubs, photographers, clubTimeline, photographerPlaces, requestLeaders };
 }
 
 function setStatus(id, status) {
@@ -421,6 +594,15 @@ module.exports = {
   create,
   getById,
   markEmailSent,
+  markApplicantEmailSent,
+  markMatchDayEmailSent,
+  linkAlbum,
+  listDueMatchDay,
+  todayPrague,
+  matchCountKey,
+  listMatchCounts,
+  lookupMatchCounts,
+  photoCoverageStats,
   setStatus,
   setHiddenFromWeb,
   countAll,

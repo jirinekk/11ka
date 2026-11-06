@@ -5,7 +5,22 @@
 %>
 <section class="cl-squad" aria-label="Soupiska">
   <% if (coach && coach.name) { %>
-  <p class="cl-squad__coach">Trenér: <strong><%= coach.name %></strong><% if (coach.age) { %> <span>· <%= coach.age %> let</span><% } %></p>
+  <article class="cl-coach">
+    <% if (coach.photo) { %>
+    <img class="cl-coach__photo" src="<%= coach.photo %>" alt="" width="72" height="72" loading="lazy" decoding="async" onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src=this.src.replace(/\.jpg(?:\?.*)?$/i,'.png');}else{this.onerror=null;this.src='/user.png';}" />
+    <% } else { %>
+    <img class="cl-coach__photo" src="/user.png" alt="" width="72" height="72" />
+    <% } %>
+    <div class="cl-coach__body">
+      <p class="cl-coach__kicker">Trenér</p>
+      <h3 class="cl-coach__name"><%= coach.name %></h3>
+      <p class="cl-coach__meta">
+        <% if (coach.age) { %><%= coach.age %> let<% } %>
+        <% if (coach.age && coach.nation) { %> · <% } %>
+        <% if (coach.nation) { %><%= coach.nation %><% } %>
+      </p>
+    </div>
+  </article>
   <% } %>
   <% if (!groups.length) { %>
   <p class="cl-matches__empty">Soupiska se právě načítá.</p>
@@ -13,32 +28,39 @@
   <% groups.forEach(function (group) { %>
   <div class="cl-squad__group">
     <h3 class="cl-squad__title"><%= group.title %></h3>
-    <div class="cl-squad__wrap">
-      <table class="cl-squad__grid">
-        <thead>
-          <tr>
-            <th class="cl-squad__no">#</th>
-            <th>Jméno</th>
-            <th>Věk</th>
-            <th title="Zápasy">Z</th>
-            <th title="Góly">G</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% (group.players || []).forEach(function (p) { %>
-          <tr class="<%= p.out ? 'is-out' : '' %>">
-            <td class="cl-squad__no"><%= p.jersey || '—' %></td>
-            <td>
-              <%= p.name %>
-              <% if (p.out) { %><span class="cl-squad__out">mimo soupisku</span><% } %>
-            </td>
-            <td><%= p.age || '—' %></td>
-            <td><%= p.played || '0' %></td>
-            <td><%= p.goals || '0' %></td>
-          </tr>
-          <% }); %>
-        </tbody>
-      </table>
+    <div class="cl-squad__cards">
+      <% (group.players || []).forEach(function (p) { %>
+      <article class="cl-player<%= p.out ? ' is-out' : '' %>">
+        <div class="cl-player__media">
+          <img
+            class="cl-player__photo"
+            src="<%= p.photo || '/user.png' %>"
+            alt=""
+            width="120"
+            height="150"
+            loading="lazy"
+            decoding="async"
+            onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src=this.src.replace(/\.jpg(?:\?.*)?$/i,'.png');}else{this.onerror=null;this.src='/user.png';}"
+          />
+          <% if (p.jersey) { %><span class="cl-player__no"><%= p.jersey %></span><% } %>
+        </div>
+        <div class="cl-player__body">
+          <h4 class="cl-player__name"><%= p.name %></h4>
+          <p class="cl-player__meta">
+            <% var bits = []; %>
+            <% if (p.age) bits.push(p.age + ' let'); %>
+            <% if (p.nation) bits.push(p.nation); %>
+            <%= bits.join(' · ') %>
+          </p>
+          <p class="cl-player__stats">
+            <span><strong><%= p.played || '0' %></strong> Z</span>
+            <span><strong><%= p.goals || '0' %></strong> G</span>
+            <span><strong><%= p.assists || '0' %></strong> A</span>
+          </p>
+          <% if (p.out) { %><span class="cl-squad__out">mimo soupisku</span><% } %>
+        </div>
+      </article>
+      <% }); %>
     </div>
   </div>
   <% }); %>

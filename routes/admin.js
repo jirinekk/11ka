@@ -10,6 +10,8 @@ const {
   canDeleteArticle,
   canPublish,
   canManageUsers,
+  canCreateFotografUsers,
+  isFotografManagedUser,
   canManageAds,
   canViewStats,
   ROLE_LABELS,
@@ -27,6 +29,7 @@ const { rolesFromBody } = require('../lib/roles');
 const { asStringArray, asIntArray } = require('../lib/safe-path');
 const chanceLigaLogos = require('../services/chance-liga-logos');
 const livesportChance = require('../services/livesport-chance');
+const graficiPng = require('../services/grafici-png');
 const { listRubrics, isRubricSlug } = require('../config/rubrics');
 const rubricsService = require('../services/rubrics');
 const aiArticleDraft = require('../services/ai-article-draft');
@@ -51,6 +54,7 @@ const { parseBlocksInput, renderBlocksToHtml } = require('../lib/article-blocks'
 const { parsePragueDatetimeLocal, formatPragueDatetimeLocal, formatPragueDateTime } = require('../lib/prague-datetime');
 const { validateLineupForSave, serializeLineup } = require('../lib/lineup');
 const { mergeAdminTagOptions } = require('../config/main-nav');
+const foto = require('../services/foto');
 
 function adminTagOptions() {
   return mergeAdminTagOptions(articlesService.listDistinctTags(200));
@@ -103,6 +107,7 @@ function adminNavFromPath(p) {
   if (p === '/administrace/kitswapy') return 'kitswapy';
   if (p.startsWith('/administrace/zapasy')) return 'zapasy';
   if (p === '/administrace/statistiky') return 'statistiky';
+  if (p.startsWith('/administrace/grafici')) return 'grafici';
   return 'dashboard';
 }
 
@@ -131,6 +136,21 @@ async function optimizeUploadedFile(req, res, next) {
 }
 
 const publicUpload = path.join(__dirname, '..', 'public', 'uploads');
+const HERO_PICK_RE = /^\/uploads\/articles\/[a-zA-Z0-9]+\.(jpe?g|png|webp|gif)$/i;
+
+function isSafeHeroPickPath(value) {
+  return HERO_PICK_RE.test(String(value || '').trim());
+}
+
+function unlinkPublicUpload(relPath) {
+  if (!relPath || !String(relPath).startsWith('/uploads/')) return;
+  const oldAbs = path.join(__dirname, '..', 'public', String(relPath).replace(/^\//, ''));
+  try {
+    if (fs.existsSync(oldAbs)) fs.unlinkSync(oldAbs);
+  } catch {
+    /* ignore */
+  }
+}
 /** Max. velikost nahraného obrázku (titulek / TinyMCE) a textových polí v multipart (body HTML). */
 const UPLOAD_MAX_BYTES = 1024 * 1024 * 1024;
 const multipartArticleLimits = { fileSize: UPLOAD_MAX_BYTES, fieldSize: UPLOAD_MAX_BYTES };
@@ -623,7 +643,7 @@ function selectedMatchKeyFrom(locals) {
 async function loadMatchPicker(selectedKey) {
   let matches = [];
   try {
-    matches = await livesportChance.listPickerMatches(48);
+    matches = await livesportChance.listPickerMatches(80);
   } catch {
     matches = [];
   }
@@ -920,37 +940,57 @@ function listStaffUsers() {
   return usersService.listAll().filter((u) => isStaffUser(u));
 }
 
-router.get('/administrace/uzivatele', requireRole('vedeni'), (req, res) => {
+function fotografOnlyUserMode(user) {
+  return canCreateFotografUsers(user) && !canManageUsers(user);
+}
+
+function usersVisibleTo(actor) {
   const users = listStaffUsers();
+  if (canManageUsers(actor)) return users;
+  return users.filter((u) => isFotografManagedUser(u));
+}
+
+function renderUsersAdmin(req, res, extra = {}) {
+  const limited = fotografOnlyUserMode(req.user);
   res.render('admin/users', {
-    title: 'Uživatelé - administrace',
-    users,
-    roles: STAFF_ROLES,
+    title: limited ? 'Fotografové - administrace' : 'Uživatelé - administrace',
+    users: usersVisibleTo(req.user),
+    roles: limited ? ['fotograf'] : STAFF_ROLES,
     roleLabels: ROLE_LABELS,
-    error: null,
-    success: null,
+    fotografOnlyMode: limited,
+    error: extra.error || null,
+    success: extra.success || null,
   });
+}
+
+router.get('/administrace/uzivatele', requireRole('vedeni', 'spravce_akreditace'), (req, res) => {
+  if (!canCreateFotografUsers(req.user)) return res.status(403).send('Nemáte oprávnění');
+  renderUsersAdmin(req, res);
 });
 
 router.post(
   '/administrace/uzivatele',
-  requireRole('vedeni'),
+  requireRole('vedeni', 'spravce_akreditace'),
   express.urlencoded({ extended: true }),
   (req, res) => {
+    if (!canCreateFotografUsers(req.user)) return res.status(403).send('Nemáte oprávnění');
+    const limited = fotografOnlyUserMode(req.user);
     const { action } = req.body;
     let error = null;
     let success = null;
 
     if (action === 'create') {
       const { email, password, display_name } = req.body;
-      const roles = rolesFromBody(req.body);
+      const roles = limited ? ['fotograf'] : rolesFromBody(req.body);
       if (!email || !password) error = 'E-mail a heslo jsou povinné.';
       else if (!roles.length) error = 'Vyberte alespoň jednu roli.';
-      else if (password.length < 8) error = 'Heslo musí mít alespoň 8 znaků.';
+      else if (limited && (roles.length !== 1 || roles[0] !== 'fotograf')) {
+        error = 'Správce akreditace může přidat jen roli fotograf.';
+      } else if (password.length < 8) error = 'Heslo musí mít alespoň 8 znaků.';
       else {
         try {
           usersService.createUser({ email, password, roles, display_name });
-          success = 'Uživatel byl vytvořen.';
+          success = limited ? 'Fotograf byl vytvořen.' : 'Uživatel byl vytvořen.';
         } catch (e) {
           error = e.message && e.message.includes('UNIQUE') ? 'Tento e-mail už existuje.' : 'Uložení se nezdařilo.';
         }
@@ -960,8 +1000,10 @@ router.post(
     if (action === 'update') {
       const { id, email, display_name, password } = req.body;
       const uid = parseInt(id, 10);
-      const roles = rolesFromBody(req.body);
+      const target = uid ? usersService.getById(uid) : null;
+      const roles = limited ? ['fotograf'] : rolesFromBody(req.body);
       if (!uid || !email || !roles.length) error = 'Neplatné údaje. Vyberte alespoň jednu roli.';
+      else if (limited && !isFotografManagedUser(target)) error = 'Můžete upravovat jen účty s rolí fotograf.';
       else {
         try {
           usersService.updateUserAdmin(uid, {
@@ -979,7 +1021,9 @@ router.post(
 
     if (action === 'delete') {
       const uid = parseInt(req.body.id, 10);
+      const target = uid ? usersService.getById(uid) : null;
       if (uid === req.user.id) error = 'Nemůžete smazat sám sebe.';
+      else if (limited && !isFotografManagedUser(target)) error = 'Můžete mazat jen účty s rolí fotograf.';
       else if (uid) {
         if (usersService.countArticlesByUser(uid) > 0) {
           error = 'Uživatele nelze smazat - má přiřazené články.';
@@ -994,15 +1038,7 @@ router.post(
       }
     }
 
-    const users = listStaffUsers();
-    res.render('admin/users', {
-      title: 'Uživatelé - administrace',
-      users,
-      roles: STAFF_ROLES,
-      roleLabels: ROLE_LABELS,
-      error,
-      success,
-    });
+    renderUsersAdmin(req, res, { error, success });
   }
 );
 
@@ -1225,10 +1261,101 @@ router.get('/administrace/statistiky', requireRole('vedeni'), (req, res) => {
   });
 });
 
+const graficiRole = requireRole('vedeni', 'sefredaktor', 'redaktor', 'fotograf');
+
+function sendGraficiPng(res, buf, filename, download) {
+  if (!buf) {
+    res.status(404).send('Grafika se nepodařila vygenerovat.');
+    return;
+  }
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'no-store');
+  if (download) {
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  } else {
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  }
+  res.send(buf);
+}
+
+router.get('/administrace/grafici', graficiRole, async (req, res) => {
+  try {
+    const ctx = await graficiPng.getContext();
+    res.render('admin/grafici', {
+      title: 'Grafici - administrace',
+      season: ctx.season,
+      round: ctx.round,
+      dateLabel: ctx.dateLabel,
+      matches: ctx.matches,
+      upcomingRound: ctx.upcomingRound,
+      upcomingDateLabel: ctx.upcomingDateLabel,
+      upcoming: ctx.upcoming,
+    });
+  } catch (err) {
+    console.error('[grafici]', err);
+    res.status(500).send('Grafici se nepodařilo načíst.');
+  }
+});
+
+router.get('/administrace/grafici/tabulka.png', graficiRole, async (req, res) => {
+  try {
+    const buf = await graficiPng.renderTablePng();
+    sendGraficiPng(res, buf, '11ka-chance-liga-tabulka.png', req.query.download);
+  } catch (err) {
+    console.error('[grafici tabulka]', err);
+    res.status(500).send('PNG tabulky se nepodařilo vygenerovat.');
+  }
+});
+
+router.get('/administrace/grafici/vysledky.png', graficiRole, async (req, res) => {
+  try {
+    const buf = await graficiPng.renderResultsPng();
+    sendGraficiPng(res, buf, '11ka-chance-liga-vysledky.png', req.query.download);
+  } catch (err) {
+    console.error('[grafici vysledky]', err);
+    res.status(500).send('PNG výsledků se nepodařilo vygenerovat.');
+  }
+});
+
+router.get('/administrace/grafici/statistiky.png', graficiRole, async (req, res) => {
+  try {
+    const buf = await graficiPng.renderStatsPng();
+    sendGraficiPng(res, buf, '11ka-chance-liga-statistiky.png', req.query.download);
+  } catch (err) {
+    console.error('[grafici statistiky]', err);
+    res.status(500).send('PNG statistik se nepodařilo vygenerovat.');
+  }
+});
+
+router.get('/administrace/grafici/program.png', graficiRole, async (req, res) => {
+  try {
+    const buf = await graficiPng.renderProgramPng();
+    sendGraficiPng(res, buf, '11ka-chance-liga-program.png', req.query.download);
+  } catch (err) {
+    console.error('[grafici program]', err);
+    res.status(500).send('PNG programu se nepodařilo vygenerovat.');
+  }
+});
+
+router.get('/administrace/grafici/zapas/:id.png', graficiRole, async (req, res) => {
+  try {
+    const buf = await graficiPng.renderMatchPng(req.params.id);
+    if (!buf) {
+      res.status(404).send('Zápas se nenašel.');
+      return;
+    }
+    sendGraficiPng(res, buf, `11ka-vysledek-${req.params.id}.png`, req.query.download);
+  } catch (err) {
+    console.error('[grafici zapas]', err);
+    res.status(500).send('PNG výsledku se nepodařilo vygenerovat.');
+  }
+});
+
 /* --- Akreditace (Vedení + Správce Akreditace) --- */
 router.get('/administrace/akreditace', requireAkreditaceAccess, (req, res) => {
   const tabRaw = String(req.query.tab || '').trim().toLowerCase();
-  const tab = tabRaw === 'skryte' ? 'skryte' : tabRaw === 'spis' ? 'spis' : 'viditelne';
+  const tab =
+    tabRaw === 'skryte' ? 'skryte' : tabRaw === 'spis' ? 'spis' : tabRaw === 'statistiky' ? 'statistiky' : 'viditelne';
   const flash = req.query.deleted === 'ok'
     ? 'deleted'
     : req.query.mail === 'ok'
@@ -1242,6 +1369,36 @@ router.get('/administrace/akreditace', requireAkreditaceAccess, (req, res) => {
   const hiddenCount = accreditationService.countByWebVisibility(true);
   const spisSearch = String(req.query.q || '').trim();
   const personEmail = String(req.query.email || '').trim();
+
+  if (tab === 'statistiky') {
+    return res.render('admin/akreditace', {
+      title: 'Akreditace - statistiky - administrace',
+      requests: [],
+      applicants: [],
+      personEmail: null,
+      personRequests: [],
+      personStats: null,
+      spisSearch: '',
+      tab,
+      dateFrom: dateFilter.od,
+      dateTo: dateFilter.do,
+      coverage: accreditationService.photoCoverageStats(),
+      tabCounts: {
+        viditelne: visibleCount,
+        skryte: hiddenCount,
+        spis: accreditationService.countApplicants(''),
+      },
+      pagination: {
+        page: 1,
+        perPage: 7,
+        totalItems: 0,
+        totalPages: 1,
+        hasPrev: false,
+        hasNext: false,
+      },
+      flash,
+    });
+  }
 
   if (tab === 'spis') {
     const perPage = 7;
@@ -1279,6 +1436,7 @@ router.get('/administrace/akreditace', requireAkreditaceAccess, (req, res) => {
         skryte: hiddenCount,
         spis: accreditationService.countApplicants(''),
       },
+      coverage: null,
       pagination: {
         page,
         perPage,
@@ -1318,6 +1476,7 @@ router.get('/administrace/akreditace', requireAkreditaceAccess, (req, res) => {
       skryte: hiddenCount,
       spis: accreditationService.countApplicants(''),
     },
+    coverage: null,
     pagination: {
       page,
       perPage,
@@ -1411,6 +1570,7 @@ function akreditaceTabFromBody(req) {
   const t = String(req.body?.tab || '').trim().toLowerCase();
   if (t === 'skryte') return 'skryte';
   if (t === 'spis') return 'spis';
+  if (t === 'statistiky') return 'statistiky';
   return 'viditelne';
 }
 
@@ -2440,6 +2600,104 @@ router.get('/administrace/moje-clanky', (req, res) => {
   res.render('admin/moje-clanky', { title: 'Moje články - administrace', articles, all: false });
 });
 
+/* --- Foták picker for articles --- */
+router.get('/administrace/foto-alba', requireRole('vedeni', 'sefredaktor', 'redaktor'), (req, res) => {
+  const q = String(req.query.q || '').trim();
+  const albums = foto.listAlbums({ q }).slice(0, 80).map((a) => ({
+    id: a.id,
+    title: a.title,
+    date_label: a.date_label,
+    photo_count: a.photo_count,
+    photographer_name: a.photographer_name || '',
+    credit: foto.photographerCredit(a.photographer_name),
+    cover_url: a.cover_url,
+  }));
+  res.json({ albums });
+});
+
+router.get('/administrace/foto-hraci', requireRole('vedeni', 'sefredaktor', 'redaktor'), (req, res) => {
+  const q = String(req.query.q || '').trim();
+  res.json({ players: foto.pickerPlayers(q) });
+});
+
+router.get('/administrace/foto-hraci/:id/fotky', requireRole('vedeni', 'sefredaktor', 'redaktor'), (req, res) => {
+  const player = foto.pickerPlayer(req.params.id);
+  if (!player) return res.status(404).json({ error: 'Hráč nenalezen' });
+  res.json({
+    player,
+    photos: foto.playerPhotos(player.id, 80).map((p) => ({
+      id: p.id,
+      album_id: p.album_id,
+      album_title: p.album_title,
+      thumbSrc: p.thumbSrc,
+      viewSrc: p.viewSrc,
+      photographer_name: p.photographer_name || '',
+      credit: p.credit || foto.photographerCredit(p.photographer_name),
+    })),
+  });
+});
+
+router.get('/administrace/foto-alba/:id/fotky', requireRole('vedeni', 'sefredaktor', 'redaktor'), (req, res) => {
+  const album = foto.getAlbum(req.params.id);
+  if (!album) return res.status(404).json({ error: 'Album nenalezeno' });
+  res.json({
+    album: {
+      id: album.id,
+      title: album.title,
+      date_label: album.date_label,
+      photographer_name: album.photographer_name || '',
+      credit: foto.photographerCredit(album.photographer_name),
+    },
+    photos: foto.listAlbumPhotos(album.id).map((p) => ({
+      id: p.id,
+      thumbSrc: p.thumbSrc,
+      viewSrc: p.viewSrc,
+      width: p.width,
+      height: p.height,
+    })),
+  });
+});
+
+async function copyFotoForArticle(req, res, photo, album) {
+  if (!photo || (album && photo.album_id !== album.id)) {
+    return res.status(404).json({ error: 'Fotka nenalezena' });
+  }
+  const kind = String(req.body && req.body.kind) === 'hero' ? 'articles' : 'inline';
+  ensureUploadDirs();
+  const dest = path.join(publicUpload, kind);
+  try {
+    const result = await foto.copyPhotoForPublic(photo.id, dest, `/uploads/${kind}`);
+    if (result.error) return res.status(400).json({ error: result.error });
+    return res.json({
+      location: result.path,
+      credit: result.credit,
+      photographer: result.photographer,
+    });
+  } catch (err) {
+    console.error('[11ka] foto copy for article failed:', err && err.message);
+    return res.status(500).json({ error: 'Fotku se nepodařilo zkopírovat' });
+  }
+}
+
+router.post(
+  '/administrace/foto-fotky/:photoId/kopirovat',
+  requireRole('vedeni', 'sefredaktor', 'redaktor'),
+  express.json(),
+  (req, res) => copyFotoForArticle(req, res, foto.getPhoto(req.params.photoId), null)
+);
+
+router.post(
+  '/administrace/foto-alba/:id/fotky/:photoId/kopirovat',
+  requireRole('vedeni', 'sefredaktor', 'redaktor'),
+  express.json(),
+  (req, res) => {
+    const album = foto.getAlbum(req.params.id);
+    const photo = foto.getPhoto(req.params.photoId);
+    if (!album) return res.status(404).json({ error: 'Fotka nenalezena' });
+    return copyFotoForArticle(req, res, photo, album);
+  }
+);
+
 /* --- TinyMCE image upload --- */
 router.post('/administrace/upload-inline', requireRole('vedeni', 'sefredaktor', 'redaktor'), (req, res, next) => {
   uploadInline.single('file')(req, res, (err) => {
@@ -2502,7 +2760,8 @@ router.post(
     const blocksJson = hasBlocks ? JSON.stringify(blocks) : null;
     const excerptNorm = normalizeExcerpt(excerpt);
     let error = articlesService.articleCopyError(title, excerptNorm);
-    const heroPath = req.file ? '/uploads/articles/' + req.file.filename : null;
+    const pickedHero = isSafeHeroPickPath(req.body.hero_picked_path) ? String(req.body.hero_picked_path).trim() : null;
+    const heroPath = req.file ? '/uploads/articles/' + req.file.filename : pickedHero;
     if (heroPath && (!hero_credit || !String(hero_credit).trim())) {
       error = 'U titulního obrázku je povinný credit.';
     }
@@ -2684,16 +2943,13 @@ router.post(
     const excerptNorm = normalizeExcerpt(excerpt);
 
     let hero_image_path = article.hero_image_path;
+    const pickedHero = isSafeHeroPickPath(req.body.hero_picked_path) ? String(req.body.hero_picked_path).trim() : null;
     if (req.file) {
       hero_image_path = '/uploads/articles/' + req.file.filename;
-      if (article.hero_image_path && article.hero_image_path.startsWith('/uploads/')) {
-        const oldAbs = path.join(__dirname, '..', 'public', article.hero_image_path.replace(/^\//, ''));
-        try {
-          if (fs.existsSync(oldAbs)) fs.unlinkSync(oldAbs);
-        } catch {
-          /* ignore */
-        }
-      }
+      unlinkPublicUpload(article.hero_image_path);
+    } else if (pickedHero && pickedHero !== article.hero_image_path) {
+      hero_image_path = pickedHero;
+      unlinkPublicUpload(article.hero_image_path);
     }
 
     let error = articlesService.articleCopyError(title, excerptNorm);

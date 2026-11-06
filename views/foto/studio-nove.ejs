@@ -1,48 +1,46 @@
 <%- include('layout-start') %>
-<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Nové album</h1>
-<p class="mt-1 text-sm text-11muted">Nejdřív zápas a datum. Fotky nahraješ hned potom.</p>
+<div class="fotak-head">
+  <h1>Nové album</h1>
+  <p>Nejdřív soutěž a týmy. Fotky nahraješ hned potom.</p>
+</div>
 <% if (error) { %>
-<p class="mt-6 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+<p class="fotak-note fotak-note--bad">
   <%= error === 'teams' ? 'Domácí a hosté musí být jiný klub.' : 'Zkontroluj formulář.' %>
 </p>
 <% } %>
-<form class="card-11 mt-8 max-w-2xl space-y-4 p-6" method="post" action="/foto/studio/alba/nove">
-  <div class="grid gap-4 sm:grid-cols-2">
-    <label class="text-xs font-semibold uppercase tracking-wider text-11muted">Domácí
-      <select name="homeTeamId" class="input-11 mt-2" required>
-        <option value="">— klub —</option>
-        <% teams.forEach(function (t) { %><option value="<%= t.id %>"><%= t.name %></option><% }); %>
-      </select>
-    </label>
-    <label class="text-xs font-semibold uppercase tracking-wider text-11muted">Hosté
-      <select name="awayTeamId" class="input-11 mt-2" required>
-        <option value="">— klub —</option>
-        <% teams.forEach(function (t) { %><option value="<%= t.id %>"><%= t.name %></option><% }); %>
-      </select>
-    </label>
-  </div>
-  <label class="block text-xs font-semibold uppercase tracking-wider text-11muted">Datum zápasu
-    <input name="matchDate" type="date" required class="input-11 mt-2" />
-  </label>
-  <label class="block text-xs font-semibold uppercase tracking-wider text-11muted">Soutěž
-    <select name="competition" class="input-11 mt-2">
-      <% competitions.forEach(function (c) { %><option><%= c %></option><% }); %>
+<form class="fotak-panel fotak-panel--album" method="post" action="/foto/studio/alba/nove" data-foto-team-form>
+  <label class="fotak-field">Soutěž
+    <select name="competition" class="input-11" data-foto-comp>
+      <% (typeof competitionGroups !== 'undefined' ? competitionGroups : [{ label: '', items: competitions }]).forEach(function (group) { %>
+      <optgroup label="<%= group.label %>">
+        <% group.items.forEach(function (c) { %><option><%= c %></option><% }); %>
+      </optgroup>
+      <% }); %>
     </select>
   </label>
+  <div class="fotak-team-pick-row">
+    <%- include('_team-pick', { name: 'homeTeamId', label: 'Domácí', placeholder: 'Vybrat domácí' }) %>
+    <%- include('_team-pick', { name: 'awayTeamId', label: 'Hosté', placeholder: 'Vybrat hosty' }) %>
+  </div>
+  <label class="fotak-field">Datum zápasu
+    <input name="matchDate" type="date" required class="input-11" />
+  </label>
   <div class="grid gap-4 sm:grid-cols-2">
-    <label class="text-xs font-semibold uppercase tracking-wider text-11muted">Góly domácích
-      <input name="homeScore" type="number" min="0" class="input-11 mt-2" />
+    <label class="fotak-field">Góly domácích
+      <input name="homeScore" type="number" min="0" class="input-11" />
     </label>
-    <label class="text-xs font-semibold uppercase tracking-wider text-11muted">Góly hostů
-      <input name="awayScore" type="number" min="0" class="input-11 mt-2" />
+    <label class="fotak-field">Góly hostů
+      <input name="awayScore" type="number" min="0" class="input-11" />
     </label>
   </div>
-  <label class="block text-xs font-semibold uppercase tracking-wider text-11muted">Stadion
-    <input name="venue" class="input-11 mt-2" />
+  <label class="fotak-field">Stadion
+    <input name="venue" class="input-11" />
   </label>
-  <label class="block text-xs font-semibold uppercase tracking-wider text-11muted">Název alba (volitelné)
-    <input name="title" class="input-11 mt-2" />
+  <label class="fotak-field">Název alba (volitelné)
+    <input name="title" class="input-11" />
   </label>
-  <button class="rounded-xl bg-11accent px-4 py-2 text-sm font-semibold text-11bg" type="submit">Vytvořit a nahrát fotky</button>
+  <button class="fotak-btn fotak-btn--solid" type="submit">Vytvořit a nahrát fotky</button>
 </form>
+<script type="application/json" id="foto-team-data"><%- JSON.stringify({ teams: teams || [], leagues: typeof teamLeagues !== 'undefined' ? teamLeagues : {} }) %></script>
+<script src="/js/foto-team-pick.js?v=<%= encodeURIComponent((typeof assetVersion !== 'undefined' ? assetVersion : '1') + '-tp1') %>"></script>
 <%- include('layout-end') %>

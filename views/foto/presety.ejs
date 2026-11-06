@@ -1,13 +1,15 @@
 <%- include('layout-start') %>
-<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Presety</h1>
+<div class="fotak-head">
+  <h1>Presety</h1>
+</div>
 <% if (!presets.length) { %>
-<p class="mt-16 text-center text-sm text-11muted">Zatím tu žádný preset není.</p>
+<p class="fotak-empty">Zatím tu žádný preset není.</p>
 <% } else { %>
-<div class="mt-8 grid gap-4 sm:grid-cols-2">
+<div class="fotak-preset-grid">
   <% presets.forEach(function (p) { %>
-  <article class="card-11 p-5">
-    <h2 class="font-semibold text-white"><%= p.name %></h2>
-    <p class="mt-1 text-sm text-11muted"><%= p.app %></p>
+  <article class="fotak-panel">
+    <h2><%= p.name %></h2>
+    <p class="fotak-quiet"><%= p.app %></p>
   </article>
   <% }); %>
 </div>

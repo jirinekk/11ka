@@ -1,0 +1,94 @@
+<%- include('../partials/admin-layout-start') %>
+
+<style>
+  .gf-preview {
+    background-color: #0b1018;
+    background-image:
+      linear-gradient(45deg, #1a2230 25%, transparent 25%),
+      linear-gradient(-45deg, #1a2230 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1a2230 75%),
+      linear-gradient(-45deg, transparent 75%, #1a2230 75%);
+    background-size: 18px 18px;
+    background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+  }
+</style>
+
+<div class="border-b border-white/10 pb-6">
+  <h1 class="text-2xl font-bold text-white md:text-3xl">Grafici</h1>
+  <p class="mt-2 max-w-2xl text-sm text-11muted">
+    Průhledné PNG aktuální tabulky, výsledků, programu a statistik Chance Ligy. Šachovnice v náhledu znamená, že pozadí v souboru není.
+  </p>
+</div>
+
+<div class="mt-8 grid gap-6 lg:grid-cols-2">
+  <section class="card-11 overflow-hidden">
+    <div class="flex items-start justify-between gap-3 p-5">
+      <div>
+        <h2 class="font-semibold text-white">Tabulka</h2>
+        <p class="mt-1 text-sm text-11muted">Chance Liga <%= season %> · LM / EL / KL · baráž · sestup</p>
+      </div>
+      <a href="/administrace/grafici/tabulka.png?download=1" class="btn-11 btn-11--sm btn-11--accent-outline shrink-0">Stáhnout PNG</a>
+    </div>
+    <div class="gf-preview p-3">
+      <img src="/administrace/grafici/tabulka.png" alt="Tabulka Chance Ligy" class="mx-auto max-h-[28rem] w-full object-contain" />
+    </div>
+  </section>
+
+  <section class="card-11 overflow-hidden">
+    <div class="flex items-start justify-between gap-3 p-5">
+      <div>
+        <h2 class="font-semibold text-white">Výsledky</h2>
+        <p class="mt-1 text-sm text-11muted"><%= round || 'Poslední kolo' %><% if (dateLabel) { %> · <%= dateLabel %><% } %></p>
+      </div>
+      <a href="/administrace/grafici/vysledky.png?download=1" class="btn-11 btn-11--sm btn-11--accent-outline shrink-0">Stáhnout PNG</a>
+    </div>
+    <div class="gf-preview p-3">
+      <img src="/administrace/grafici/vysledky.png" alt="Výsledky kola" class="mx-auto max-h-[28rem] w-full object-contain" />
+    </div>
+  </section>
+
+  <section class="card-11 overflow-hidden">
+    <div class="flex items-start justify-between gap-3 p-5">
+      <div>
+        <h2 class="font-semibold text-white">Program</h2>
+        <p class="mt-1 text-sm text-11muted"><%= upcomingRound || 'Další kolo' %><% if (upcomingDateLabel) { %> · <%= upcomingDateLabel %><% } %></p>
+      </div>
+      <a href="/administrace/grafici/program.png?download=1" class="btn-11 btn-11--sm btn-11--accent-outline shrink-0">Stáhnout PNG</a>
+    </div>
+    <div class="gf-preview p-3">
+      <img src="/administrace/grafici/program.png" alt="Program kola" class="mx-auto max-h-[28rem] w-full object-contain" />
+    </div>
+  </section>
+
+  <section class="card-11 overflow-hidden">
+    <div class="flex items-start justify-between gap-3 p-5">
+      <div>
+        <h2 class="font-semibold text-white">Statistiky</h2>
+        <p class="mt-1 text-sm text-11muted">Lídr, útok, obrana a forma</p>
+      </div>
+      <a href="/administrace/grafici/statistiky.png?download=1" class="btn-11 btn-11--sm btn-11--accent-outline shrink-0">Stáhnout PNG</a>
+    </div>
+    <div class="gf-preview p-3">
+      <img src="/administrace/grafici/statistiky.png" alt="Statistiky Chance Ligy" class="mx-auto max-h-[22rem] w-full object-contain" />
+    </div>
+  </section>
+</div>
+
+<% if (matches && matches.length) { %>
+<section class="mt-10">
+  <h2 class="text-xs font-semibold uppercase tracking-wider text-11muted">Jednotlivé výsledky</h2>
+  <div class="mt-4 grid gap-3 sm:grid-cols-2">
+    <% matches.forEach(function (m) { %>
+    <div class="card-11 flex items-center gap-3 p-4">
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-sm font-semibold text-white"><%= m.homeLabel || m.home %> – <%= m.awayLabel || m.away %></p>
+        <p class="mt-0.5 text-sm text-11accent"><%= m.scoreHome %> : <%= m.scoreAway %></p>
+      </div>
+      <a href="/administrace/grafici/zapas/<%= encodeURIComponent(m.id) %>.png?download=1" class="btn-11 btn-11--sm btn-11--accent-outline shrink-0">PNG</a>
+    </div>
+    <% }); %>
+  </div>
+</section>
+<% } %>
+
+<%- include('../partials/admin-layout-end') %>

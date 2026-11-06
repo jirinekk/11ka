@@ -653,6 +653,7 @@ svg {
 
 .article-body img,
 .article-body video {
+  width: 100%;
   max-width: 100%;
   height: auto;
   border-radius: 0.75rem;
@@ -1264,6 +1265,7 @@ body[data-admin="1"] a.rounded-xl.px-4:not(.btn-11):active {
 
 .article-body .block-image img {
   display: block;
+  width: 100%;
   max-width: 100%;
   height: auto;
   border-radius: 0.75rem;

@@ -137,6 +137,26 @@ function initDb() {
     /* column already exists */
   }
 
+  try {
+    db.exec(`ALTER TABLE accreditation_requests ADD COLUMN album_id TEXT;`);
+  } catch {
+    /* column already exists */
+  }
+  try {
+    db.exec(
+      `ALTER TABLE accreditation_requests ADD COLUMN applicant_email_sent INTEGER NOT NULL DEFAULT 0;`
+    );
+  } catch {
+    /* column already exists */
+  }
+  try {
+    db.exec(
+      `ALTER TABLE accreditation_requests ADD COLUMN match_day_email_sent INTEGER NOT NULL DEFAULT 0;`
+    );
+  } catch {
+    /* column already exists */
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS reels (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -294,21 +294,26 @@ function setArticleTeams(articleId, codes) {
   return unique;
 }
 
+const MATCH_KEY_PREFIXES = ['chance', 'narodni', 'mol', 'repre', 'ucl', 'el', 'ecl'];
+
 function normalizeMatchKey(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
-  if (raw.startsWith('chance:')) {
-    const slug = raw.slice(7).trim();
-    return slug ? `chance:${slug}` : null;
-  }
-  return null;
+  const idx = raw.indexOf(':');
+  if (idx < 1) return null;
+  const prefix = raw.slice(0, idx);
+  const slug = raw.slice(idx + 1).trim();
+  if (!MATCH_KEY_PREFIXES.includes(prefix) || !slug) return null;
+  return `${prefix}:${slug}`;
 }
 
 function parseMatchKey(value) {
   const key = normalizeMatchKey(value);
   if (!key) return null;
-  const slug = key.slice(7);
-  return { type: 'chance', slug, href: `/zapasy/chance/${encodeURIComponent(slug)}` };
+  const idx = key.indexOf(':');
+  const type = key.slice(0, idx);
+  const slug = key.slice(idx + 1);
+  return { type, slug, href: `/zapasy/chance/${encodeURIComponent(slug)}` };
 }
 
 function persistCommunityFields(articleId, { mentionedTeamCodes, relatedArticleIds, rubricSlug, matchKey } = {}) {
@@ -348,6 +353,32 @@ function listPublishedByMatchKey(matchKey, limit = 8) {
        LIMIT ?`
     )
     .all(key, lim);
+}
+
+function listPublishedForMatchSlug(slug, limit = 8) {
+  if (!hasArticlesColumn('match_key')) return [];
+  const s = String(slug || '').trim();
+  if (!s) return [];
+  const lim = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(24, Number(limit))) : 8;
+  const idMatch = s.match(/([A-Za-z0-9]{8})$/);
+  const keys = MATCH_KEY_PREFIXES.map((prefix) => `${prefix}:${s}`);
+  const clauses = ['a.match_key IN (?, ?, ?, ?)'];
+  const params = keys.slice();
+  if (idMatch) {
+    clauses.push('a.match_key LIKE ?');
+    params.push(`%-${idMatch[1]}`);
+  }
+  return getDb()
+    .prepare(
+      `SELECT a.*, u.display_name AS author_display
+       FROM articles a
+       JOIN users u ON u.id = a.author_id
+       WHERE a.status = 'published' AND a.match_key IS NOT NULL AND (${clauses.join(' OR ')})
+       ORDER BY COALESCE(a.published_at, a.created_at) DESC, a.id DESC
+       LIMIT ?`
+    )
+    .all(...params, lim)
+    .filter((row, idx, all) => all.findIndex((item) => item.id === row.id) === idx);
 }
 
 function getMentionedTeams(articleId) {
@@ -2208,6 +2239,7 @@ module.exports = {
   normalizeMatchKey,
   parseMatchKey,
   listPublishedByMatchKey,
+  listPublishedForMatchSlug,
   listArticleTeamCodes,
   getMentionedTeams,
   listPublishedByTeamCode,

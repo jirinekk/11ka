@@ -45,6 +45,7 @@ const apiArticleTts = require('./routes/api-article-tts');
 const newsletterPublicRouter = require('./routes/newsletter-public');
 const { router: adminRouter, ensureUploadDirs } = require('./routes/admin');
 const fotoRouter = require('./routes/foto');
+const cronRouter = require('./routes/cron');
 const { attachUser } = require('./middleware/auth');
 const authCookie = require('./lib/auth-cookie');
 const {
@@ -54,12 +55,15 @@ const {
   isAkreditaceOnly,
   isFotografOnly,
   canAccessFoto,
+  canManageFotoArchive,
+  canCreateFotografUsers,
   isRedaktorWorkflow,
   formatRoles,
   ROLE_LABELS,
   STAFF_ROLES,
 } = require('./lib/roles');
 const { canAccessAiDrafts } = require('./config/ai-drafts');
+const chanceTableZones = require('./lib/chance-table-zones');
 
 const app = express();
 app.set('trust proxy', process.env.TRUST_PROXY || 1);
@@ -94,6 +98,7 @@ function getAssetVersion() {
         path.join(__dirname, 'public', 'js', 'article-audio.js'),
         path.join(__dirname, 'public', 'js', 'whats-new.js'),
         path.join(__dirname, 'public', 'js', 'foto-gallery.js'),
+        path.join(__dirname, 'public', 'js', 'rail-fit.js'),
     ];
     let newestMs = 0;
     for (const filePath of candidates) {
@@ -196,10 +201,14 @@ app.use((req, res, next) => {
     res.locals.isAkreditaceOnly = isAkreditaceOnly;
     res.locals.isFotografOnly = isFotografOnly;
     res.locals.canAccessFoto = canAccessFoto;
+    res.locals.canManageFotoArchive = canManageFotoArchive;
+    res.locals.canCreateFotografUsers = canCreateFotografUsers;
     res.locals.isRedaktorWorkflow = isRedaktorWorkflow;
     res.locals.formatRoles = formatRoles;
     res.locals.roleLabels = ROLE_LABELS;
     res.locals.canAccessAiDrafts = canAccessAiDrafts;
+    res.locals.chanceTableZoneClass = chanceTableZones.zoneClass;
+    res.locals.chanceTableLegend = chanceTableZones.ZONE_LEGEND;
     res.locals.seoBaseUrl = 'https://11ka.cz';
     res.locals.googlePreferredSource = getGooglePreferredSourceCta({
         seoBaseUrl: res.locals.seoBaseUrl,
@@ -261,6 +270,7 @@ app.use(siteRouter);
 app.use(authRouter);
 app.use(ucetRouter);
 app.use('/foto', fotoRouter);
+app.use('/cron', cronRouter);
 app.use(adminRouter);
 
 app.use((req, res) => {
@@ -289,6 +299,12 @@ setInterval(() => {
         console.error(e);
     }
 }, 60 * 1000);
+
+setInterval(() => {
+  require('./services/accreditation-notify')
+    .sendDueMatchDayReminders()
+    .catch((err) => console.error('[11ka] match-day reminders:', err && err.message));
+}, 60 * 60 * 1000);
 
 try {
   require('./services/ai-ingest').startFeedScheduler();

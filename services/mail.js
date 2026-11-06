@@ -323,6 +323,124 @@ async function verifySmtpConnection() {
   return { ok: true, warning: errors.length ? errors.join('; ') : undefined };
 }
 
+function accreditationEmailShell({ heading, lead, rows, cta }) {
+  const logoUrl = `${(process.env.PUBLIC_BASE_URL || 'https://11ka.cz').replace(/\/$/, '')}/logo.png`;
+  const rowHtml = (rows || [])
+    .map(
+      (row) =>
+        `<tr><td style="padding:6px 0;color:#94a3b8;width:110px;">${escapeHtml(row.label)}</td><td style="padding:6px 0;">${row.html || escapeHtml(row.value)}</td></tr>`
+    )
+    .join('');
+  const ctaHtml = cta
+    ? `<p style="margin:20px 0 0 0;"><a href="${escapeHtml(cta.href)}" style="display:inline-block;background:#16dffb;color:#0b111b;text-decoration:none;font-weight:700;font-size:14px;padding:10px 16px;border-radius:10px;">${escapeHtml(cta.label)}</a></p>`
+    : '';
+  return `
+<div style="margin:0;padding:24px;background:#0b111b;font-family:Inter,Segoe UI,Arial,sans-serif;color:#e2e8f0;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;margin:0 auto;background:#151c2c;border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:hidden;">
+    <tr>
+      <td style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.08);">
+        <img src="${logoUrl}" alt="11ka" style="height:34px;width:auto;display:block;" />
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px;">
+        <p style="margin:0 0 10px 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#16dffb;">Akreditace</p>
+        <h1 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#ffffff;">${escapeHtml(heading)}</h1>
+        <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#cbd5e1;">${escapeHtml(lead)}</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;line-height:1.6;color:#e2e8f0;">${rowHtml}</table>
+        ${ctaHtml}
+      </td>
+    </tr>
+  </table>
+</div>`;
+}
+
+function publicBaseUrl() {
+  return (process.env.PUBLIC_BASE_URL || 'https://11ka.cz').replace(/\/$/, '');
+}
+
+/**
+ * @param {{ email: string, name: string, match: string, matchDate?: string, accreditationType: 'photo' | 'pisi' }} data
+ */
+async function sendAccreditationApplicantReceived(data) {
+  const tx = createTransporterForProfile('ACCREDITATION');
+  if (!tx) return { ok: false, error: 'smtp_not_configured' };
+  const from = getAccreditationFrom();
+  const to = sanitizeField(data.email, 180);
+  if (!from || !to) return { ok: false, error: 'mail_from_missing' };
+
+  const typeLabel = data.accreditationType === 'photo' ? 'Photo' : 'Píšící';
+  const matchLabel = sanitizeField(data.match, 120);
+  const matchDateLabel = formatMatchDateCs(data.matchDate);
+  const subject = '11ka - žádost o akreditaci se zpracovává';
+  const lead =
+    data.accreditationType === 'photo'
+      ? 'Vaši žádost o fotoakreditaci jsme přijali a právě se zpracovává. K zápasu jsme vám připravili album ve Fotáku.'
+      : 'Vaši žádost o akreditaci jsme přijali a právě se zpracovává. Ozveme se, jakmile bude vyřízená.';
+  const text = [
+    `Dobrý den, ${data.name || ''}`,
+    '',
+    lead,
+    '',
+    `Zápas: ${matchLabel}`,
+    `Datum: ${matchDateLabel}`,
+    `Typ: ${typeLabel}`,
+  ].join('\n');
+  const html = accreditationEmailShell({
+    heading: 'Žádost se zpracovává',
+    lead,
+    rows: [
+      { label: 'Zápas', value: matchLabel },
+      { label: 'Datum', value: matchDateLabel },
+      { label: 'Typ', value: typeLabel },
+    ],
+  });
+
+  try {
+    await tx.sendMail({ from, to, subject, text, html });
+    return { ok: true };
+  } catch (err) {
+    console.error('[11ka] Applicant acc mail:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * @param {{ email: string, name: string, match_name?: string, match?: string, match_date?: string, album_id?: string }} data
+ */
+async function sendAccreditationMatchDayReminder(data) {
+  const tx = createTransporterForProfile('ACCREDITATION');
+  if (!tx) return { ok: false, error: 'smtp_not_configured' };
+  const from = getAccreditationFrom();
+  const to = sanitizeField(data.email, 180);
+  if (!from || !to) return { ok: false, error: 'mail_from_missing' };
+
+  const matchLabel = sanitizeField(data.match_name || data.match, 120);
+  const matchDateLabel = formatMatchDateCs(data.match_date || data.matchDate);
+  const albumId = data.album_id || data.albumId;
+  const albumUrl = albumId ? `${publicBaseUrl()}/foto/studio/alba/${encodeURIComponent(albumId)}` : `${publicBaseUrl()}/foto`;
+  const subject = `11ka - dnes hrajete ${matchLabel || 'zápas'}: upravte album`;
+  const lead = `Dnes je den zápasu ${matchLabel || ''}. Doplňte prosím fotky a údaje v albu, ať je archiv kompletní.`.replace(/\s+/g, ' ').trim();
+  const text = `${lead}\n\nAlbum: ${albumUrl}\n`;
+  const html = accreditationEmailShell({
+    heading: 'Upravte dnešní album',
+    lead,
+    rows: [
+      { label: 'Zápas', value: matchLabel },
+      { label: 'Datum', value: matchDateLabel },
+    ],
+    cta: { href: albumUrl, label: 'Otevřít album' },
+  });
+
+  try {
+    await tx.sendMail({ from, to, subject, text, html });
+    return { ok: true };
+  } catch (err) {
+    console.error('[11ka] Match-day acc mail:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   createTransporter,
   isSmtpConfigured,
@@ -330,4 +448,6 @@ module.exports = {
   notifyNewArticle,
   notifyRubricArticle,
   sendAccreditationRequest,
+  sendAccreditationApplicantReceived,
+  sendAccreditationMatchDayReminder,
 };

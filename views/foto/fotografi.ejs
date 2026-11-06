@@ -1,6 +1,9 @@
 <%- include('layout-start') %>
-<h1 class="text-2xl font-bold tracking-tight text-white md:text-3xl">Fotografové</h1>
-<ul class="card-11 mt-6 divide-y divide-white/10 px-4">
+<div class="fotak-head">
+  <h1>Fotografové</h1>
+  <p><%= (photographers || []).length %></p>
+</div>
+<ul class="fotak-list">
   <% photographers.forEach(function (p) { %>
   <li>
     <a class="fotak-row" href="/foto/fotografi/<%= p.slug %>">

@@ -51,12 +51,16 @@
   }
   function isPct(v) { return /%/.test(String(v || '')); }
   var scoreLine = m.scoreLine || String(m.score || '0:0').replace(':', ' - ');
+  var isChanceLiga = /chance liga/i.test(String(m.league || '')) && !/narodni/i.test(String(m.league || ''));
+  var isEurope = /liga mistr|evropsk|konferenc/i.test(String(m.league || ''));
+  var europeStandings = m.standings && m.standings.length ? m.standings : [];
+  var hasEuropeTable = isEurope && europeStandings.length;
   var tabs = [
     { id: 'prehled', label: 'Přehled' },
     { id: 'sestavy', label: 'Sestavy' },
-    { id: 'tabulka', label: 'Tabulka' },
+    (isChanceLiga || hasEuropeTable) ? { id: 'tabulka', label: 'Tabulka' } : null,
     { id: 'statistiky', label: 'Statistiky' },
-  ];
+  ].filter(Boolean);
 %>
 
 <main id="main-content" class="flex-1" tabindex="-1">
@@ -69,7 +73,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Zápasy
             </a>
-            <p class="mc-hero__comp"><%= m.league %><% if (m.round) { %> · <%= m.round %><% } %></p>
+            <p class="mc-hero__comp"><%= m.league || 'Zápas' %><% if (m.stage) { %> · <%= m.stage %><% } %><% if (m.round) { %> · <%= m.round %><% } %></p>
             <span class="mc-hero__spacer" aria-hidden="true"></span>
           </div>
           <p class="mc-hero__meta">
@@ -81,15 +85,25 @@
             <% var homeTag = m.homeHref ? 'a' : 'div'; %>
             <<%= homeTag %><% if (m.homeHref) { %> href="<%= m.homeHref %>"<% } %> class="mc-hero__club mc-hero__club--home">
               <span class="mc-hero__name"><%= m.home %></span>
-              <% if (m.homeLogo) { %><img class="mc-hero__crest" src="<%= m.homeLogo %>" alt="" /><% } %>
+              <% if (m.homeLogo) { %>
+              <img class="mc-hero__crest" src="<%= m.homeLogo %>" alt="" referrerpolicy="no-referrer" data-ini="<%= (m.homeInitials || m.home || '?').slice(0,2) %>" onerror="this.classList.add('is-hidden'); if(this.nextElementSibling) this.nextElementSibling.hidden=false;" />
+              <span class="mc-hero__crest-ph" hidden><%= (m.homeInitials || m.home || '?').slice(0,2) %></span>
+              <% } else { %>
+              <span class="mc-hero__crest-ph"><%= (m.homeInitials || m.home || '?').slice(0,2) %></span>
+              <% } %>
             </<%= homeTag %>>
             <div class="mc-hero__mid">
               <p class="mc-hero__score"><%= scoreLine %></p>
-              <p class="mc-hero__status<%= m.isLive ? ' is-live' : '' %>"><%= m.statusLabel === 'Konec' ? 'Full time' : (m.statusLabel || '') %></p>
+              <p class="mc-hero__status<%= m.isLive ? ' is-live' : '' %>"><%= m.statusLabel || '' %></p>
             </div>
             <% var awayTag = m.awayHref ? 'a' : 'div'; %>
             <<%= awayTag %><% if (m.awayHref) { %> href="<%= m.awayHref %>"<% } %> class="mc-hero__club mc-hero__club--away">
-              <% if (m.awayLogo) { %><img class="mc-hero__crest" src="<%= m.awayLogo %>" alt="" /><% } %>
+              <% if (m.awayLogo) { %>
+              <img class="mc-hero__crest" src="<%= m.awayLogo %>" alt="" referrerpolicy="no-referrer" data-ini="<%= (m.awayInitials || m.away || '?').slice(0,2) %>" onerror="this.classList.add('is-hidden'); if(this.nextElementSibling) this.nextElementSibling.hidden=false;" />
+              <span class="mc-hero__crest-ph" hidden><%= (m.awayInitials || m.away || '?').slice(0,2) %></span>
+              <% } else { %>
+              <span class="mc-hero__crest-ph"><%= (m.awayInitials || m.away || '?').slice(0,2) %></span>
+              <% } %>
               <span class="mc-hero__name"><%= m.away %></span>
             </<%= awayTag %>>
           </div>
@@ -131,6 +145,28 @@
         </section>
 
         <div class="mc-tabs__pane is-active mt-4" data-cl-pane="prehled" role="tabpanel">
+          <% if (typeof matchArticles !== 'undefined' && matchArticles && matchArticles.length) { %>
+          <section class="mc-reports" aria-labelledby="match-report-heading">
+            <h2 id="match-report-heading" class="mc-facts__title"><%= matchArticles.length === 1 ? 'Report' : 'Reporty' %></h2>
+            <div class="mc-reports__list">
+              <% matchArticles.forEach(function (item, idx) { %>
+              <a href="<%= item.href %>" class="mc-report<%= idx === 0 ? ' is-featured' : '' %>">
+                <% if (item.image) { %>
+                <img src="<%= item.image %>" alt="" loading="lazy" decoding="async" style="object-position: <%= item.heroPosition || '50% 50%' %>;" />
+                <% } %>
+                <div class="mc-report__body">
+                  <span class="mc-report__cat"><%= item.tag || item.category || 'Report' %></span>
+                  <h3 class="mc-report__title font-article-title"><%= item.title %></h3>
+                  <% if (item.excerpt) { %>
+                  <p class="mc-report__excerpt"><%= item.excerpt %></p>
+                  <% } %>
+                </div>
+              </a>
+              <% }); %>
+            </div>
+          </section>
+          <% } %>
+
           <% if (hasStats) { %>
           <section class="mc-facts">
             <h2 class="mc-facts__title">Top statistiky</h2>
@@ -199,25 +235,6 @@
           </section>
           <% } %>
 
-          <% if (typeof matchArticles !== 'undefined' && matchArticles && matchArticles.length) { %>
-          <section class="related-stories related-stories--match mt-8" aria-labelledby="match-articles-heading">
-            <h2 id="match-articles-heading" class="related-stories__title">Články k zápasu</h2>
-            <div class="related-stories__grid">
-              <% matchArticles.forEach(function (item) { %>
-              <a href="<%= item.href %>" class="related-card">
-                <img src="<%= item.image %>" alt="" loading="lazy" decoding="async" style="object-position: <%= item.heroPosition || '50% 50%' %>;" />
-                <div class="related-card__shade" aria-hidden="true"></div>
-                <div class="related-card__body">
-                  <% if (item.tag || item.category) { %>
-                  <span class="related-card__cat"><%= item.tag || item.category %></span>
-                  <% } %>
-                  <h3 class="related-card__title font-article-title"><%= item.title %></h3>
-                </div>
-              </a>
-              <% }); %>
-            </div>
-          </section>
-          <% } %>
         </div>
 
         <div class="mc-tabs__pane mt-4" data-cl-pane="sestavy" role="tabpanel" hidden>
@@ -231,12 +248,33 @@
           <% } %>
         </div>
 
+        <% if (isChanceLiga) { %>
         <div class="mc-tabs__pane mt-4" data-cl-pane="tabulka" role="tabpanel" hidden>
           <%- include('partials/chance-liga-table', {
             standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [],
             highlightCodes: [m.homeCode, m.awayCode].filter(Boolean)
           }) %>
         </div>
+        <% } else if (hasEuropeTable) { %>
+        <div class="mc-tabs__pane mt-4" data-cl-pane="tabulka" role="tabpanel" hidden>
+          <%- include('partials/chance-liga-table', {
+            standings: europeStandings,
+            tableTitle: 'Tabulka · ' + (m.league || 'Evropa'),
+            highlightCodes: [m.homeTeamId, m.awayTeamId, m.homeCode, m.awayCode].filter(Boolean),
+            chanceTableZoneClass: function (rank) {
+              var r = Number(rank);
+              if (r <= 8) return 'is-cl';
+              if (r <= 24) return 'is-el';
+              return 'is-down';
+            },
+            chanceTableLegend: [
+              { className: 'is-cl', label: 'Přímo osmifinále', shortLabel: 'Osmifinále' },
+              { className: 'is-el', label: 'Play-off', shortLabel: 'Play-off' },
+              { className: 'is-down', label: 'Konec základní fáze', shortLabel: 'Konec' }
+            ]
+          }) %>
+        </div>
+        <% } %>
 
         <div class="mc-tabs__pane mt-4" data-cl-pane="statistiky" role="tabpanel" hidden>
           <% if (hasStats) { %>
@@ -263,34 +301,28 @@
         </div>
       </div>
 
-      <aside class="mc-layout__rail space-y-6">
-        <% if (m.venue || m.city || m.attendance) { %>
-        <section class="fm-card">
-          <h2 class="fm-card__title">Stadion</h2>
-          <p class="mc-sideinfo__name"><%= m.venue || 'Stadion' %></p>
-          <% if (m.city) { %><p class="mc-sideinfo__muted"><%= m.city %></p><% } %>
-          <% if (m.attendance) { %><p class="mc-sideinfo__muted">Návštěva <%= m.attendance %></p><% } %>
+      <aside class="mc-layout__rail">
+        <% if (m.venue || m.city || m.attendance || m.referee) { %>
+        <section class="mc-side">
+          <h2 class="mc-side__title">Zápas</h2>
+          <% if (m.venue || m.city) { %>
+          <p class="mc-side__name"><%= m.venue || 'Stadion' %></p>
+          <% if (m.city) { %><p class="mc-side__muted"><%= m.city %></p><% } %>
+          <% } %>
+          <% if (m.attendance) { %><p class="mc-side__muted">Návštěva <%= m.attendance %></p><% } %>
+          <% if (m.referee) { %><p class="mc-side__muted">Rozhodčí <%= m.referee %></p><% } %>
         </section>
         <% } %>
-        <% if (m.referee) { %>
-        <section class="fm-card">
-          <h2 class="fm-card__title">Rozhodčí</h2>
-          <p class="mc-sideinfo__name"><%= m.referee %></p>
-        </section>
-        <% } %>
-        <%- include('partials/chance-liga-table', { standings: typeof chanceStandings !== 'undefined' ? chanceStandings : [], compactTable: true, tableRail: true, highlightCodes: [m.homeCode, m.awayCode].filter(Boolean) }) %>
         <% if (typeof roundMates !== 'undefined' && roundMates && roundMates.length) { %>
-        <section class="fm-card">
-          <h2 class="fm-card__title"><%= m.round || 'Kolo' %></h2>
-          <div class="fm-league__list fm-league__list--tight">
+        <section class="mc-side">
+          <h2 class="mc-side__title"><%= m.round || 'Kolo' %></h2>
+          <div class="mc-side__round">
             <% roundMates.forEach(function (row) { %>
             <%- include('partials/fotmob-match-row', { match: row }) %>
             <% }); %>
           </div>
         </section>
         <% } %>
-        <%- include('partials/sidebar-ssp-ad') %>
-        <%- include('partials/sidebar-social') %>
       </aside>
     </div>
   </div>

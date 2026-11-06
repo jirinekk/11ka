@@ -1,0 +1,17 @@
+<%
+  var pickName = typeof name !== 'undefined' ? name : 'homeTeamId';
+  var pickLabel = typeof label !== 'undefined' ? label : 'Tým';
+  var pickSelected = typeof selectedId !== 'undefined' ? selectedId : '';
+  var pickPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Vybrat tým';
+%>
+<div class="fotak-team-pick" data-foto-team="<%= pickName %>">
+  <span class="fotak-field"><%= pickLabel %></span>
+  <input type="hidden" name="<%= pickName %>" value="<%= pickSelected || '' %>" required data-foto-team-id />
+  <button type="button" class="fotak-team-pick__btn" data-foto-team-btn>
+    <span data-foto-team-label><%= pickPlaceholder %></span>
+  </button>
+  <div class="fotak-team-pick__pop" hidden data-foto-team-pop>
+    <input type="search" class="input-11 fotak-team-pick__search" placeholder="Hledat tým…" autocomplete="off" data-foto-team-q />
+    <div class="fotak-team-pick__results" data-foto-team-list></div>
+  </div>
+</div>

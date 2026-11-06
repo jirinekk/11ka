@@ -9,14 +9,38 @@
     });
   }
   var tableHref = typeof tableHref !== 'undefined' && tableHref ? tableHref : '/zapasy/live#tabulka';
+  var heading =
+    typeof tableTitle !== 'undefined' && tableTitle
+      ? tableTitle
+      : compact
+        ? 'Tabulka'
+        : 'Tabulka Chance Ligy';
   var tableClass = 'cl-table';
   if (compact) tableClass += ' cl-table--compact';
   if (typeof tableRail !== 'undefined' && tableRail) tableClass += ' cl-table--rail';
+  var zoneFn = typeof chanceTableZoneClass === 'function' ? chanceTableZoneClass : function (rank) {
+    var r = Number(rank);
+    if (r <= 2) return 'is-cl';
+    if (r === 3) return 'is-el';
+    if (r === 4) return 'is-ecl';
+    if (r === 14 || r === 15) return 'is-playoff';
+    if (r >= 16) return 'is-down';
+    return '';
+  };
+  var legendItems = typeof chanceTableLegend !== 'undefined' && chanceTableLegend && chanceTableLegend.length
+    ? chanceTableLegend
+    : [
+        { className: 'is-cl', label: 'Liga mistrů', shortLabel: 'LM' },
+        { className: 'is-el', label: 'Evropská liga', shortLabel: 'EL' },
+        { className: 'is-ecl', label: 'Konferenční liga', shortLabel: 'KL' },
+        { className: 'is-playoff', label: 'Baráž', shortLabel: 'Baráž' },
+        { className: 'is-down', label: 'Sestup', shortLabel: 'Sestup' },
+      ];
 %>
 <% if (rows.length) { %>
-<section class="<%= tableClass %>" aria-label="Tabulka Chance Ligy">
+<section class="<%= tableClass %>" aria-label="<%= heading %>">
   <div class="home-section-head cl-table__head">
-    <h2 class="cl-matches__title"><%= compact ? 'Tabulka' : 'Tabulka Chance Ligy' %></h2>
+    <h2 class="cl-matches__title"><%= heading %></h2>
     <% if (compact) { %>
     <a href="<%= tableHref %>" class="btn-11 btn-11--sm btn-11--accent-outline shrink-0">Celá tabulka</a>
     <% } %>
@@ -43,12 +67,13 @@
       </thead>
       <tbody>
         <% rows.forEach(function (row) { %>
-        <tr class="<%= highlights[row.code] ? 'is-active' : '' %>">
+        <% var zone = zoneFn(row.rank); %>
+        <tr class="<%= highlights[row.code] ? 'is-active' : '' %> <%= zone %>">
           <td class="cl-table__rank"><%= row.rank %></td>
           <td class="cl-table__team">
             <a href="<%= row.href %>">
               <% if (row.logo) { %>
-              <img src="<%= row.logo %>" alt="" width="22" height="22" />
+              <img src="<%= row.logo %>" alt="" width="22" height="22" referrerpolicy="no-referrer" />
               <% } %>
               <span><%= compact ? (row.short || row.name) : row.name %></span>
             </a>
@@ -74,5 +99,10 @@
       </tbody>
     </table>
   </div>
+  <p class="cl-table__legend">
+    <% legendItems.forEach(function (item) { %>
+    <span class="cl-table__legend-item <%= item.className %>"><%= compact ? item.shortLabel : item.label %></span>
+    <% }); %>
+  </p>
 </section>
 <% } %>

@@ -4,7 +4,12 @@
   var homeName = m.homeLabel || m.home || '';
   var awayName = m.awayLabel || m.away || '';
   var badge = m.badge || m.time || '';
-  var score = m.scoreLine || (m.isLive || m.isDone ? (m.score || '0 - 0').replace(':', ' - ') : '–');
+  var showScore = m.isLive || m.isDone || m.state === 'in' || m.state === 'post';
+  var rawScore = String(m.score || '').replace(/\s+/g, '');
+  var hasScore = /^\d+[:\-]\d+$/.test(rawScore) || (m.scoreLine && m.scoreLine !== '–' && /\d/.test(String(m.scoreLine)));
+  var score = showScore && hasScore
+    ? (m.scoreLine && m.scoreLine !== '–' ? m.scoreLine : rawScore.replace(':', ' - '))
+    : '–';
   var Tag = href ? 'a' : 'div';
 %>
 <<%= Tag %> class="fm-row<%= m.isLive ? ' is-live' : '' %>"<% if (href) { %> href="<%= href %>"<% } %>>
@@ -12,13 +17,19 @@
   <span class="fm-row__home">
     <span class="fm-row__name"><%= homeName %></span>
     <% if (m.homeLogo) { %>
-    <img class="fm-row__crest" src="<%= m.homeLogo %>" alt="" width="22" height="22" />
+    <img class="fm-row__crest" src="<%= m.homeLogo %>" alt="" width="22" height="22" referrerpolicy="no-referrer" onerror="this.classList.add('is-hidden'); if(this.nextElementSibling) this.nextElementSibling.hidden=false;" />
+    <span class="fm-row__crest-ph" hidden><%= (m.homeInitials || homeName || '?').slice(0,2) %></span>
+    <% } else { %>
+    <span class="fm-row__crest-ph"><%= (m.homeInitials || homeName || '?').slice(0,2) %></span>
     <% } %>
   </span>
   <span class="fm-row__score"><%= score %></span>
   <span class="fm-row__away">
     <% if (m.awayLogo) { %>
-    <img class="fm-row__crest" src="<%= m.awayLogo %>" alt="" width="22" height="22" />
+    <img class="fm-row__crest" src="<%= m.awayLogo %>" alt="" width="22" height="22" referrerpolicy="no-referrer" onerror="this.classList.add('is-hidden'); if(this.nextElementSibling) this.nextElementSibling.hidden=false;" />
+    <span class="fm-row__crest-ph" hidden><%= (m.awayInitials || awayName || '?').slice(0,2) %></span>
+    <% } else { %>
+    <span class="fm-row__crest-ph"><%= (m.awayInitials || awayName || '?').slice(0,2) %></span>
     <% } %>
     <span class="fm-row__name"><%= awayName %></span>
   </span>

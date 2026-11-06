@@ -5,7 +5,13 @@
   "functions": {
     "server.js": {
       "includeFiles": "{views,db,public,data}/**",
-      "maxDuration": 60
+      "maxDuration": 300
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/cron/accreditation-match-day",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }

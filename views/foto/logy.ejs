@@ -1,0 +1,99 @@
+<%- include('layout-start') %>
+<%
+  function fmtLogWhen(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function actionLabel(a) {
+    if (a === 'create_album') return 'Nové album';
+    if (a === 'update_album') return 'Úprava alba';
+    if (a === 'delete_album') return 'Smazání alba';
+    if (a === 'upload') return 'Nahrání';
+    if (a === 'delete_photo') return 'Smazání fotky';
+    if (a === 'download') return 'Stažení';
+    return a || 'Akce';
+  }
+%>
+<div class="fotak-head">
+  <h1>Logy</h1>
+  <p>Kdo nahrává, maže a stahuje.</p>
+</div>
+
+<form class="fotak-filter fotak-filter--stack" method="get" action="/foto/logy">
+  <label class="fotak-filter__q">
+    <span class="sr-only">Hledat</span>
+    <svg class="fotak-filter__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/>
+    </svg>
+    <input class="input-11 fotak-filter__input" type="search" name="q" value="<%= q || '' %>" placeholder="Jméno, e-mail, album…" />
+  </label>
+  <div class="fotak-filter__tools">
+    <label class="fotak-filter__field">
+      <span>Akce</span>
+      <select class="input-11 fotak-filter__liga" name="akce">
+        <option value="">Všechny</option>
+        <% ['create_album','update_album','upload','delete_photo','delete_album','download'].forEach(function (a) { %>
+        <option value="<%= a %>" <%= action === a ? 'selected' : '' %>><%= actionLabel(a) %></option>
+        <% }); %>
+      </select>
+    </label>
+    <label class="fotak-filter__field fotak-filter__date<%= dateFrom ? '' : ' is-empty' %>">
+      <span>Od</span>
+      <span class="fotak-filter__date-box">
+        <input class="input-11" type="date" name="od" value="<%= dateFrom || '' %>" />
+        <span class="fotak-filter__date-ph" aria-hidden="true">dd.mm.rrrr</span>
+      </span>
+    </label>
+    <label class="fotak-filter__field fotak-filter__date<%= dateTo ? '' : ' is-empty' %>">
+      <span>Do</span>
+      <span class="fotak-filter__date-box">
+        <input class="input-11" type="date" name="do" value="<%= dateTo || '' %>" />
+        <span class="fotak-filter__date-ph" aria-hidden="true">dd.mm.rrrr</span>
+      </span>
+    </label>
+    <div class="fotak-filter__actions">
+      <button type="submit" class="fotak-filter__go">Filtrovat</button>
+    </div>
+  </div>
+</form>
+<script src="/js/foto-albums-filter.js?v=<%= encodeURIComponent((typeof assetVersion !== 'undefined' ? assetVersion : '1') + '-af1') %>"></script>
+
+<% if (!(logs || []).length) { %>
+<p class="fotak-empty">Žádný záznam neodpovídá filtru.</p>
+<% } else { %>
+<div class="foto-log">
+  <table>
+    <thead>
+      <tr>
+        <th>Čas</th>
+        <th>Kdo</th>
+        <th>Akce</th>
+        <th>Album</th>
+        <th>Detail</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% logs.forEach(function (row) { %>
+      <tr>
+        <td class="tabular-nums whitespace-nowrap"><%= fmtLogWhen(row.created_at) %></td>
+        <td>
+          <span class="text-white"><%= row.actor_name || '—' %></span>
+          <% if (row.actor_email) { %><span class="block text-xs text-11muted"><%= row.actor_email %></span><% } %>
+        </td>
+        <td><span class="foto-log__badge"><%= actionLabel(row.action) %></span></td>
+        <td>
+          <% if (row.album_id) { %>
+          <a href="/foto/alba/<%= row.album_id %>"><%= row.album_title || row.album_id %></a>
+          <% } else { %>—<% } %>
+        </td>
+        <td class="text-11muted"><%= row.detail || '—' %></td>
+      </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+<%- include('layout-end') %>
